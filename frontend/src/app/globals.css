@@ -1,0 +1,560 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definir variáveis de cor com a nova paleta */
+:root {
+  --background-primary: linear-gradient(135deg, #03122F, #19305C, #413B61, #AE7DAC);
+  --text-primary: #F3DADF;
+  --text-primary-secondary: #03122F;
+  --text-secondary: #AE7DAC;
+  --card-bg-start: #1e293b;
+  --card-bg-end: #2d3748;
+  /* Removido: --card-text: #F3DADF; (não usado) */
+  /* Removido: --card-text-secondary: #AE7DAC; (não usado) */
+  --accent-blue: #F1916D;
+  --accent-gray: #AE7DAC;
+  /* Removido: --shadow-light: 0 2px 6px 2px rgba(0, 0, 0, 0.3); (não usado) */
+  /* Removido: --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.5); (não usado) */
+  --dashboard-bg: rgba(243, 218, 223, 0.2);
+  --current-month-bg: linear-gradient(135deg, rgba(241, 145, 109, 0.6), rgba(174, 125, 172, 0.6));
+  --button-active-bg: #00da77;
+  --button-active-text: #03122F;
+  --button-inactive-bg: #AE7DAC;
+  --button-inactive-text: #F3DADF;
+  /* Removido: --danger-bg: #e63946; (não usado) */
+  --table-bg: rgba(30, 41, 59, 0.9);
+  --table-header-bg: rgba(45, 55, 72, 0.9);
+  --nubank-bg: linear-gradient(135deg, #a64dff, #820ad1, #5c078f, #3a055c);
+  --pagseguro-bg: linear-gradient(135deg, #ffeb3b, #ffc107, #ffa000, #cc7a00);
+  --caixa-bg: linear-gradient(135deg, #4d8cff, #0061a8, #004075, #002b4a);
+  --picpay-bg: linear-gradient(135deg, #4fff9b, #00da77, #009f57, #006b3a);
+  --banco-do-brasil-bg: linear-gradient(135deg, #ffff99, #ffd700, #ccac00, #997f00);
+}
+
+/* Zerar configurações padrão do body e html */
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    width: 100vw;
+    font-family: "Inter", sans-serif;
+    background: var(--background-primary);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  #__next {
+    min-height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  html {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .dashboard-container {
+    @apply flex-1 bg-[var(--dashboard-bg)] backdrop-blur-xl rounded-2xl p-5 m-5 shadow-lg max-w-full overflow-x-hidden overflow-y-auto;
+    min-height: calc(100vh - 64px - 40px);
+  }
+
+  @media (max-width: 640px) {
+    .dashboard-container {
+      @apply m-2 p-3;
+      min-height: calc(100vh - 64px - 20px);
+    }
+  }
+
+  .dashboard-card {
+    @apply bg-[var(--dashboard-bg)] rounded-xl p-3 shadow-lg backdrop-blur-md;
+  }
+
+  .card {
+    @apply rounded-xl p-5 shadow-md;
+  }
+
+  .bank-card {
+    @apply w-full h-48 max-w-[288px];
+  }
+
+  @media (max-width: 640px) {
+    .bank-card {
+      @apply max-w-full h-40;
+    }
+  }
+
+  @media (min-width: 640px) and (max-width: 1024px) {
+    .bank-card {
+      @apply max-w-[240px] h-40;
+    }
+  }
+
+  .card-nubank {
+    background: var(--nubank-bg);
+    border: 2px solid #ffffff;
+  }
+
+  .card-nubank .card-amount,
+  .card-nubank .card-method {
+    color: #ffffff;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  .card-pagseguro {
+    background: var(--pagseguro-bg);
+    border: 2px solid #ffffff;
+  }
+
+  .card-pagseguro .card-amount,
+  .card-pagseguro .card-method {
+    color: var(--text-secondary);
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3);
+  }
+
+  .card-caixa {
+    background: var(--caixa-bg);
+    border: 2px solid #ffffff;
+  }
+
+  .card-caixa .card-amount,
+  .card-caixa .card-method {
+    color: #ffffff;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  .card-picpay {
+    background: var(--picpay-bg);
+    border: 2px solid #ffffff;
+  }
+
+  .card-picpay .card-amount,
+  .card-picpay .card-method {
+    color: var(--text-secondary);
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3);
+  }
+
+  .card-banco-do-brasil {
+    background: var(--banco-do-brasil-bg);
+    border: 2px solid #ffffff;
+  }
+
+  .card-banco-do-brasil .card-amount,
+  .card-banco-do-brasil .card-method {
+    color: var(--text-secondary);
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3);
+  }
+
+  .card-default {
+    background: linear-gradient(
+      135deg,
+      var(--card-bg-start),
+      #253147,
+      var(--card-bg-end)
+    );
+    border: 2px solid #ffffff;
+  }
+
+  .card-default .card-amount,
+  .card-default .card-method {
+    color: #ffffff;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  .card-container {
+    @apply grid transition-opacity duration-300 ease-in-out;
+  }
+
+  .card-container > * {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .chart-card {
+    background: var(--dashboard-bg);
+    backdrop-filter: blur(5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 250, 0.1);
+  }
+
+  .current-month-card {
+    background: var(--current-month-bg);
+    backdrop-filter: blur(3px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .toggle-button {
+    @apply px-3 py-1 rounded-full text-sm transition-all duration-300;
+  }
+
+  .toggle-button.active {
+    background-color: var(--button-active-bg);
+    color: var(--button-active-text);
+  }
+
+  .toggle-button.inactive {
+    background-color: var(--button-inactive-bg);
+    color: var(--button-inactive-text);
+  }
+
+  .nav-icon {
+    @apply text-2xl text-white transition-colors duration-300;
+  }
+
+  .nav-icon:hover {
+    color: var(--accent-blue);
+  }
+
+  /* Removido: Estilos de .renew-modal .custom-select__* (não usados mais, substituídos por customStyles inline) */
+
+  .client-search-container {
+    @apply relative w-full max-w-md mx-auto mb-5;
+  }
+
+  .client-search-input {
+    @apply w-full px-4 py-2 pl-10 bg-[var(--table-bg)] backdrop-blur-md border border-[rgba(255,255,255,0.3)] rounded-full text-[var(--text-primary)] text-sm transition-all duration-300;
+  }
+
+  .client-search-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+  }
+
+  .client-search-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(241, 145, 109, 0.3);
+  }
+
+  .search-icon {
+    @apply absolute left-4 top-1/2 transform -translate-y-1/2 text-[var(--text-secondary)] text-base;
+  }
+
+  .client-search-input:focus + .search-icon,
+  .client-search-input:not(:placeholder-shown) + .search-icon {
+    color: var(--accent-blue);
+  }
+
+  @media (min-width: 640px) {
+    .client-search-container {
+      @apply max-w-lg;
+    }
+
+    .client-search-input {
+      @apply px-5 py-3 text-base;
+    }
+
+    .search-icon {
+      @apply left-5 text-lg;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .client-search-container {
+      @apply max-w-xl;
+    }
+  }
+
+  .clients-table-container {
+    @apply bg-[var(--table-bg)] backdrop-blur-md rounded-xl p-2 shadow-lg;
+  }
+
+  .clients-table {
+    @apply w-full border-collapse text-[var(--text-primary)];
+  }
+
+  .clients-table th,
+  .clients-table td {
+    @apply py-3 px-4 text-left border-b border-[rgba(255,255,255,0.15)];
+  }
+
+  .clients-table th {
+    @apply bg-[var(--table-header-bg)] text-[var(--text-secondary)] font-medium cursor-pointer transition-colors duration-300;
+  }
+
+  .clients-table th:hover {
+    background: rgba(55, 65, 81, 0.9);
+  }
+
+  .clients-table th:hover .sort-icon {
+    color: var(--accent-blue);
+  }
+
+  .clients-table tr {
+    @apply transition-colors duration-300;
+  }
+
+  .clients-table tr:hover {
+    background: rgba(55, 65, 81, 0.5);
+  }
+
+  .clients-table .sort-icon {
+    @apply ml-1 inline-block align-middle text-[var(--text-primary)];
+  }
+
+  /* Estilo para a coluna de email */
+  .clients-table .email-column {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .client-card {
+    @apply bg-[var(--table-bg)] backdrop-blur-sm rounded-lg p-4 shadow-md cursor-pointer;
+  }
+
+  .client-card .expanded-content {
+    animation: slideDown 0.3s ease-in-out;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      height: 0;
+    }
+    to {
+      opacity: 1;
+      height: auto;
+    }
+  }
+
+  /* Ajustes responsivos para a tabela */
+  @media (min-width: 1024px) and (max-width: 1279px) {
+    .clients-table th,
+    .clients-table td {
+      @apply py-2 px-2 text-sm;
+    }
+
+    .clients-table th {
+      @apply whitespace-nowrap;
+    }
+
+    .clients-table .email-column {
+      max-width: 150px;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .clients-table th,
+    .clients-table td {
+      @apply py-1 px-1 text-xs;
+    }
+
+    .clients-table th {
+      @apply whitespace-nowrap;
+    }
+
+    .clients-table .email-column {
+      max-width: 120px;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .clients-table-container {
+      @apply p-1;
+    }
+
+    .client-card {
+      @apply p-3;
+    }
+
+    .client-card h3 {
+      @apply text-base;
+    }
+
+    .client-card p {
+      @apply text-xs;
+    }
+  }
+
+  @media (max-width: 639px) {
+    .clients-table-container {
+      @apply p-1;
+    }
+
+    .client-card {
+      @apply p-2;
+    }
+
+    .client-card h3 {
+      @apply text-sm;
+    }
+
+    .client-card p {
+      @apply text-xs;
+    }
+  }
+
+  .action-button {
+    @apply p-2 rounded-full text-sm transition-all duration-300 bg-[rgba(255,255,255,0.1)];
+  }
+
+  .action-button:hover {
+    background-color: rgba(241, 145, 109, 0.8);
+  }
+
+  .action-menu {
+    @apply absolute right-0 top-full mt-1 w-48 bg-[var(--table-bg)] backdrop-blur-md rounded-lg shadow-lg z-50 border border-[rgba(255,255,255,0.1)];
+  }
+
+  .action-menu-item {
+    @apply flex items-center justify-start w-full px-2 py-2 text-sm text-[var(--text-primary)] transition-colors duration-300 rounded-md my-1;
+  }
+
+  .action-menu-item > svg {
+    margin-right: 0.75rem; /* Equivalente a mr-2 no Tailwind */
+  }
+
+  .action-menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  @media (max-width: 639px) {
+    .action-button {
+      @apply p-1 text-xs;
+    }
+
+    .action-menu {
+      @apply w-44 right-0 top-full mt-1;
+    }
+
+    .action-menu-item {
+      @apply px-1.5 py-1.5 text-xs;
+    }
+
+    .action-menu-item > svg {
+      margin-right: 0.75rem; /* Equivalente a mr-1.5 no Tailwind para telas menores */
+    }
+  }
+
+  .new-client-button {
+    @apply px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 bg-[var(--button-active-bg)] text-[var(--button-active-text)];
+  }
+
+  .new-client-button:hover {
+    background-color: #00ae5f;
+  }
+
+  @media (max-width: 640px) {
+    .new-client-button {
+      @apply px-3 py-1 text-xs;
+    }
+
+    .dashboard-container .flex.sm\:flex-row {
+      @apply flex-col gap-3;
+    }
+
+    .dashboard-container h1 {
+      @apply text-2xl text-center;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .dashboard-container h1 {
+      @apply text-3xl;
+    }
+  }
+
+  .renew-modal {
+    @apply bg-[var(--dashboard-bg)] backdrop-blur-md rounded-xl shadow-lg p-5 max-w-[400px] w-full;
+  }
+
+  .renew-modal .modal-header {
+    @apply flex justify-between items-center mb-5;
+  }
+
+  .renew-modal .modal-title {
+    @apply text-xl font-medium text-[var(--text-secondary)];
+  }
+
+  .renew-modal .close-button {
+    @apply text-[var(--text-primary)] transition-colors duration-300;
+  }
+
+  .renew-modal .close-button:hover {
+    color: var(--accent-blue);
+  }
+
+  .renew-modal label {
+    @apply block text-sm text-[var(--text-primary)] mb-1;
+  }
+
+  .renew-modal input[type="date"],
+  .renew-modal input[type="text"],
+  .renew-modal input[type="email"],
+  .renew-modal input[type="tel"] {
+    @apply w-full p-2 rounded-lg bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] text-[var(--text-primary)] transition-colors duration-300;
+  }
+
+  .renew-modal input[type="date"]:focus,
+  .renew-modal input[type="text"]:focus,
+  .renew-modal input[type="email"]:focus,
+  .renew-modal input[type="tel"]:focus {
+    @apply outline-none border-[var(--accent-blue)] shadow-[0_0_0_2px_rgba(241,145,109,0.3)];
+  }
+
+  .renew-modal .submit-button {
+    @apply w-full px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 bg-[var(--button-active-bg)] text-[var(--button-active-text)] mt-4;
+  }
+
+  .renew-modal .submit-button:hover {
+    background-color: #00ae5f;
+  }
+
+  @media (max-width: 640px) {
+    .renew-modal {
+      @apply p-4 max-w-[90%];
+    }
+
+    .renew-modal .modal-title {
+      @apply text-lg;
+    }
+
+    .renew-modal input[type="date"],
+    .renew-modal input[type="text"],
+    .renew-modal input[type="email"],
+    .renew-modal input[type="tel"] {
+      @apply p-1 text-sm;
+    }
+
+    .renew-modal .submit-button {
+      @apply py-1 text-sm;
+    }
+  }
+
+  .loading-message,
+  .error-message {
+    @apply text-center p-5 text-[var(--text-primary)];
+  }
+
+  .error-message {
+    @apply text-red-500;
+  }
+}
