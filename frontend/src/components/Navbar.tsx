@@ -66,6 +66,7 @@ export default function Navbar() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               onClick={() => handleIconClick(item.href)}
               className="flex items-center group"
             >
@@ -88,14 +89,14 @@ export default function Navbar() {
           onClick={handleLogout}
           className="px-4 py-2 rounded-full transition-all duration-300"
           style={{
-            backgroundColor: "#e63946", // Vermelho cereja
-            color: "#FFFFFF", // Texto branco para contraste
+            backgroundColor: "#e63946",
+            color: "#FFFFFF",
           }}
-          onMouseOver={
-            (e) => (e.currentTarget.style.backgroundColor = "#b82e38") // Tom mais escuro no hover
+          onMouseOver={(e) =>
+            (e.currentTarget.style.backgroundColor = "#b82e38")
           }
-          onMouseOut={
-            (e) => (e.currentTarget.style.backgroundColor = "#e63946") // Volta ao vermelho original
+          onMouseOut={(e) =>
+            (e.currentTarget.style.backgroundColor = "#e63946")
           }
         >
           Sair

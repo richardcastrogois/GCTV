@@ -1,5 +1,3 @@
-//backend/src/routes/clientRoutes.ts
-
 import { Router } from "express";
 import {
   getClients,
@@ -11,7 +9,8 @@ import {
   getPaymentMethods,
   renewClient,
   getExpiredClients,
-  reactivateClient, // Adicione a importação
+  reactivateClient,
+  updatePaymentStatus,
 } from "../controllers/clientController";
 import { authMiddleware } from "../middleware/authMiddleware";
 
@@ -38,6 +37,7 @@ router.put("/:id", authMiddleware, updateClient); // Atualizar cliente
 router.delete("/:id", authMiddleware, deleteClient); // Deletar cliente
 router.put("/renew/:id", authMiddleware, renewClient); // Renovar cliente
 router.put("/reactivate/:id", authMiddleware, reactivateClient); // Reativar cliente
+router.put("/payment-status/:id", authMiddleware, updatePaymentStatus); // Atualizar status de pagamento
 
 console.log("Rotas em clientRoutes.ts carregadas com sucesso.");
 

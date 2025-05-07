@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import { AxiosError } from "axios";
-import Navbar from "@/components/Navbar";
 import ClientsTable from "./components/ClientsTable";
 import EditClientModal from "./components/EditClientModal";
 import ClientSearch from "@/components/ClientSearch";
 import {
-  fetchClients,
   fetchPlans,
   fetchPaymentMethods,
   deleteClient,
@@ -20,8 +22,9 @@ import {
 import { Client, Plan, PaymentMethod, EditFormData } from "./types";
 import { useAuth } from "@/hooks/useAuth";
 import { FaTimes } from "react-icons/fa";
+import axios from "axios";
+import { useSearch } from "@/hooks/useSearch";
 
-// Função auxiliar para formatar a data para o formato YYYY-MM-DD
 const formatDateToLocal = (date: string | Date): string => {
   const d = new Date(date);
   const year = d.getUTCFullYear();
@@ -49,7 +52,7 @@ export default function Clients() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchTerm } = useSearch();
   const [sortConfig, setSortConfig] = useState<{
     key:
       | keyof Omit<Client, "plan" | "paymentMethod">
@@ -61,93 +64,81 @@ export default function Clients() {
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
   const [clientToRenew, setClientToRenew] = useState<Client | null>(null);
   const [newDueDate, setNewDueDate] = useState<string>("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
   useEffect(() => {
     const loadPlansAndMethods = async () => {
       try {
-        console.log("Carregando planos e métodos de pagamento...");
         const [plansData, paymentMethodsData] = await Promise.all([
           fetchPlans(),
           fetchPaymentMethods(),
         ]);
         setPlans(plansData);
         setPaymentMethods(paymentMethodsData);
-        console.log("Planos carregados:", plansData);
-        console.log("Métodos de pagamento carregados:", paymentMethodsData);
       } catch (error) {
-        console.error(
-          "Erro ao carregar planos ou métodos de pagamento:",
-          error
-        );
         if (error instanceof AxiosError) {
-          console.log("Detalhes do erro Axios:", {
-            status: error.response?.status,
-            data: error.response?.data,
-            message: error.message,
-          });
-          toast.error(
-            `Erro ao carregar planos ou métodos de pagamento: ${
-              error.response?.data?.message || error.message
-            }`
-          );
-          if (error.response?.status === 401) {
-            handleUnauthorized();
-          }
-        } else {
-          toast.error(
-            "Erro desconhecido ao carregar planos ou métodos de pagamento."
-          );
+          toast.error(`Erro ao carregar planos ou métodos: ${error.message}`);
+          if (error.response?.status === 401) handleUnauthorized();
         }
       }
     };
-
     loadPlansAndMethods();
   }, [handleUnauthorized]);
 
+  const { data: allClients } = useQuery<Client[]>({
+    queryKey: ["allClients"],
+    queryFn: async () => {
+      const response = await axios.get("http://localhost:3001/api/clients", {
+        params: { limit: 9999 },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      return response.data.data;
+    },
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
   const {
-    data: clients,
+    data: clientsResponse,
     isLoading,
+    isFetching,
     error,
-  } = useQuery<Client[]>({
-    queryKey: ["clients"],
+  } = useQuery<{ data: Client[]; total: number; page: number; limit: number }>({
+    queryKey: ["clients", page, limit],
     queryFn: async () => {
       try {
-        const result = await fetchClients();
-        console.log("Dados buscados do backend (clientes):", result);
-        return result;
-      } catch (error: unknown) {
-        console.error("Erro ao buscar clientes:", error);
+        const response = await axios.get("http://localhost:3001/api/clients", {
+          params: { page, limit },
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        return response.data;
+      } catch (error) {
         if (error instanceof AxiosError) {
-          console.log("Detalhes do erro Axios (fetchClients):", {
-            status: error.response?.status,
-            data: error.response?.data,
-            message: error.message,
-          });
-          if (error.response?.status === 401) {
-            handleUnauthorized();
-          }
+          if (error.response?.status === 401) handleUnauthorized();
         }
         throw error;
       }
     },
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
 
   const filterClients = useCallback(
     (term: string) => {
-      if (!Array.isArray(clients)) {
-        setFilteredClients([]);
+      if (!Array.isArray(allClients)) {
+        setFilteredClients(clientsResponse?.data || []);
         return;
       }
 
       if (!term) {
-        setFilteredClients(clients);
+        setFilteredClients(clientsResponse?.data || []);
         return;
       }
 
       const lowerSearchTerm = term.toLowerCase();
-      const filtered = clients.filter((client) => {
+      const filtered = allClients.filter((client) => {
         const fields = [
           client.fullName.toLowerCase(),
           client.email.toLowerCase(),
@@ -159,25 +150,22 @@ export default function Clients() {
           new Date(client.dueDate).toLocaleDateString("pt-BR").toLowerCase(),
           client.isActive ? "ativo" : "inativo",
         ];
-
         return fields.some((field) => field.includes(lowerSearchTerm));
       });
-
       setFilteredClients(filtered);
-      console.log("Clientes filtrados:", filtered);
     },
-    [clients]
+    [allClients, clientsResponse?.data]
   );
 
   useEffect(() => {
     filterClients(searchTerm);
-  }, [clients, searchTerm, filterClients]);
+  }, [searchTerm, filterClients, allClients, clientsResponse?.data]);
 
   const sortedClients = [...filteredClients].sort((a, b) => {
     if (!sortConfig.key) return 0;
 
-    let valueA: string | number | Date | boolean;
-    let valueB: string | number | Date | boolean;
+    let valueA: string | number;
+    let valueB: string | number;
 
     if (sortConfig.key === "plan.name") {
       valueA = a.plan?.name?.toLowerCase() ?? "";
@@ -186,19 +174,21 @@ export default function Clients() {
       valueA = a.paymentMethod?.name?.toLowerCase() ?? "";
       valueB = b.paymentMethod?.name?.toLowerCase() ?? "";
     } else {
-      valueA = a[sortConfig.key] ?? "";
-      valueB = b[sortConfig.key] ?? "";
-
-      if (typeof valueA === "string" && sortConfig.key !== "dueDate") {
-        valueA = valueA.toLowerCase();
-      }
-      if (typeof valueB === "string" && sortConfig.key !== "dueDate") {
-        valueB = valueB.toLowerCase();
-      }
+      const rawValueA = a[sortConfig.key];
+      const rawValueB = b[sortConfig.key];
 
       if (sortConfig.key === "dueDate") {
-        valueA = new Date(valueA as string).getTime();
-        valueB = new Date(valueB as string).getTime();
+        valueA = new Date(rawValueA as string).getTime() || 0;
+        valueB = new Date(rawValueB as string).getTime() || 0;
+      } else if (sortConfig.key === "isActive") {
+        valueA = rawValueA === true ? 1 : 0;
+        valueB = rawValueB === true ? 1 : 0;
+      } else if (typeof rawValueA === "string") {
+        valueA = (rawValueA as string).toLowerCase() ?? "";
+        valueB = (rawValueB as string).toLowerCase() ?? "";
+      } else {
+        valueA = (rawValueA as number) ?? 0;
+        valueB = (rawValueB as number) ?? 0;
       }
     }
 
@@ -219,40 +209,23 @@ export default function Clients() {
     }));
   };
 
-  const handleNewClient = () => {
-    router.push("/clients/new");
-  };
-
+  const handleNewClient = () => router.push("/clients/new");
   const handleDelete = async (id: number) => {
-    const confirm = window.confirm(
-      "Tem certeza que deseja excluir este cliente?"
-    );
-    if (!confirm) return;
-
-    try {
-      await deleteClient(id);
-      toast.success("Cliente excluído com sucesso.");
-      await queryClient.invalidateQueries({ queryKey: ["clients"] });
-      await queryClient.invalidateQueries({ queryKey: ["expiredClients"] }); // Adicionado
-    } catch (error: unknown) {
-      if (error instanceof AxiosError) {
-        console.log("Erro ao excluir cliente:", error.response?.data);
-        toast.error(
-          `Erro ao excluir cliente: ${
-            error.response?.data?.message || error.message
-          }`
-        );
-        if (error.response?.status === 401) {
-          handleUnauthorized();
+    if (window.confirm("Tem certeza?")) {
+      try {
+        await deleteClient(id);
+        toast.success("Cliente excluído!");
+        queryClient.invalidateQueries({ queryKey: ["clients"] });
+        queryClient.invalidateQueries({ queryKey: ["allClients"] });
+      } catch (error) {
+        if (error instanceof AxiosError) {
+          toast.error(`Erro: ${error.message}`);
+          if (error.response?.status === 401) handleUnauthorized();
         }
-      } else {
-        toast.error("Erro desconhecido ao excluir cliente.");
       }
     }
   };
-
   const handleEdit = (client: Client) => {
-    const formattedDueDate = formatDateToLocal(client.dueDate);
     setSelectedClient(client);
     setEditFormData({
       fullName: client.fullName,
@@ -260,23 +233,16 @@ export default function Clients() {
       phone: client.phone || "",
       planId: client.plan.id,
       paymentMethodId: client.paymentMethod.id,
-      dueDate: formattedDueDate,
+      dueDate: formatDateToLocal(client.dueDate),
       grossAmount: client.grossAmount.toString(),
       isActive: client.isActive,
     });
-    console.log("Dados iniciais do formulário de edição:", {
-      ...client,
-      dueDate: formattedDueDate,
-    });
     setIsModalOpen(true);
   };
-
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!selectedClient) return;
-
     if (
+      !selectedClient ||
       !editFormData.fullName ||
       !editFormData.email ||
       editFormData.planId === 0 ||
@@ -284,150 +250,119 @@ export default function Clients() {
       !editFormData.dueDate ||
       !editFormData.grossAmount
     ) {
-      toast.error("Por favor, preencha todos os campos obrigatórios.");
+      toast.error("Preencha todos os campos!");
       return;
     }
-
     const grossAmountNum = parseFloat(editFormData.grossAmount);
     if (isNaN(grossAmountNum)) {
-      toast.error("O valor bruto deve ser um número válido.");
+      toast.error("Valor inválido!");
       return;
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(editFormData.email)) {
-      toast.error("Por favor, insira um email válido.");
-      return;
-    }
-
-    const parsedDueDate = new Date(editFormData.dueDate + "T00:00:00Z");
-    if (isNaN(parsedDueDate.getTime())) {
-      toast.error("Por favor, insira uma data de vencimento válida.");
-      return;
-    }
-    const dueDateISO = parsedDueDate.toISOString();
-
-    console.log("Estado do formulário antes de enviar:", editFormData);
-    const updatedClientData = {
-      fullName: editFormData.fullName,
-      email: editFormData.email,
-      phone: editFormData.phone || null,
-      planId: editFormData.planId,
-      paymentMethodId: editFormData.paymentMethodId,
-      dueDate: dueDateISO,
-      grossAmount: grossAmountNum,
-      isActive: editFormData.isActive,
-    };
-    console.log("Dados enviados para o backend:", updatedClientData);
-
+    const dueDateISO = new Date(editFormData.dueDate).toISOString();
     try {
-      const updatedClient = await updateClient(
-        selectedClient.id,
-        updatedClientData
-      );
-      console.log("Cliente atualizado:", updatedClient);
-      toast.success("Cliente atualizado com sucesso!");
+      await updateClient(selectedClient.id, {
+        ...editFormData,
+        grossAmount: grossAmountNum,
+        dueDate: dueDateISO,
+      });
+      toast.success("Cliente atualizado!");
       setIsModalOpen(false);
-      setSelectedClient(null);
-      await queryClient.invalidateQueries({ queryKey: ["clients"] });
-      await queryClient.invalidateQueries({ queryKey: ["expiredClients"] }); // Adicionado
-    } catch (error: unknown) {
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["allClients"] });
+    } catch (error) {
       if (error instanceof AxiosError) {
-        console.log("Erro ao atualizar cliente:", error.response?.data);
-        if (error.response?.status === 401) {
-          handleUnauthorized();
-        } else {
-          toast.error(
-            `Erro ao atualizar cliente: ${
-              error.response?.data?.message || error.message
-            }`
-          );
-        }
-      } else {
-        toast.error("Erro desconhecido ao atualizar cliente.");
+        toast.error(`Erro: ${error.message}`);
+        if (error.response?.status === 401) handleUnauthorized();
       }
     }
   };
-
   const handleRenew = (client: Client) => {
     setClientToRenew(client);
     setNewDueDate("");
     setIsRenewModalOpen(true);
   };
-
   const handleRenewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!clientToRenew || !newDueDate) {
-      toast.error("Por favor, insira uma nova data de vencimento.");
+      toast.error("Informe a data!");
       return;
     }
-
-    const parsedDueDate = new Date(newDueDate + "T00:00:00Z");
-    if (isNaN(parsedDueDate.getTime())) {
-      toast.error("Por favor, insira uma data de vencimento válida.");
-      return;
-    }
-    const dueDateISO = parsedDueDate.toISOString();
-
     try {
-      await renewClient(clientToRenew.id, dueDateISO);
-      toast.success("Data de vencimento renovada com sucesso!");
+      await renewClient(clientToRenew.id, new Date(newDueDate).toISOString());
+      toast.success("Renovado!");
       setIsRenewModalOpen(false);
-      setClientToRenew(null);
-      setNewDueDate("");
-      await queryClient.invalidateQueries({ queryKey: ["clients"] });
-      await queryClient.invalidateQueries({ queryKey: ["expiredClients"] }); // Adicionado
-    } catch (error: unknown) {
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["allClients"] });
+    } catch (error) {
       if (error instanceof AxiosError) {
-        console.log("Erro ao renovar cliente:", error.response?.data);
-        if (error.response?.status === 401) {
-          handleUnauthorized();
-        } else {
-          toast.error(
-            `Erro ao renovar data de vencimento: ${
-              error.response?.data?.message || error.message
-            }`
-          );
-        }
-      } else {
-        toast.error("Erro desconhecido ao renovar data de vencimento.");
+        toast.error(`Erro: ${error.message}`);
+        if (error.response?.status === 401) handleUnauthorized();
       }
     }
   };
-
   const closeRenewModal = () => {
     setIsRenewModalOpen(false);
     setClientToRenew(null);
     setNewDueDate("");
   };
+  const handlePageChange = (newPage: number) => {
+    if (
+      clientsResponse &&
+      newPage > 0 &&
+      newPage <= Math.ceil(clientsResponse.total / limit)
+    )
+      setPage(newPage);
+  };
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1);
+  };
+  const handleUpdatePaymentStatus = async (
+    clientId: number,
+    verified: boolean,
+    date?: string
+  ) => {
+    try {
+      await axios.put(
+        `http://localhost:3001/api/clients/payment-status/${clientId}`,
+        { paymentVerified: verified, paymentVerifiedDate: date },
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+      toast.success("Status atualizado!");
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["allClients"] });
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        toast.error(`Erro: ${error.message}`);
+        if (error.response?.status === 401) handleUnauthorized();
+      }
+    }
+  };
 
-  if (isLoading)
-    return <div className="loading-message">Carregando clientes...</div>;
   if (error) {
-    console.error("Erro ao carregar clientes (final):", error);
     return (
-      <div className="error-message">
-        Erro ao carregar clientes: {(error as Error).message}
-      </div>
+      <div className="error-message">Erro: {(error as Error).message}</div>
     );
   }
 
+  const isDataReady = clientsResponse?.data && filteredClients.length > 0;
+
   return (
-    <div style={{ background: "var(--background-primary)" }}>
-      <Navbar />
-      <div className="dashboard-container">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">
-            Clientes Ativos
-          </h1>
-          <button onClick={handleNewClient} className="new-client-button">
-            Cadastrar Novo Cliente
-          </button>
-        </div>
-        <ClientSearch onSearchTermChange={setSearchTerm} />
-        {sortedClients?.length ? (
-          <div className="clients-table-container">
+    <div className="dashboard-container">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">
+          Clientes Ativos
+        </h1>
+        <button onClick={handleNewClient} className="new-client-button">
+          Cadastrar Novo Cliente
+        </button>
+      </div>
+      <ClientSearch />
+      <div className="clients-table-container">
+        <div className="table-wrapper">
+          {isDataReady ? (
             <ClientsTable
               clients={sortedClients}
               onEdit={handleEdit}
@@ -435,48 +370,91 @@ export default function Clients() {
               onRenew={handleRenew}
               onSort={handleSort}
               sortConfig={sortConfig}
+              onUpdatePaymentStatus={handleUpdatePaymentStatus}
+              isFetching={isFetching}
+              isLoading={isLoading}
             />
-          </div>
-        ) : (
-          <p className="text-center mt-4">Nenhum cliente encontrado.</p>
-        )}
-        <EditClientModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          formData={editFormData}
-          onChange={setEditFormData}
-          onSubmit={handleUpdate}
-          plans={plans}
-          paymentMethods={paymentMethods}
-        />
+          ) : (
+            <p className="text-center mt-4">Nenhum cliente encontrado.</p>
+          )}
+        </div>
+        {isFetching && <div className="text-center mt-2">Atualizando...</div>}
+        <div className="pagination">
+          <select
+            value={limit}
+            onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+            className="pagination-select"
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={30}>30</option>
+          </select>
+          <button
+            onClick={() => handlePageChange(page - 1)}
+            disabled={page === 1}
+            className="pagination-button"
+          >
+            Anterior
+          </button>
+          <span className="pagination-info">
+            Página {page} de{" "}
+            {clientsResponse ? Math.ceil(clientsResponse.total / limit) : 1}
+          </span>
+          <button
+            onClick={() => handlePageChange(page + 1)}
+            disabled={
+              clientsResponse ? page * limit >= clientsResponse.total : true
+            }
+            className="pagination-button"
+          >
+            Próxima
+          </button>
+        </div>
       </div>
-
+      <EditClientModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        formData={editFormData}
+        onChange={setEditFormData}
+        onSubmit={handleUpdate}
+        plans={plans}
+        paymentMethods={paymentMethods}
+      />
       {isRenewModalOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 sm:p-0"
-          onClick={closeRenewModal}
-        >
-          <div className="renew-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={closeRenewModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Renovar Assinatura</h2>
-              <button onClick={closeRenewModal} className="close-button">
+              <button onClick={closeRenewModal} className="modal-close-button">
                 <FaTimes size={20} />
               </button>
             </div>
             <form onSubmit={handleRenewSubmit}>
-              <div className="mb-4">
-                <label className="block">Nova Data de Vencimento</label>
+              <div className="modal-body">
+                <label className="modal-label">Nova Data de Vencimento</label>
                 <input
                   type="date"
                   value={newDueDate}
                   onChange={(e) => setNewDueDate(e.target.value)}
                   required
-                  className="w-full"
+                  className="modal-input"
                 />
               </div>
-              <button type="submit" className="submit-button">
-                Salvar
-              </button>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  onClick={closeRenewModal}
+                  className="modal-button modal-button-cancel"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="modal-button modal-button-save"
+                >
+                  Salvar
+                </button>
+              </div>
             </form>
           </div>
         </div>

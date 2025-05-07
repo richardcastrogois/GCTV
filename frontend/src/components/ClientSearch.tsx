@@ -1,25 +1,19 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import debounce from "lodash/debounce";
 import { FaSearch } from "react-icons/fa";
+import { useSearch } from "@/hooks/useSearch";
 
-interface ClientSearchProps {
-  onSearchTermChange: (term: string) => void;
-}
+export default function ClientSearch() {
+  const { searchTerm, setSearchTerm } = useSearch();
 
-export default function ClientSearch({
-  onSearchTermChange,
-}: ClientSearchProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-
-  // Memoiza a função debounced para que ela seja criada apenas uma vez
   const debouncedSearch = useMemo(
     () =>
       debounce((term: string) => {
-        onSearchTermChange(term);
+        setSearchTerm(term);
       }, 300),
-    [onSearchTermChange]
+    [setSearchTerm]
   );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,7 +22,6 @@ export default function ClientSearch({
     debouncedSearch(term);
   };
 
-  // Limpa o debounce quando o componente é desmontado
   useEffect(() => {
     return () => {
       debouncedSearch.cancel();

@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Inter } from "next/font/google";
-import { usePathname } from "next/navigation"; // Importar usePathname
+import { usePathname } from "next/navigation";
+import Navbar from "@/components/Navbar";
+import { SearchProvider } from "@/components/SearchContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -16,9 +18,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname(); // Obter a rota atual
+  const pathname = usePathname();
 
-  // Definir as rotas onde a Navbar estará presente
   const routesWithNavbar = [
     "/dashboard",
     "/clients",
@@ -36,12 +37,17 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         <QueryClientProvider client={queryClient}>
-          <main
-            className={`min-h-screen flex flex-col ${hasNavbar ? "pt-16" : ""}`}
-          >
-            {children}
-            <ToastContainer position="top-right" autoClose={3000} />
-          </main>
+          <SearchProvider>
+            {hasNavbar && <Navbar />}
+            <main
+              className={`min-h-screen flex flex-col ${
+                hasNavbar ? "pt-16" : ""
+              }`}
+            >
+              {children}
+              <ToastContainer position="top-right" autoClose={3000} />
+            </main>
+          </SearchProvider>
         </QueryClientProvider>
       </body>
     </html>

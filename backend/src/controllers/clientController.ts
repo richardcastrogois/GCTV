@@ -24,22 +24,24 @@ type RenewClientBody = {
   dueDate: string;
 };
 
-// Função para buscar todos os clientes (apenas ativos)
+// Função para buscar todos os clientes (apenas ativos) com paginação
 export const getClients: RequestHandler = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
     const clients = await prisma.client.findMany({
-      where: {
-        isActive: true, // Apenas clientes ativos
-      },
-      include: {
-        plan: true,
-        paymentMethod: true,
-      },
+      where: { isActive: true },
+      include: { plan: true, paymentMethod: true },
+      skip,
+      take: limit,
     });
-    res.json(clients);
+    const total = await prisma.client.count({ where: { isActive: true } });
+    res.json({ data: clients, total, page, limit });
   } catch (error) {
     console.error("Erro ao buscar clientes:", error);
     res.status(500).json({ message: "Erro ao buscar clientes" });
@@ -80,22 +82,24 @@ export const getClientById: RequestHandler<ParamsWithId> = async (
   }
 };
 
-// Função para buscar clientes expirados (apenas inativos)
+// Função para buscar clientes expirados (apenas inativos) com paginação
 export const getExpiredClients: RequestHandler = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
     const clients = await prisma.client.findMany({
-      where: {
-        isActive: false, // Apenas clientes inativos
-      },
-      include: {
-        plan: true,
-        paymentMethod: true,
-      },
+      where: { isActive: false },
+      include: { plan: true, paymentMethod: true },
+      skip,
+      take: limit,
     });
-    res.json(clients);
+    const total = await prisma.client.count({ where: { isActive: false } });
+    res.json({ data: clients, total, page, limit });
   } catch (error) {
     console.error("Erro ao buscar clientes expirados:", error);
     res.status(500).json({ message: "Erro ao buscar clientes expirados" });
@@ -211,6 +215,8 @@ export const createClient: RequestHandler<
         grossAmount,
         netAmount,
         isActive,
+        paymentVerified: false, // Valor padrão para novos clientes
+        paymentVerifiedDate: null,
       },
     });
 
@@ -468,5 +474,42 @@ export const reactivateClient: RequestHandler<ParamsWithId> = async (
       }
     }
     res.status(500).json({ message: "Erro ao reativar cliente" });
+  }
+};
+
+// Função para atualizar o status de pagamento
+export const updatePaymentStatus: RequestHandler<ParamsWithId> = async (
+  req: Request<ParamsWithId>,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params;
+  const { paymentVerified, paymentVerifiedDate } = req.body;
+
+  if (isNaN(parseInt(id))) {
+    res.status(400).json({ message: "ID inválido" });
+    return;
+  }
+
+  try {
+    const updatedClient = await prisma.client.update({
+      where: { id: parseInt(id) },
+      data: {
+        paymentVerified,
+        paymentVerifiedDate: paymentVerified
+          ? new Date(paymentVerifiedDate)
+          : null,
+      },
+      include: { plan: true, paymentMethod: true },
+    });
+    res.json(updatedClient);
+  } catch (error) {
+    console.error("Erro ao atualizar status de pagamento:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2025") {
+        res.status(404).json({ message: "Cliente não encontrado" });
+        return;
+      }
+    }
+    res.status(500).json({ message: "Erro ao atualizar status de pagamento" });
   }
 };

@@ -10,19 +10,14 @@
   --text-secondary: #AE7DAC;
   --card-bg-start: #1e293b;
   --card-bg-end: #2d3748;
-  /* Removido: --card-text: #F3DADF; (não usado) */
-  /* Removido: --card-text-secondary: #AE7DAC; (não usado) */
   --accent-blue: #F1916D;
   --accent-gray: #AE7DAC;
-  /* Removido: --shadow-light: 0 2px 6px 2px rgba(0, 0, 0, 0.3); (não usado) */
-  /* Removido: --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.5); (não usado) */
   --dashboard-bg: rgba(243, 218, 223, 0.2);
   --current-month-bg: linear-gradient(135deg, rgba(241, 145, 109, 0.6), rgba(174, 125, 172, 0.6));
   --button-active-bg: #00da77;
   --button-active-text: #03122F;
   --button-inactive-bg: #AE7DAC;
   --button-inactive-text: #F3DADF;
-  /* Removido: --danger-bg: #e63946; (não usado) */
   --table-bg: rgba(30, 41, 59, 0.9);
   --table-header-bg: rgba(45, 55, 72, 0.9);
   --nubank-bg: linear-gradient(135deg, #a64dff, #820ad1, #5c078f, #3a055c);
@@ -30,6 +25,7 @@
   --caixa-bg: linear-gradient(135deg, #4d8cff, #0061a8, #004075, #002b4a);
   --picpay-bg: linear-gradient(135deg, #4fff9b, #00da77, #009f57, #006b3a);
   --banco-do-brasil-bg: linear-gradient(135deg, #ffff99, #ffd700, #ccac00, #997f00);
+  --danger-bg: #ff4d4f;
 }
 
 /* Zerar configurações padrão do body e html */
@@ -70,14 +66,25 @@
   }
 
   .dashboard-container {
-    @apply flex-1 bg-[var(--dashboard-bg)] backdrop-blur-xl rounded-2xl p-5 m-5 shadow-lg max-w-full overflow-x-hidden overflow-y-auto;
-    min-height: calc(100vh - 64px - 40px);
+    flex: 1;
+    background: var(--dashboard-bg);
+    backdrop-filter: blur(20px);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    margin: 1.25rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    transition: opacity 0.3s ease-in-out;
   }
 
   @media (max-width: 640px) {
     .dashboard-container {
-      @apply m-2 p-3;
-      min-height: calc(100vh - 64px - 20px);
+      margin: 0.5rem;
+      padding: 0.75rem;
     }
   }
 
@@ -231,8 +238,6 @@
     color: var(--accent-blue);
   }
 
-  /* Removido: Estilos de .renew-modal .custom-select__* (não usados mais, substituídos por customStyles inline) */
-
   .client-search-container {
     @apply relative w-full max-w-md mx-auto mb-5;
   }
@@ -283,15 +288,24 @@
 
   .clients-table-container {
     @apply bg-[var(--table-bg)] backdrop-blur-md rounded-xl p-2 shadow-lg;
+    min-height: 400px; /* Altura mínima para evitar saltos */
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+  }
+
+  .clients-table-container.fade {
+    opacity: 0.5;
+    transform: scale(0.98);
   }
 
   .clients-table {
     @apply w-full border-collapse text-[var(--text-primary)];
+    table-layout: fixed; /* Garante colunas consistentes */
   }
 
   .clients-table th,
   .clients-table td {
     @apply py-3 px-4 text-left border-b border-[rgba(255,255,255,0.15)];
+    min-width: 100px; /* Garante largura mínima para colunas */
   }
 
   .clients-table th {
@@ -318,7 +332,6 @@
     @apply ml-1 inline-block align-middle text-[var(--text-primary)];
   }
 
-  /* Estilo para a coluna de email */
   .clients-table .email-column {
     max-width: 200px;
     white-space: nowrap;
@@ -345,7 +358,6 @@
     }
   }
 
-  /* Ajustes responsivos para a tabela */
   @media (min-width: 1024px) and (max-width: 1279px) {
     .clients-table th,
     .clients-table td {
@@ -429,7 +441,7 @@
   }
 
   .action-menu-item > svg {
-    margin-right: 0.75rem; /* Equivalente a mr-2 no Tailwind */
+    margin-right: 0.75rem;
   }
 
   .action-menu-item:hover {
@@ -450,7 +462,7 @@
     }
 
     .action-menu-item > svg {
-      margin-right: 0.75rem; /* Equivalente a mr-1.5 no Tailwind para telas menores */
+      margin-right: 0.75rem;
     }
   }
 
@@ -482,79 +494,119 @@
     }
   }
 
-  .renew-modal {
-    @apply bg-[var(--dashboard-bg)] backdrop-blur-md rounded-xl shadow-lg p-5 max-w-[400px] w-full;
+  .table-wrapper {
+    opacity: 1;
+    transition: opacity 0.3s ease-in-out;
   }
 
-  .renew-modal .modal-header {
-    @apply flex justify-between items-center mb-5;
+  .table-wrapper.fade {
+    opacity: 0;
   }
 
-  .renew-modal .modal-title {
+  .md\\:hidden .client-card {
+    opacity: 1;
+    transition: opacity 0.3s ease-in-out;
+  }
+
+  .md\\:hidden .client-card.fade {
+    opacity: 0;
+  }
+
+  .pagination {
+    @apply flex justify-center items-center gap-4 mt-6;
+  }
+
+  .pagination-select {
+    @apply px-4 py-2 rounded-full border border-[rgba(255,255,255,0.3)] bg-[var(--table-bg)] text-[var(--text-primary)] text-sm transition-all duration-300 cursor-pointer backdrop-blur-md;
+  }
+
+  .pagination-select:hover {
+    border-color: var(--accent-blue);
+    background-color: rgba(55, 65, 81, 0.9);
+  }
+
+  .pagination-button {
+    @apply px-4 py-2 rounded-full border border-[rgba(255,255,255,0.3)] bg-[var(--table-bg)] text-[var(--text-primary)] text-sm transition-all duration-300 cursor-pointer backdrop-blur-md;
+  }
+
+  .pagination-button:hover:not(:disabled) {
+    background-color: var(--accent-blue);
+    border-color: var(--accent-blue);
+    color: #fff;
+  }
+
+  .pagination-button:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  .pagination-info {
+    @apply text-[var(--text-secondary)] text-sm;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4;
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .modal-content {
+    @apply bg-[var(--dashboard-bg)] rounded-xl shadow-lg p-6 max-w-md w-full backdrop-blur-md;
+    animation: slideIn 0.3s ease-in-out;
+  }
+
+  .modal-header {
+    @apply flex justify-between items-center mb-5 border-b border-[rgba(255,255,255,0.1)] pb-2;
+  }
+
+  .modal-title {
     @apply text-xl font-medium text-[var(--text-secondary)];
   }
 
-  .renew-modal .close-button {
-    @apply text-[var(--text-primary)] transition-colors duration-300;
+  .modal-close-button {
+    @apply text-[var(--text-primary)] hover:text-[var(--accent-blue)] transition-colors duration-300;
   }
 
-  .renew-modal .close-button:hover {
-    color: var(--accent-blue);
+  .modal-body {
+    @apply mb-5;
   }
 
-  .renew-modal label {
-    @apply block text-sm text-[var(--text-primary)] mb-1;
+  .modal-label {
+    @apply block text-[var(--text-primary)] text-sm mb-1;
   }
 
-  .renew-modal input[type="date"],
-  .renew-modal input[type="text"],
-  .renew-modal input[type="email"],
-  .renew-modal input[type="tel"] {
-    @apply w-full p-2 rounded-lg bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] text-[var(--text-primary)] transition-colors duration-300;
+  .modal-input {
+    @apply w-full px-3 py-2 bg-[var(--table-bg)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300;
   }
 
-  .renew-modal input[type="date"]:focus,
-  .renew-modal input[type="text"]:focus,
-  .renew-modal input[type="email"]:focus,
-  .renew-modal input[type="tel"]:focus {
-    @apply outline-none border-[var(--accent-blue)] shadow-[0_0_0_2px_rgba(241,145,109,0.3)];
+  .modal-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(241, 145, 109, 0.3);
   }
 
-  .renew-modal .submit-button {
-    @apply w-full px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 bg-[var(--button-active-bg)] text-[var(--button-active-text)] mt-4;
+  .modal-footer {
+    @apply flex justify-end gap-3;
   }
 
-  .renew-modal .submit-button:hover {
-    background-color: #00ae5f;
+  .modal-button {
+    @apply px-4 py-2 rounded-lg text-sm transition-all duration-300;
   }
 
-  @media (max-width: 640px) {
-    .renew-modal {
-      @apply p-4 max-w-[90%];
+  .modal-button-cancel {
+    @apply bg-[rgba(255,255,255,0.1)] text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.2)];
+  }
+
+  .modal-button-save {
+    @apply bg-[var(--button-active-bg)] text-[var(--button-active-text)] hover:bg-[#00ae5f];
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
     }
-
-    .renew-modal .modal-title {
-      @apply text-lg;
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
-
-    .renew-modal input[type="date"],
-    .renew-modal input[type="text"],
-    .renew-modal input[type="email"],
-    .renew-modal input[type="tel"] {
-      @apply p-1 text-sm;
-    }
-
-    .renew-modal .submit-button {
-      @apply py-1 text-sm;
-    }
-  }
-
-  .loading-message,
-  .error-message {
-    @apply text-center p-5 text-[var(--text-primary)];
-  }
-
-  .error-message {
-    @apply text-red-500;
   }
 }

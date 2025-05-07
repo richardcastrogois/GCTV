@@ -20,6 +20,8 @@ export interface Client {
   grossAmount: number;
   netAmount: number;
   isActive: boolean;
+  paymentVerified: boolean; // Adicionado
+  paymentVerifiedDate: string | null; // Adicionado
 }
 
 export interface EditFormData {
