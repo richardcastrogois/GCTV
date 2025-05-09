@@ -5,6 +5,8 @@ import clientRoutes from "./routes/clientRoutes";
 import authRoutes from "./routes/authRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
 import currentMonthRoutes from "./routes/currentMonthRoutes";
+import { getExpiredClients } from "./controllers/clientController"; // Importando o controlador
+import { authMiddleware } from "./middleware/authMiddleware"; // Importando o middleware
 
 dotenv.config();
 
@@ -33,6 +35,7 @@ function setupRoutes(app: Express) {
   app.use("/api/auth", authRoutes);
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/current-month", currentMonthRoutes);
+  app.get("/api/expired-clients", authMiddleware, getExpiredClients);
   console.log("Rotas registradas com sucesso.");
 }
 

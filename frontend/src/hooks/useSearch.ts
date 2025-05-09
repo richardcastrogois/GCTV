@@ -1,3 +1,5 @@
+//frontend/src/hooks/useSearch.ts
+
 import { useContext } from "react";
 import { SearchContext } from "@/contexts/SearchContext";
 

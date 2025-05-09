@@ -8,12 +8,12 @@ import {
   FaEllipsisV,
   FaCheck,
   FaTimes,
+  FaInfoCircle,
 } from "react-icons/fa";
 import { Client } from "../types";
 import { useState, useEffect, useRef } from "react";
 import { Skeleton } from "@mui/material";
 
-// Função auxiliar para formatar a data no fuso horário UTC
 const formatDateToUTC = (date: string | Date): string => {
   const d = new Date(date);
   const day = String(d.getUTCDate()).padStart(2, "0");
@@ -64,9 +64,11 @@ export default function ClientsTable({
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [modalClientId, setModalClientId] = useState<number | null>(null);
   const [modalIsVerified, setModalIsVerified] = useState<boolean>(false);
   const [modalDate, setModalDate] = useState<string>("");
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null); // Correção aqui
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,14 +78,9 @@ export default function ClientsTable({
       }
     };
 
-    if (openMenu !== null) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [openMenu]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const getSortIcon = (
     columnKey:
@@ -131,6 +128,16 @@ export default function ClientsTable({
     setModalDate("");
   };
 
+  const openInfoModal = (client: Client) => {
+    setSelectedClient(client);
+    setIsInfoModalOpen(true);
+  };
+
+  const closeInfoModal = () => {
+    setIsInfoModalOpen(false);
+    setSelectedClient(null);
+  };
+
   const handleModalSubmit = () => {
     if (!onUpdatePaymentStatus || modalClientId === null) return;
 
@@ -151,78 +158,74 @@ export default function ClientsTable({
     return (
       <>
         <div className="clients-table-container hidden md:block">
-          <table className="clients-table">
-            <thead>
-              <tr>
-                <th>
-                  <Skeleton variant="text" width={50} />
-                </th>
-                <th>
-                  <Skeleton variant="text" width={150} />
-                </th>
-                <th className="hidden lg:table-cell">
-                  <Skeleton variant="text" width={200} />
-                </th>
-                <th>
-                  <Skeleton variant="text" width={120} />
-                </th>
-                <th>
-                  <Skeleton variant="text" width={120} />
-                </th>
-                <th>
-                  <Skeleton variant="text" width={100} />
-                </th>
-                <th className="hidden xl:table-cell">
-                  <Skeleton variant="text" width={80} />
-                </th>
-                <th className="hidden xl:table-cell">
-                  <Skeleton variant="text" width={80} />
-                </th>
-                <th className="xl:hidden">
-                  <Skeleton variant="text" width={100} />
-                </th>
-                <th>
-                  <Skeleton variant="text" width={40} />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...Array(5)].map((_, index) => (
-                <tr key={index}>
-                  <td>
+          <div className="table-wrapper">
+            <table className="clients-table">
+              <thead>
+                <tr>
+                  <th className="status-column">
                     <Skeleton variant="text" width={50} />
-                  </td>
-                  <td>
+                  </th>
+                  <th className="name-column">
                     <Skeleton variant="text" width={150} />
-                  </td>
-                  <td className="hidden lg:table-cell">
+                  </th>
+                  <th className="email-column hidden lg:table-cell">
                     <Skeleton variant="text" width={200} />
-                  </td>
-                  <td>
+                  </th>
+                  <th className="plan-column">
                     <Skeleton variant="text" width={120} />
-                  </td>
-                  <td>
+                  </th>
+                  <th className="method-column hidden lg:table-cell">
                     <Skeleton variant="text" width={120} />
-                  </td>
-                  <td>
+                  </th>
+                  <th className="due-date-column">
                     <Skeleton variant="text" width={100} />
-                  </td>
-                  <td className="hidden xl:table-cell">
+                  </th>
+                  <th className="gross-amount-column hidden xl:table-cell">
                     <Skeleton variant="text" width={80} />
-                  </td>
-                  <td className="hidden xl:table-cell">
+                  </th>
+                  <th className="net-amount-column hidden xl:table-cell">
                     <Skeleton variant="text" width={80} />
-                  </td>
-                  <td className="xl:hidden">
-                    <Skeleton variant="text" width={100} />
-                  </td>
-                  <td>
+                  </th>
+                  <th className="actions-column">
                     <Skeleton variant="text" width={40} />
-                  </td>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {[...Array(5)].map((_, index) => (
+                  <tr key={index}>
+                    <td className="status-column">
+                      <Skeleton variant="text" width={50} />
+                    </td>
+                    <td className="name-column">
+                      <Skeleton variant="text" width={150} />
+                    </td>
+                    <td className="email-column hidden lg:table-cell">
+                      <Skeleton variant="text" width={200} />
+                    </td>
+                    <td className="plan-column">
+                      <Skeleton variant="text" width={120} />
+                    </td>
+                    <td className="method-column hidden lg:table-cell">
+                      <Skeleton variant="text" width={120} />
+                    </td>
+                    <td className="due-date-column">
+                      <Skeleton variant="text" width={100} />
+                    </td>
+                    <td className="gross-amount-column hidden xl:table-cell">
+                      <Skeleton variant="text" width={80} />
+                    </td>
+                    <td className="net-amount-column hidden xl:table-cell">
+                      <Skeleton variant="text" width={80} />
+                    </td>
+                    <td className="actions-column">
+                      <Skeleton variant="text" width={40} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="md:hidden space-y-4">
@@ -259,143 +262,161 @@ export default function ClientsTable({
 
   return (
     <>
-      <div className="clients-table-container">
-        <table
-          className={`clients-table hidden md:table ${
-            isFetching ? "fade" : ""
-          }`}
-        >
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th onClick={() => onSort("fullName")}>
-                Nome {getSortIcon("fullName")}
-              </th>
-              <th
-                className="hidden lg:table-cell"
-                onClick={() => onSort("email")}
-              >
-                Email {getSortIcon("email")}
-              </th>
-              <th onClick={() => onSort("plan.name")}>
-                Plano {getSortIcon("plan.name")}
-              </th>
-              <th onClick={() => onSort("paymentMethod.name")}>
-                Método de Pagamento {getSortIcon("paymentMethod.name")}
-              </th>
-              <th onClick={() => onSort("dueDate")}>
-                Data de Vencimento {getSortIcon("dueDate")}
-              </th>
-              <th
-                className="hidden xl:table-cell"
-                onClick={() => onSort("grossAmount")}
-              >
-                Valor Bruto {getSortIcon("grossAmount")}
-              </th>
-              <th
-                className="hidden xl:table-cell"
-                onClick={() => onSort("netAmount")}
-              >
-                Valor Líquido {getSortIcon("netAmount")}
-              </th>
-              <th className="xl:hidden">Valor (Bruto/Líquido)</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((client) => (
-              <tr key={client.id}>
-                <td>
-                  <button
-                    onClick={() => openModal(client.id, client.paymentVerified)}
-                    className="action-button"
-                    title={
-                      client.paymentVerified ? "Verificado" : "Não Verificado"
-                    }
-                  >
-                    {client.paymentVerified ? (
-                      <FaCheck className="text-green-500" />
-                    ) : (
-                      <FaTimes className="text-red-500" />
-                    )}
-                  </button>
-                </td>
-                <td>{client.fullName}</td>
-                <td className="hidden lg:table-cell email-column">
-                  {client.email}
-                </td>
-                <td>{client.plan.name}</td>
-                <td>{client.paymentMethod.name}</td>
-                <td>{formatDateToUTC(client.dueDate)}</td>
-                <td className="hidden xl:table-cell">
-                  R$ {client.grossAmount.toFixed(2)}
-                </td>
-                <td className="hidden xl:table-cell">
-                  R$ {client.netAmount.toFixed(2)}
-                </td>
-                <td className="xl:hidden">
-                  R$ {client.grossAmount.toFixed(2)} / R${" "}
-                  {client.netAmount.toFixed(2)}
-                </td>
-                <td className="relative">
-                  <button
-                    onClick={(e) => toggleMenu(client.id, e)}
-                    className="action-button"
-                    title="Ações"
-                  >
-                    <FaEllipsisV size={16} />
-                  </button>
-                  {openMenu === client.id && (
-                    <div className="action-menu" ref={menuRef}>
+      <div className="clients-table-container hidden md:block">
+        <div className="table-wrapper">
+          <table className={`clients-table ${isFetching ? "fade" : ""}`}>
+            <thead>
+              <tr>
+                <th className="status-column">Status</th>
+                <th className="name-column" onClick={() => onSort("fullName")}>
+                  Nome {getSortIcon("fullName")}
+                </th>
+                <th
+                  className="email-column hidden lg:table-cell"
+                  onClick={() => onSort("email")}
+                >
+                  Email {getSortIcon("email")}
+                </th>
+                <th className="plan-column" onClick={() => onSort("plan.name")}>
+                  Plano {getSortIcon("plan.name")}
+                </th>
+                <th
+                  className="method-column hidden lg:table-cell"
+                  onClick={() => onSort("paymentMethod.name")}
+                >
+                  Método de Pagamento {getSortIcon("paymentMethod.name")}
+                </th>
+                <th
+                  className="due-date-column"
+                  onClick={() => onSort("dueDate")}
+                >
+                  Data de Vencimento {getSortIcon("dueDate")}
+                </th>
+                <th
+                  className="gross-amount-column hidden xl:table-cell"
+                  onClick={() => onSort("grossAmount")}
+                >
+                  Valor Bruto {getSortIcon("grossAmount")}
+                </th>
+                <th
+                  className="net-amount-column hidden xl:table-cell"
+                  onClick={() => onSort("netAmount")}
+                >
+                  Valor Líquido {getSortIcon("netAmount")}
+                </th>
+                <th className="actions-column">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((client) => (
+                <tr key={client.id}>
+                  <td className="status-column">
+                    <button
+                      onClick={() =>
+                        openModal(client.id, client.paymentVerified)
+                      }
+                      className="action-button"
+                      title={
+                        client.paymentVerified ? "Verificado" : "Não Verificado"
+                      }
+                    >
+                      {client.paymentVerified ? (
+                        <FaCheck className="text-green-500" />
+                      ) : (
+                        <FaTimes className="text-red-500" />
+                      )}
+                    </button>
+                  </td>
+                  <td className="name-column">{client.fullName}</td>
+                  <td className="email-column hidden lg:table-cell">
+                    {client.email}
+                  </td>
+                  <td className="plan-column">{client.plan.name}</td>
+                  <td className="method-column hidden lg:table-cell">
+                    {client.paymentMethod.name}
+                  </td>
+                  <td className="due-date-column">
+                    {formatDateToUTC(client.dueDate)}
+                  </td>
+                  <td className="gross-amount-column hidden xl:table-cell">
+                    R$ {client.grossAmount.toFixed(2)}
+                  </td>
+                  <td className="net-amount-column hidden xl:table-cell">
+                    R$ {client.netAmount.toFixed(2)}
+                  </td>
+                  <td className="actions-column relative">
+                    <div className="flex space-x-2">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEdit(client);
-                          setOpenMenu(null);
-                        }}
-                        className="action-menu-item"
+                        onClick={() => openInfoModal(client)}
+                        className="action-button"
+                        title="Mais Informações"
                       >
-                        <FaEdit
-                          size={16}
-                          className="text-[var(--accent-blue)]"
-                        />{" "}
-                        Editar
+                        <FaInfoCircle size={16} />
                       </button>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(client.id);
-                          setOpenMenu(null);
-                        }}
-                        className="action-menu-item"
+                        onClick={(e) => toggleMenu(client.id, e)}
+                        className="action-button"
+                        title="Ações"
                       >
-                        <FaTrash
-                          size={16}
-                          className="text-[var(--accent-blue)]"
-                        />{" "}
-                        Excluir
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRenew(client);
-                          setOpenMenu(null);
-                        }}
-                        className="action-menu-item"
-                      >
-                        <FaBolt
-                          size={16}
-                          className="text-[var(--accent-blue)]"
-                        />{" "}
-                        Renovar
+                        <FaEllipsisV size={16} />
                       </button>
                     </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    {openMenu === client.id && (
+                      <div
+                        className="action-menu"
+                        ref={menuRef}
+                        style={{ zIndex: 1000 }}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit(client);
+                            setOpenMenu(null);
+                          }}
+                          className="action-menu-item"
+                        >
+                          <FaEdit
+                            size={16}
+                            className="text-[var(--accent-blue)]"
+                          />{" "}
+                          Editar
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(client.id);
+                            setOpenMenu(null);
+                          }}
+                          className="action-menu-item"
+                        >
+                          <FaTrash
+                            size={16}
+                            className="text-[var(--accent-blue)]"
+                          />{" "}
+                          Excluir
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRenew(client);
+                            setOpenMenu(null);
+                          }}
+                          className="action-menu-item"
+                        >
+                          <FaBolt
+                            size={16}
+                            className="text-[var(--accent-blue)]"
+                          />{" "}
+                          Renovar
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="md:hidden space-y-4">
@@ -521,6 +542,59 @@ export default function ClientsTable({
                 className="modal-button modal-button-save"
               >
                 OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isInfoModalOpen && selectedClient && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeInfoModal();
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title">Detalhes do Cliente</h2>
+              <button onClick={closeInfoModal} className="modal-close-button">
+                <FaTimes size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Nome:</strong> {selectedClient.fullName}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Email:</strong> {selectedClient.email}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Plano:</strong> {selectedClient.plan.name}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Método de Pagamento:</strong>{" "}
+                {selectedClient.paymentMethod.name}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Data de Vencimento:</strong>{" "}
+                {formatDateToUTC(selectedClient.dueDate)}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Valor Bruto:</strong> R${" "}
+                {selectedClient.grossAmount.toFixed(2)}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Valor Líquido:</strong> R${" "}
+                {selectedClient.netAmount.toFixed(2)}
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                onClick={closeInfoModal}
+                className="modal-button modal-button-cancel"
+              >
+                Fechar
               </button>
             </div>
           </div>

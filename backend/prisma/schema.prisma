@@ -22,8 +22,10 @@ model PaymentMethod {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  clients   Client[] // Relação com Client
-  discounts PlanPaymentMethodDiscount[] // Relação com a nova tabela de taxas
+  clients   Client[]
+  discounts PlanPaymentMethodDiscount[]
+
+  @@index([isActive])
 }
 
 model Plan {
@@ -32,20 +34,25 @@ model Plan {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  clients   Client[] // Relação com Client
-  discounts PlanPaymentMethodDiscount[] // Relação com a nova tabela de taxas
+  clients   Client[]
+  discounts PlanPaymentMethodDiscount[]
+
+  @@index([isActive])
 }
 
 model PlanPaymentMethodDiscount {
   id             Int           @id @default(autoincrement())
   planId         Int
   paymentMethodId Int
-  discount       Float         @default(0) // Taxa de desconto para a combinação plano/forma de pagamento
+  discount       Float         @default(0)
   plan           Plan          @relation(fields: [planId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   paymentMethod  PaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
-  @@unique([planId, paymentMethodId]) // Garante que cada combinação plano/forma de pagamento é única
+
+  @@unique([planId, paymentMethodId])
+  @@index([planId])
+  @@index([paymentMethodId])
 }
 
 model Client {
@@ -53,16 +60,20 @@ model Client {
   fullName       String
   email          String        @unique
   phone          String?
-  planId         Int           @default(999) // ID de "Outros" como padrão
+  planId         Int           @default(999)
   plan           Plan          @relation(fields: [planId], references: [id], onDelete: SetDefault, onUpdate: Cascade)
-  paymentMethodId Int           @default(999) // ID de "Outros" como padrão
+  paymentMethodId Int           @default(999)
   paymentMethod  PaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: SetDefault, onUpdate: Cascade)
   dueDate        DateTime
   grossAmount    Float
   netAmount      Float
   isActive       Boolean       @default(true)
-  paymentVerified Boolean      @default(false) // Novo campo para status de pagamento
-  paymentVerifiedDate DateTime? // Novo campo para data de verificação, opcional
+  paymentVerified Boolean      @default(false)
+  paymentVerifiedDate DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  @@index([isActive])
+  @@index([dueDate])
+  @@index([email])
 }

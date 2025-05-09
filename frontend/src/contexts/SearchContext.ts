@@ -1,3 +1,5 @@
+//frontend/src/contexts/SearchContext.ts
+
 import { createContext } from "react";
 
 interface SearchContextType {

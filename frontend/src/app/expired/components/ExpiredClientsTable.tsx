@@ -1,61 +1,46 @@
-import { useState, useEffect, useRef } from "react";
 import {
-  FaTrash,
-  FaEdit,
   FaSort,
   FaSortUp,
   FaSortDown,
-  FaEllipsisV,
-  FaCheck,
+  FaBolt,
+  FaInfoCircle,
   FaTimes,
 } from "react-icons/fa";
-import { Client } from "@/app/clients/types";
+import { Client } from "../../clients/types";
+import { useState } from "react";
 import { Skeleton } from "@mui/material";
+
+const formatDateToUTC = (date: string | Date): string => {
+  const d = new Date(date);
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+};
 
 interface ExpiredClientsTableProps {
   clients: Client[];
+  onSort: (key: keyof Client | "plan.name") => void;
+  onReactivate: (client: Client) => void;
   sortConfig: {
     key: keyof Client | "plan.name" | null;
     direction: "asc" | "desc";
   };
-  onSort: (key: keyof Client | "plan.name") => void;
-  selectedClients: number[];
-  onSelectClient: (id: number) => void;
-  onSelectAll: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onDelete: (id: number) => void;
-  onReactivate: (id: number) => void;
-  onUpdatePaymentStatus: (clientId: number, currentStatus: boolean) => void;
   isFetching?: boolean;
   isLoading?: boolean;
 }
 
 export default function ExpiredClientsTable({
   clients,
-  sortConfig,
   onSort,
-  selectedClients,
-  onSelectClient,
-  onSelectAll,
-  onDelete,
   onReactivate,
-  onUpdatePaymentStatus,
+  sortConfig,
   isFetching = false,
   isLoading = false,
 }: ExpiredClientsTableProps) {
-  const [openMenu, setOpenMenu] = useState<number | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpenMenu(null);
-      }
-    };
-    if (openMenu !== null) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [openMenu]);
+  const [expandedRows, setExpandedRows] = useState<number[]>([]);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   const getSortIcon = (columnKey: keyof Client | "plan.name") => {
     if (sortConfig.key !== columnKey) return <FaSort className="sort-icon" />;
@@ -66,36 +51,56 @@ export default function ExpiredClientsTable({
     );
   };
 
-  const toggleMenu = (clientId: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setOpenMenu((prev) => (prev === clientId ? null : clientId));
+  const toggleRow = (clientId: number) => {
+    setExpandedRows((prev) =>
+      prev.includes(clientId)
+        ? prev.filter((id) => id !== clientId)
+        : [clientId]
+    );
+  };
+
+  const handleCardClick = (clientId: number, e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest(".action-button")) return;
+    toggleRow(clientId);
+  };
+
+  const openInfoModal = (client: Client) => {
+    setSelectedClient(client);
+    setIsInfoModalOpen(true);
+  };
+
+  const closeInfoModal = () => {
+    setIsInfoModalOpen(false);
+    setSelectedClient(null);
   };
 
   if (isLoading) {
     return (
       <>
-        {/* Skeleton para tabela (md e acima) */}
         <div className="clients-table-container hidden md:block">
           <div className="table-wrapper">
-            <table className="clients-table w-full">
+            <table className="clients-table">
               <thead>
                 <tr>
-                  <th className="w-12">
-                    <Skeleton variant="text" width={20} />
-                  </th>
-                  <th>
+                  <th className="status-column">
                     <Skeleton variant="text" width={50} />
                   </th>
-                  <th>
+                  <th className="name-column">
                     <Skeleton variant="text" width={150} />
                   </th>
-                  <th className="hidden lg:table-cell">
+                  <th className="email-column hidden lg:table-cell">
                     <Skeleton variant="text" width={200} />
                   </th>
-                  <th>
+                  <th className="plan-column">
                     <Skeleton variant="text" width={120} />
                   </th>
-                  <th>
+                  <th className="due-date-column">
+                    <Skeleton variant="text" width={100} />
+                  </th>
+                  <th className="status-column">
+                    <Skeleton variant="text" width={80} />
+                  </th>
+                  <th className="actions-column">
                     <Skeleton variant="text" width={40} />
                   </th>
                 </tr>
@@ -103,22 +108,25 @@ export default function ExpiredClientsTable({
               <tbody>
                 {[...Array(5)].map((_, index) => (
                   <tr key={index}>
-                    <td className="w-12 text-center">
-                      <Skeleton variant="circular" width={20} height={20} />
-                    </td>
-                    <td>
+                    <td className="status-column">
                       <Skeleton variant="text" width={50} />
                     </td>
-                    <td>
+                    <td className="name-column">
                       <Skeleton variant="text" width={150} />
                     </td>
-                    <td className="hidden lg:table-cell">
+                    <td className="email-column hidden lg:table-cell">
                       <Skeleton variant="text" width={200} />
                     </td>
-                    <td>
+                    <td className="plan-column">
                       <Skeleton variant="text" width={120} />
                     </td>
-                    <td>
+                    <td className="due-date-column">
+                      <Skeleton variant="text" width={100} />
+                    </td>
+                    <td className="status-column">
+                      <Skeleton variant="text" width={80} />
+                    </td>
+                    <td className="actions-column">
                       <Skeleton variant="text" width={40} />
                     </td>
                   </tr>
@@ -128,7 +136,6 @@ export default function ExpiredClientsTable({
           </div>
         </div>
 
-        {/* Skeleton para cards (abaixo de md) */}
         <div className="md:hidden space-y-4">
           {[...Array(5)].map((_, index) => (
             <div
@@ -151,7 +158,6 @@ export default function ExpiredClientsTable({
                 <div className="flex gap-2 mt-2">
                   <Skeleton variant="rectangular" width={40} height={40} />
                   <Skeleton variant="rectangular" width={40} height={40} />
-                  <Skeleton variant="rectangular" width={40} height={40} />
                 </div>
               </div>
             </div>
@@ -163,113 +169,195 @@ export default function ExpiredClientsTable({
 
   return (
     <>
-      {/* Tabela para telas grandes e médias (md e acima) */}
-      <div className="table-wrapper">
-        <table className={`clients-table w-full ${isFetching ? "fade" : ""}`}>
-          <thead>
-            <tr>
-              <th className="w-12">
-                <input
-                  type="checkbox"
-                  onChange={onSelectAll}
-                  checked={
-                    clients.length > 0 &&
-                    selectedClients.length === clients.length
-                  }
-                />
-              </th>
-              <th>Status</th>
-              <th onClick={() => onSort("fullName")}>
-                Nome {getSortIcon("fullName")}
-              </th>
-              <th
-                className="hidden lg:table-cell"
-                onClick={() => onSort("email")}
-              >
-                Email {getSortIcon("email")}
-              </th>
-              <th onClick={() => onSort("plan.name")}>
-                Plano {getSortIcon("plan.name")}
-              </th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((client) => (
-              <tr key={client.id}>
-                <td className="w-12 text-center">
-                  <input
-                    type="checkbox"
-                    checked={selectedClients.includes(client.id)}
-                    onChange={() => onSelectClient(client.id)}
-                  />
-                </td>
-                <td>
-                  <button
-                    onClick={() =>
-                      onUpdatePaymentStatus(client.id, client.paymentVerified)
-                    }
-                    className="action-button"
-                    title={
-                      client.paymentVerified ? "Verificado" : "Não Verificado"
-                    }
-                  >
-                    {client.paymentVerified ? (
-                      <FaCheck className="text-green-500" />
-                    ) : (
-                      <FaTimes className="text-red-500" />
-                    )}
-                  </button>
-                </td>
-                <td>{client.fullName}</td>
-                <td className="hidden lg:table-cell email-column">
-                  {client.email}
-                </td>
-                <td>{client.plan.name}</td>
-                <td className="relative">
-                  <button
-                    onClick={(e) => toggleMenu(client.id, e)}
-                    className="action-button"
-                    title="Ações"
-                  >
-                    <FaEllipsisV size={16} />
-                  </button>
-                  {openMenu === client.id && (
-                    <div className="action-menu" ref={menuRef}>
+      <div className="clients-table-container hidden md:block">
+        <div className="table-wrapper">
+          <table className={`clients-table ${isFetching ? "fade" : ""}`}>
+            <thead>
+              <tr>
+                <th className="status-column"></th>
+                <th className="name-column" onClick={() => onSort("fullName")}>
+                  Nome {getSortIcon("fullName")}
+                </th>
+                <th
+                  className="email-column hidden lg:table-cell"
+                  onClick={() => onSort("email")}
+                >
+                  Email {getSortIcon("email")}
+                </th>
+                <th className="plan-column" onClick={() => onSort("plan.name")}>
+                  Plano {getSortIcon("plan.name")}
+                </th>
+                <th
+                  className="due-date-column"
+                  onClick={() => onSort("dueDate")}
+                >
+                  Vencimento {getSortIcon("dueDate")}
+                </th>
+                <th
+                  className="status-column"
+                  onClick={() => onSort("isActive")}
+                >
+                  Status {getSortIcon("isActive")}
+                </th>
+                <th className="actions-column">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((client) => (
+                <tr
+                  key={client.id}
+                  className={expandedRows.includes(client.id) ? "expanded" : ""}
+                  onClick={(e) => handleCardClick(client.id, e)}
+                >
+                  <td className="status-column text-center"></td>
+                  <td className="name-column text-center">{client.fullName}</td>
+                  <td className="email-column hidden lg:table-cell text-center">
+                    {client.email}
+                  </td>
+                  <td className="plan-column text-center">
+                    {client.plan.name}
+                  </td>
+                  <td className="due-date-column text-center">
+                    {formatDateToUTC(client.dueDate)}
+                  </td>
+                  <td className="status-column text-center">
+                    <span
+                      className={`status-dot ${
+                        client.isActive ? "bg-green-500" : "bg-red-500"
+                      }`}
+                    ></span>
+                    {client.isActive ? "Ativo" : "Inativo"}
+                  </td>
+                  <td className="actions-column text-center">
+                    <div className="flex justify-center space-x-2">
                       <button
-                        onClick={() => {
-                          onDelete(client.id);
-                          setOpenMenu(null);
-                        }}
-                        className="action-menu-item"
+                        onClick={() => openInfoModal(client)}
+                        className="action-button"
+                        title="Mais Informações"
                       >
-                        <FaTrash
-                          size={16}
-                          className="text-[var(--accent-blue)]"
-                        />{" "}
-                        Excluir
+                        <FaInfoCircle size={16} />
                       </button>
                       <button
-                        onClick={() => {
-                          onReactivate(client.id);
-                          setOpenMenu(null);
-                        }}
-                        className="action-menu-item"
+                        onClick={() => onReactivate(client)}
+                        className="action-button"
+                        title="Reativar"
                       >
-                        <FaEdit
+                        <FaBolt size={16} />
+                      </button>
+                      <button className="action-button" title="Observação">
+                        <FaInfoCircle
                           size={16}
-                          className="text-[var(--accent-blue)]"
-                        />{" "}
-                        Reativar
+                          style={{ transform: "rotate(45deg)" }}
+                        />
                       </button>
                     </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      <div className="md:hidden space-y-4">
+        {clients.map((client) => (
+          <div
+            key={client.id}
+            className={`client-card bg-[var(--table-bg)] backdrop-blur-sm rounded-lg p-4 shadow-md ${
+              isFetching ? "fade" : ""
+            }`}
+            onClick={(e) => handleCardClick(client.id, e)}
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                  {client.fullName}
+                </h3>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Plano: {client.plan.name}
+                </p>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Vencimento: {formatDateToUTC(client.dueDate)}
+                </p>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Status: {client.isActive ? "Ativo" : "Inativo"}
+                </p>
+              </div>
+            </div>
+
+            {expandedRows.includes(client.id) && (
+              <div className="mt-3 space-y-2 expanded-content">
+                <p className="text-sm text-[var(--text-primary)]">
+                  Email: {client.email}
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => openInfoModal(client)}
+                    className="action-button"
+                    title="Mais Informações"
+                  >
+                    <FaInfoCircle size={16} />
+                  </button>
+                  <button
+                    onClick={() => onReactivate(client)}
+                    className="action-button"
+                    title="Reativar"
+                  >
+                    <FaBolt size={16} />
+                  </button>
+                  <button className="action-button" title="Observação">
+                    <FaInfoCircle
+                      size={16}
+                      style={{ transform: "rotate(45deg)" }}
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {isInfoModalOpen && selectedClient && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeInfoModal();
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title">Detalhes do Cliente</h2>
+              <button onClick={closeInfoModal} className="modal-close-button">
+                <FaTimes size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Nome:</strong> {selectedClient.fullName}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Email:</strong> {selectedClient.email}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Plano:</strong> {selectedClient.plan.name}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Data de Vencimento:</strong>{" "}
+                {formatDateToUTC(selectedClient.dueDate)}
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                onClick={closeInfoModal}
+                className="modal-button modal-button-cancel"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

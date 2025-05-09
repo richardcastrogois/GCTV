@@ -1,3 +1,5 @@
+//frontend/src/components/ClientSearch.tsx
+
 "use client";
 
 import { useEffect, useMemo } from "react";

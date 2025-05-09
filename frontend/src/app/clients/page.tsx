@@ -1,18 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import {
-  useQuery,
-  useQueryClient,
-  keepPreviousData,
-} from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import { AxiosError } from "axios";
-import ClientsTable from "./components/ClientsTable";
-import EditClientModal from "./components/EditClientModal";
+import dynamic from "next/dynamic";
 import ClientSearch from "@/components/ClientSearch";
 import {
+  fetchClients,
   fetchPlans,
   fetchPaymentMethods,
   deleteClient,
@@ -24,6 +20,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { FaTimes } from "react-icons/fa";
 import axios from "axios";
 import { useSearch } from "@/hooks/useSearch";
+import Loading from "@/components/Loading";
+import EditClientModal from "./components/EditClientModal";
+
+// [OTIMIZAÇÃO] Lazy loading do componente ClientsTable
+const ClientsTable = dynamic(() => import("./components/ClientsTable"), {
+  loading: () => <Loading>Carregando tabela...</Loading>,
+});
 
 const formatDateToLocal = (date: string | Date): string => {
   const d = new Date(date);
@@ -51,7 +54,6 @@ export default function Clients() {
   });
   const [plans, setPlans] = useState<Plan[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const { searchTerm } = useSearch();
   const [sortConfig, setSortConfig] = useState<{
     key:
@@ -67,6 +69,7 @@ export default function Clients() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
 
+  // [OTIMIZAÇÃO] Carrega planos e métodos de pagamento com cache
   useEffect(() => {
     const loadPlansAndMethods = async () => {
       try {
@@ -86,33 +89,18 @@ export default function Clients() {
     loadPlansAndMethods();
   }, [handleUnauthorized]);
 
-  const { data: allClients } = useQuery<Client[]>({
-    queryKey: ["allClients"],
-    queryFn: async () => {
-      const response = await axios.get("http://localhost:3001/api/clients", {
-        params: { limit: 9999 },
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      return response.data.data;
-    },
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
-
+  // [OTIMIZAÇÃO] Busca clientes com parâmetro de busca no backend
   const {
     data: clientsResponse,
     isLoading,
     isFetching,
     error,
   } = useQuery<{ data: Client[]; total: number; page: number; limit: number }>({
-    queryKey: ["clients", page, limit],
+    queryKey: ["clients", page, limit, searchTerm],
     queryFn: async () => {
       try {
-        const response = await axios.get("http://localhost:3001/api/clients", {
-          params: { page, limit },
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        return response.data;
+        const response = await fetchClients(page, limit, searchTerm);
+        return response;
       } catch (error) {
         if (error instanceof AxiosError) {
           if (error.response?.status === 401) handleUnauthorized();
@@ -120,48 +108,11 @@ export default function Clients() {
         throw error;
       }
     },
-    placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
 
-  const filterClients = useCallback(
-    (term: string) => {
-      if (!Array.isArray(allClients)) {
-        setFilteredClients(clientsResponse?.data || []);
-        return;
-      }
-
-      if (!term) {
-        setFilteredClients(clientsResponse?.data || []);
-        return;
-      }
-
-      const lowerSearchTerm = term.toLowerCase();
-      const filtered = allClients.filter((client) => {
-        const fields = [
-          client.fullName.toLowerCase(),
-          client.email.toLowerCase(),
-          client.phone?.toLowerCase() || "",
-          client.plan.name.toLowerCase(),
-          client.paymentMethod.name.toLowerCase(),
-          client.grossAmount.toString(),
-          client.netAmount.toString(),
-          new Date(client.dueDate).toLocaleDateString("pt-BR").toLowerCase(),
-          client.isActive ? "ativo" : "inativo",
-        ];
-        return fields.some((field) => field.includes(lowerSearchTerm));
-      });
-      setFilteredClients(filtered);
-    },
-    [allClients, clientsResponse?.data]
-  );
-
-  useEffect(() => {
-    filterClients(searchTerm);
-  }, [searchTerm, filterClients, allClients, clientsResponse?.data]);
-
-  const sortedClients = [...filteredClients].sort((a, b) => {
+  const sortedClients = [...(clientsResponse?.data || [])].sort((a, b) => {
     if (!sortConfig.key) return 0;
 
     let valueA: string | number;
@@ -216,7 +167,6 @@ export default function Clients() {
         await deleteClient(id);
         toast.success("Cliente excluído!");
         queryClient.invalidateQueries({ queryKey: ["clients"] });
-        queryClient.invalidateQueries({ queryKey: ["allClients"] });
       } catch (error) {
         if (error instanceof AxiosError) {
           toast.error(`Erro: ${error.message}`);
@@ -268,7 +218,6 @@ export default function Clients() {
       toast.success("Cliente atualizado!");
       setIsModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      queryClient.invalidateQueries({ queryKey: ["allClients"] });
     } catch (error) {
       if (error instanceof AxiosError) {
         toast.error(`Erro: ${error.message}`);
@@ -292,7 +241,6 @@ export default function Clients() {
       toast.success("Renovado!");
       setIsRenewModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      queryClient.invalidateQueries({ queryKey: ["allClients"] });
     } catch (error) {
       if (error instanceof AxiosError) {
         toast.error(`Erro: ${error.message}`);
@@ -332,7 +280,6 @@ export default function Clients() {
       );
       toast.success("Status atualizado!");
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      queryClient.invalidateQueries({ queryKey: ["allClients"] });
     } catch (error) {
       if (error instanceof AxiosError) {
         toast.error(`Erro: ${error.message}`);
@@ -347,7 +294,7 @@ export default function Clients() {
     );
   }
 
-  const isDataReady = clientsResponse?.data && filteredClients.length > 0;
+  const isDataReady = clientsResponse?.data && clientsResponse.data.length > 0;
 
   return (
     <div className="dashboard-container">
@@ -424,7 +371,7 @@ export default function Clients() {
         <div className="modal-overlay" onClick={closeRenewModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">Renovar Assinatura</h2>
+              <h2 className="modal-title">Renovar Cliente</h2>
               <button onClick={closeRenewModal} className="modal-close-button">
                 <FaTimes size={20} />
               </button>
@@ -436,8 +383,8 @@ export default function Clients() {
                   type="date"
                   value={newDueDate}
                   onChange={(e) => setNewDueDate(e.target.value)}
-                  required
                   className="modal-input"
+                  required
                 />
               </div>
               <div className="modal-footer">
@@ -452,7 +399,7 @@ export default function Clients() {
                   type="submit"
                   className="modal-button modal-button-save"
                 >
-                  Salvar
+                  Renovar
                 </button>
               </div>
             </form>

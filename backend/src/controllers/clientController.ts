@@ -4,10 +4,7 @@ import { ParsedQs } from "qs";
 
 const prisma = new PrismaClient();
 
-// Tipo para parâmetros com 'id'
 type ParamsWithId = { id: string };
-
-// Tipo para o corpo da requisição de criação/atualização de cliente
 type ClientBody = {
   fullName: string;
   email: string;
@@ -18,13 +15,8 @@ type ClientBody = {
   grossAmount: number;
   isActive: boolean;
 };
+type RenewClientBody = { dueDate: string };
 
-// Tipo para o corpo da requisição de renovação de cliente
-type RenewClientBody = {
-  dueDate: string;
-};
-
-// Função para buscar todos os clientes (apenas ativos) com paginação
 export const getClients: RequestHandler = async (
   req: Request,
   res: Response
@@ -33,14 +25,30 @@ export const getClients: RequestHandler = async (
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
+    const searchTerm = (req.query.search as string)?.toLowerCase() || "";
+
+    const whereClause: Prisma.ClientWhereInput = { isActive: true };
+    if (searchTerm) {
+      whereClause.OR = [
+        { fullName: { contains: searchTerm, mode: "insensitive" } },
+        { email: { contains: searchTerm, mode: "insensitive" } },
+        { phone: { contains: searchTerm, mode: "insensitive" } },
+        { plan: { name: { contains: searchTerm, mode: "insensitive" } } },
+        {
+          paymentMethod: {
+            name: { contains: searchTerm, mode: "insensitive" },
+          },
+        },
+      ];
+    }
 
     const clients = await prisma.client.findMany({
-      where: { isActive: true },
+      where: whereClause,
       include: { plan: true, paymentMethod: true },
       skip,
       take: limit,
     });
-    const total = await prisma.client.count({ where: { isActive: true } });
+    const total = await prisma.client.count({ where: whereClause });
     res.json({ data: clients, total, page, limit });
   } catch (error) {
     console.error("Erro ao buscar clientes:", error);
@@ -48,12 +56,10 @@ export const getClients: RequestHandler = async (
   }
 };
 
-// Função para buscar um cliente por ID
 export const getClientById: RequestHandler<ParamsWithId> = async (
   req: Request<ParamsWithId>,
   res: Response
 ): Promise<void> => {
-  console.log(`Função getClientById chamada com id=${req.params.id}`);
   const { id } = req.params;
 
   if (isNaN(parseInt(id))) {
@@ -64,10 +70,7 @@ export const getClientById: RequestHandler<ParamsWithId> = async (
   try {
     const client = await prisma.client.findUnique({
       where: { id: parseInt(id) },
-      include: {
-        plan: true,
-        paymentMethod: true,
-      },
+      include: { plan: true, paymentMethod: true },
     });
 
     if (!client) {
@@ -82,7 +85,6 @@ export const getClientById: RequestHandler<ParamsWithId> = async (
   }
 };
 
-// Função para buscar clientes expirados (apenas inativos) com paginação
 export const getExpiredClients: RequestHandler = async (
   req: Request,
   res: Response
@@ -91,14 +93,30 @@ export const getExpiredClients: RequestHandler = async (
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
+    const searchTerm = (req.query.search as string)?.toLowerCase() || "";
+
+    const whereClause: Prisma.ClientWhereInput = { isActive: false };
+    if (searchTerm) {
+      whereClause.OR = [
+        { fullName: { contains: searchTerm, mode: "insensitive" } },
+        { email: { contains: searchTerm, mode: "insensitive" } },
+        { phone: { contains: searchTerm, mode: "insensitive" } },
+        { plan: { name: { contains: searchTerm, mode: "insensitive" } } },
+        {
+          paymentMethod: {
+            name: { contains: searchTerm, mode: "insensitive" },
+          },
+        },
+      ];
+    }
 
     const clients = await prisma.client.findMany({
-      where: { isActive: false },
+      where: whereClause,
       include: { plan: true, paymentMethod: true },
       skip,
       take: limit,
     });
-    const total = await prisma.client.count({ where: { isActive: false } });
+    const total = await prisma.client.count({ where: whereClause });
     res.json({ data: clients, total, page, limit });
   } catch (error) {
     console.error("Erro ao buscar clientes expirados:", error);
@@ -106,12 +124,10 @@ export const getExpiredClients: RequestHandler = async (
   }
 };
 
-// Função para buscar planos
 export const getPlans: RequestHandler = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  console.log("Função getPlans chamada. Buscando planos...");
   try {
     const plans = await prisma.plan.findMany({
       where: { isActive: true },
@@ -123,14 +139,10 @@ export const getPlans: RequestHandler = async (
   }
 };
 
-// Função para buscar métodos de pagamento
 export const getPaymentMethods: RequestHandler = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  console.log(
-    "Função getPaymentMethods chamada. Buscando métodos de pagamento..."
-  );
   try {
     const paymentMethods = await prisma.paymentMethod.findMany({
       where: { isActive: true },
@@ -142,7 +154,6 @@ export const getPaymentMethods: RequestHandler = async (
   }
 };
 
-// Função para criar um cliente
 export const createClient: RequestHandler<
   never,
   unknown,
@@ -164,7 +175,6 @@ export const createClient: RequestHandler<
       isActive,
     } = req.body;
 
-    // Validações
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       res.status(400).json({ message: "Email inválido" });
@@ -191,14 +201,8 @@ export const createClient: RequestHandler<
       return;
     }
 
-    // Buscar desconto aplicável
     const discountEntry = await prisma.planPaymentMethodDiscount.findUnique({
-      where: {
-        planId_paymentMethodId: {
-          planId,
-          paymentMethodId,
-        },
-      },
+      where: { planId_paymentMethodId: { planId, paymentMethodId } },
     });
 
     const discount = discountEntry ? discountEntry.discount : 0;
@@ -215,7 +219,7 @@ export const createClient: RequestHandler<
         grossAmount,
         netAmount,
         isActive,
-        paymentVerified: false, // Valor padrão para novos clientes
+        paymentVerified: false,
         paymentVerifiedDate: null,
       },
     });
@@ -226,8 +230,9 @@ export const createClient: RequestHandler<
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (
         error.code === "P2002" &&
-        Array.isArray(error.meta?.target) &&
-        error.meta.target.includes("email")
+        error.meta &&
+        Array.isArray((error.meta as any).target) &&
+        (error.meta as any).target.includes("email")
       ) {
         res.status(400).json({ message: "Email já cadastrado" });
         return;
@@ -237,7 +242,6 @@ export const createClient: RequestHandler<
   }
 };
 
-// Função para atualizar um cliente
 export const updateClient: RequestHandler<
   ParamsWithId,
   unknown,
@@ -266,7 +270,6 @@ export const updateClient: RequestHandler<
       isActive,
     } = req.body;
 
-    // Validações
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       res.status(400).json({ message: "Email inválido" });
@@ -293,14 +296,8 @@ export const updateClient: RequestHandler<
       return;
     }
 
-    // Buscar desconto aplicável
     const discountEntry = await prisma.planPaymentMethodDiscount.findUnique({
-      where: {
-        planId_paymentMethodId: {
-          planId,
-          paymentMethodId,
-        },
-      },
+      where: { planId_paymentMethodId: { planId, paymentMethodId } },
     });
 
     const discount = discountEntry ? discountEntry.discount : 0;
@@ -327,8 +324,9 @@ export const updateClient: RequestHandler<
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (
         error.code === "P2002" &&
-        Array.isArray(error.meta?.target) &&
-        error.meta.target.includes("email")
+        error.meta &&
+        Array.isArray((error.meta as any).target) &&
+        (error.meta as any).target.includes("email")
       ) {
         res.status(400).json({ message: "Email já cadastrado" });
         return;
@@ -342,7 +340,6 @@ export const updateClient: RequestHandler<
   }
 };
 
-// Função para deletar um cliente
 export const deleteClient: RequestHandler<ParamsWithId> = async (
   req: Request<ParamsWithId>,
   res: Response
@@ -371,7 +368,6 @@ export const deleteClient: RequestHandler<ParamsWithId> = async (
   }
 };
 
-// Função para renovar um cliente (atualizar apenas a dueDate)
 export const renewClient: RequestHandler<
   ParamsWithId,
   unknown,
@@ -390,14 +386,12 @@ export const renewClient: RequestHandler<
   }
 
   try {
-    // Validar a data de vencimento
     const parsedDueDate = new Date(dueDate);
     if (isNaN(parsedDueDate.getTime())) {
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
 
-    // Verificar se o cliente existe
     const clientExists = await prisma.client.findUnique({
       where: { id: parseInt(id) },
     });
@@ -406,16 +400,10 @@ export const renewClient: RequestHandler<
       return;
     }
 
-    // Atualizar apenas a dueDate do cliente
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
-      data: {
-        dueDate: parsedDueDate,
-      },
-      include: {
-        plan: true,
-        paymentMethod: true,
-      },
+      data: { dueDate: parsedDueDate },
+      include: { plan: true, paymentMethod: true },
     });
 
     res.status(200).json(updatedClient);
@@ -431,7 +419,6 @@ export const renewClient: RequestHandler<
   }
 };
 
-// Função para reativar um cliente (alterar isActive para true)
 export const reactivateClient: RequestHandler<ParamsWithId> = async (
   req: Request<ParamsWithId>,
   res: Response
@@ -455,13 +442,8 @@ export const reactivateClient: RequestHandler<ParamsWithId> = async (
 
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
-      data: {
-        isActive: true, // Reativar o cliente
-      },
-      include: {
-        plan: true,
-        paymentMethod: true,
-      },
+      data: { isActive: true },
+      include: { plan: true, paymentMethod: true },
     });
 
     res.status(200).json(updatedClient);
@@ -477,7 +459,6 @@ export const reactivateClient: RequestHandler<ParamsWithId> = async (
   }
 };
 
-// Função para atualizar o status de pagamento
 export const updatePaymentStatus: RequestHandler<ParamsWithId> = async (
   req: Request<ParamsWithId>,
   res: Response

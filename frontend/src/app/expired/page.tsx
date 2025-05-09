@@ -1,24 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  keepPreviousData,
-} from "@tanstack/react-query";
-import axios, { AxiosError } from "axios";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { Client } from "@/app/clients/types";
-import ExpiredClientsTable from "@/app/expired/components/ExpiredClientsTable";
+import { AxiosError } from "axios";
+import dynamic from "next/dynamic";
 import ClientSearch from "@/components/ClientSearch";
+import { fetchExpiredClients, reactivateClient } from "./api.ts"; // Importação explícita com .ts
+import { Client } from "../clients/types";
+import { useAuth } from "@/hooks/useAuth";
 import { useSearch } from "@/hooks/useSearch";
+import Loading from "@/components/Loading";
 
-export default function ExpiredClients() {
-  const [selectedClients, setSelectedClients] = useState<number[]>([]);
-  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
-  const { searchTerm } = useSearch();
+// [OTIMIZAÇÃO] Lazy loading do componente ExpiredClientsTable
+const ExpiredClientsTable = dynamic(
+  () => import("./components/ExpiredClientsTable"),
+  {
+    loading: () => <Loading>Carregando tabela...</Loading>,
+  }
+);
+
+export default function Expired() {
+  const { handleUnauthorized } = useAuth();
   const queryClient = useQueryClient();
+  const { searchTerm } = useSearch();
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Client | "plan.name" | null;
     direction: "asc" | "desc";
@@ -26,83 +31,56 @@ export default function ExpiredClients() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
 
-  const { data: allExpiredClients } = useQuery<Client[]>({
-    queryKey: ["allExpiredClients"],
-    queryFn: async () => {
-      const response = await axios.get(
-        "http://localhost:3001/api/clients/expired",
-        {
-          params: { limit: 9999 },
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      );
-      return response.data.data;
-    },
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
-
+  // [OTIMIZAÇÃO] Busca clientes expirados com parâmetro de busca no backend
   const {
     data: clientsResponse,
     isLoading,
     isFetching,
     error,
   } = useQuery<{ data: Client[]; total: number; page: number; limit: number }>({
-    queryKey: ["expiredClients", page, limit],
+    queryKey: ["expiredClients", page, limit, searchTerm],
     queryFn: async () => {
-      const { data } = await axios.get(
-        "http://localhost:3001/api/clients/expired",
-        {
-          params: { page, limit },
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      try {
+        const response = await fetchExpiredClients(page, limit, searchTerm);
+        return response;
+      } catch (error) {
+        if (error instanceof AxiosError) {
+          if (error.response?.status === 401) handleUnauthorized();
         }
-      );
-      return data;
+        throw error;
+      }
     },
-    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
-  useEffect(() => {
-    if (clientsResponse?.data)
-      setSelectedClients((prev) =>
-        prev.filter((id) =>
-          clientsResponse.data.some((client) => client.id === id)
-        )
-      );
-  }, [clientsResponse?.data]);
-
-  useEffect(() => {
-    if (!allExpiredClients) {
-      setFilteredClients(clientsResponse?.data || []);
-      return;
-    }
-    if (!searchTerm) {
-      setFilteredClients(clientsResponse?.data || []);
-      return;
-    }
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    const filtered = allExpiredClients.filter((client) => {
-      const fields = [
-        client.fullName.toLowerCase(),
-        client.email.toLowerCase(),
-        client.plan.name.toLowerCase(),
-      ];
-      return fields.some((field) => field.includes(lowerSearchTerm));
-    });
-    setFilteredClients(filtered);
-  }, [searchTerm, allExpiredClients, clientsResponse?.data]);
-
-  const sortedClients = [...filteredClients].sort((a, b) => {
+  const sortedClients = [...(clientsResponse?.data || [])].sort((a, b) => {
     if (!sortConfig.key) return 0;
 
-    const valueA =
-      sortConfig.key === "plan.name"
-        ? a.plan.name.toLowerCase()
-        : (a[sortConfig.key] as string);
-    const valueB =
-      sortConfig.key === "plan.name"
-        ? b.plan.name.toLowerCase()
-        : (b[sortConfig.key] as string);
+    let valueA: string | number;
+    let valueB: string | number;
+
+    if (sortConfig.key === "plan.name") {
+      valueA = a.plan?.name?.toLowerCase() ?? "";
+      valueB = b.plan?.name?.toLowerCase() ?? "";
+    } else {
+      const rawValueA = a[sortConfig.key];
+      const rawValueB = b[sortConfig.key];
+
+      if (sortConfig.key === "dueDate") {
+        valueA = new Date(rawValueA as string).getTime() || 0;
+        valueB = new Date(rawValueB as string).getTime() || 0;
+      } else if (sortConfig.key === "isActive") {
+        valueA = rawValueA === true ? 1 : 0;
+        valueB = rawValueB === true ? 1 : 0;
+      } else if (typeof rawValueA === "string") {
+        valueA = (rawValueA as string).toLowerCase() ?? "";
+        valueB = (rawValueB as string).toLowerCase() ?? "";
+      } else {
+        valueA = (rawValueA as number) ?? 0;
+        valueB = (rawValueB as number) ?? 0;
+      }
+    }
 
     if (valueA < valueB) return sortConfig.direction === "asc" ? -1 : 1;
     if (valueA > valueB) return sortConfig.direction === "asc" ? 1 : -1;
@@ -116,140 +94,26 @@ export default function ExpiredClients() {
     }));
   };
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) =>
-      axios.delete(`http://localhost:3001/api/clients/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      }),
-    onSuccess: () => {
+  const handleReactivate = async (client: Client) => {
+    try {
+      await reactivateClient(client.id);
+      toast.success("Cliente reativado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["expiredClients"] });
-      queryClient.invalidateQueries({ queryKey: ["allExpiredClients"] });
-      toast.success("Excluído!");
-    },
-    onError: (error) =>
-      toast.error(
-        error instanceof AxiosError
-          ? `Erro: ${error.message}`
-          : "Erro desconhecido"
-      ),
-  });
-
-  const bulkDeleteMutation = useMutation({
-    mutationFn: (ids: number[]) =>
-      Promise.all(
-        ids.map((id) =>
-          axios.delete(`http://localhost:3001/api/clients/${id}`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          })
-        )
-      ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expiredClients"] });
-      queryClient.invalidateQueries({ queryKey: ["allExpiredClients"] });
-      setSelectedClients([]);
-      toast.success("Excluídos!");
-    },
-    onError: (error) =>
-      toast.error(
-        error instanceof AxiosError
-          ? `Erro: ${error.message}`
-          : "Erro desconhecido"
-      ),
-  });
-
-  const reactivateMutation = useMutation({
-    mutationFn: (id: number) =>
-      axios.put(
-        `http://localhost:3001/api/clients/reactivate/${id}`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expiredClients"] });
-      queryClient.invalidateQueries({ queryKey: ["allExpiredClients"] });
-      toast.success("Reativado!");
-    },
-    onError: (error) =>
-      toast.error(
-        error instanceof AxiosError
-          ? `Erro: ${error.message}`
-          : "Erro desconhecido"
-      ),
-  });
-
-  const handleSelectClient = (id: number) =>
-    setSelectedClients((prev) =>
-      prev.includes(id)
-        ? prev.filter((clientId) => clientId !== id)
-        : [...prev, id]
-    );
-
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked)
-      setSelectedClients(sortedClients.map((client) => client.id));
-    else setSelectedClients([]);
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        toast.error(`Erro ao reativar cliente: ${error.message}`);
+        if (error.response?.status === 401) handleUnauthorized();
+      }
+    }
   };
 
-  const handleBulkDelete = () =>
-    selectedClients.length > 0 && bulkDeleteMutation.mutate(selectedClients);
-
-  const handlePaymentStatusClick = (
-    clientId: number,
-    currentStatus: boolean
-  ) => {
-    if (currentStatus) {
-      if (window.confirm("Marcar como não verificado?")) {
-        axios
-          .put(
-            `http://localhost:3001/api/clients/payment-status/${clientId}`,
-            { paymentVerified: false },
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }
-          )
-          .then(() => {
-            toast.success("Atualizado!");
-            queryClient.invalidateQueries({ queryKey: ["expiredClients"] });
-          })
-          .catch((error) =>
-            toast.error(
-              error instanceof AxiosError
-                ? `Erro: ${error.message}`
-                : "Erro desconhecido"
-            )
-          );
-      }
-    } else {
-      const date = prompt("Data (YYYY-MM-DD):");
-      if (date && !isNaN(new Date(date).getTime())) {
-        axios
-          .put(
-            `http://localhost:3001/api/clients/payment-status/${clientId}`,
-            { paymentVerified: true, paymentVerifiedDate: date },
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }
-          )
-          .then(() => {
-            toast.success("Atualizado!");
-            queryClient.invalidateQueries({ queryKey: ["expiredClients"] });
-          })
-          .catch((error) =>
-            toast.error(
-              error instanceof AxiosError
-                ? `Erro: ${error.message}`
-                : "Erro desconhecido"
-            )
-          );
-      } else alert("Data inválida!");
+  const handlePageChange = (newPage: number) => {
+    if (
+      clientsResponse &&
+      newPage > 0 &&
+      newPage <= Math.ceil(clientsResponse.total / limit)
+    ) {
+      setPage(newPage);
     }
   };
 
@@ -258,31 +122,20 @@ export default function ExpiredClients() {
     setPage(1);
   };
 
-  const handlePageChange = (newPage: number) => {
-    if (
-      clientsResponse &&
-      newPage > 0 &&
-      newPage <= Math.ceil(clientsResponse.total / limit)
-    )
-      setPage(newPage);
-  };
+  if (error) {
+    return (
+      <div className="error-message">Erro: {(error as Error).message}</div>
+    );
+  }
 
-  if (error) return <div className="error-message">Erro: {error.message}</div>;
-
-  const isDataReady = clientsResponse?.data && filteredClients.length > 0;
+  const isDataReady = clientsResponse?.data && clientsResponse.data.length > 0;
 
   return (
     <div className="dashboard-container">
-      <div className="flex sm:flex-row flex-col justify-between items-center mb-5">
-        <h1 className="text-3xl mb-4 sm:mb-0">Clientes Expirados</h1>
-        {selectedClients.length > 0 && (
-          <button
-            onClick={handleBulkDelete}
-            className="new-client-button bg-[var(--danger-bg)] text-white hover:bg-red-600"
-          >
-            Excluir Selecionados ({selectedClients.length})
-          </button>
-        )}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">
+          Clientes Expirados
+        </h1>
       </div>
       <ClientSearch />
       <div className="clients-table-container">
@@ -290,19 +143,16 @@ export default function ExpiredClients() {
           {isDataReady ? (
             <ExpiredClientsTable
               clients={sortedClients}
-              sortConfig={sortConfig}
               onSort={handleSort}
-              selectedClients={selectedClients}
-              onSelectClient={handleSelectClient}
-              onSelectAll={handleSelectAll}
-              onDelete={(id: number) => deleteMutation.mutate(id)}
-              onReactivate={(id: number) => reactivateMutation.mutate(id)}
-              onUpdatePaymentStatus={handlePaymentStatusClick}
+              onReactivate={handleReactivate}
+              sortConfig={sortConfig}
               isFetching={isFetching}
               isLoading={isLoading}
             />
           ) : (
-            <p className="text-center mt-4">Nenhum cliente encontrado.</p>
+            <p className="text-center mt-4">
+              Nenhum cliente expirado encontrado.
+            </p>
           )}
         </div>
         {isFetching && <div className="text-center mt-2">Atualizando...</div>}

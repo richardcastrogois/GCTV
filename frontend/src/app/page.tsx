@@ -50,10 +50,7 @@ export default function Login() {
     try {
       const { data } = await axios.post(
         "http://localhost:3001/api/auth/login",
-        {
-          username,
-          password,
-        }
+        { username, password }
       );
       localStorage.setItem("token", data.token);
       setupLogoutTimer(data.token);
@@ -74,7 +71,7 @@ export default function Login() {
       className="min-h-screen flex items-center justify-center bg-cover bg-center"
       style={{
         backgroundImage:
-          "url('https://images.pexels.com/photos/39811/pexels-photo-39811.jpeg')",
+          "url('https://images.pexels.com/photos/39811/pexels-photo-39811.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=500')",
       }}
     >
       <form

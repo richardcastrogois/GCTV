@@ -1,5 +1,3 @@
-// frontend/src/app/clients/api.ts
-
 import api from "@/utils/api";
 import { Client, Plan, PaymentMethod } from "./types";
 
@@ -13,8 +11,14 @@ export const fetchPaymentMethods = async (): Promise<PaymentMethod[]> => {
   return response.data;
 };
 
-export const fetchClients = async (): Promise<Client[]> => {
-  const response = await api.get("/api/clients");
+export const fetchClients = async (
+  page: number,
+  limit: number,
+  search: string
+): Promise<{ data: Client[]; total: number; page: number; limit: number }> => {
+  const response = await api.get("/api/clients", {
+    params: { page, limit, search },
+  });
   return response.data;
 };
 

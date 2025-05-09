@@ -1,3 +1,5 @@
+//backend/src/controllers/dashboardController.ts
+
 import { Request, Response, RequestHandler } from "express";
 import { PrismaClient } from "@prisma/client";
 
