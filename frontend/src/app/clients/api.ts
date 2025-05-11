@@ -39,6 +39,7 @@ export const updateClient = async (
     dueDate: string;
     grossAmount: number;
     isActive: boolean;
+    observations?: string; // Adicionado ao tipo de dados
   }
 ): Promise<Client> => {
   const response = await api.put(`/api/clients/${id}`, data);
@@ -58,5 +59,16 @@ export const renewClient = async (
   dueDate: string
 ): Promise<Client> => {
   const response = await api.put(`/api/clients/renew/${id}`, { dueDate });
+  return response.data;
+};
+
+// Nova função para atualizar apenas as observações
+export const updateClientObservations = async (
+  id: number,
+  observations: string
+): Promise<Client> => {
+  const response = await api.put(`/api/clients/observations/${id}`, {
+    observations,
+  });
   return response.data;
 };

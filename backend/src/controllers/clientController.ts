@@ -1,3 +1,5 @@
+//backend/src/controllers/clientController.ts
+
 import { RequestHandler, Request, Response } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { ParsedQs } from "qs";
@@ -14,8 +16,10 @@ type ClientBody = {
   dueDate: string;
   grossAmount: number;
   isActive: boolean;
+  observations?: string; // Adicionado
 };
 type RenewClientBody = { dueDate: string };
+type ObservationBody = { observations: string };
 
 export const getClients: RequestHandler = async (
   req: Request,
@@ -221,6 +225,7 @@ export const createClient: RequestHandler<
         isActive,
         paymentVerified: false,
         paymentVerifiedDate: null,
+        observations: req.body.observations || null,
       },
     });
 
@@ -315,6 +320,7 @@ export const updateClient: RequestHandler<
         grossAmount,
         netAmount,
         isActive,
+        observations: req.body.observations || null,
       },
     });
 
@@ -492,5 +498,42 @@ export const updatePaymentStatus: RequestHandler<ParamsWithId> = async (
       }
     }
     res.status(500).json({ message: "Erro ao atualizar status de pagamento" });
+  }
+};
+
+// Nova função para atualizar apenas o campo observations
+export const updateClientObservations: RequestHandler<
+  ParamsWithId,
+  unknown,
+  ObservationBody,
+  ParsedQs
+> = async (
+  req: Request<ParamsWithId, unknown, ObservationBody, ParsedQs>,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params;
+  const { observations } = req.body;
+
+  if (isNaN(parseInt(id))) {
+    res.status(400).json({ message: "ID inválido" });
+    return;
+  }
+
+  try {
+    const updatedClient = await prisma.client.update({
+      where: { id: parseInt(id) },
+      data: { observations: observations || null },
+      include: { plan: true, paymentMethod: true },
+    });
+    res.json(updatedClient);
+  } catch (error) {
+    console.error("Erro ao atualizar observações:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2025") {
+        res.status(404).json({ message: "Cliente não encontrado" });
+        return;
+      }
+    }
+    res.status(500).json({ message: "Erro ao atualizar observações" });
   }
 };

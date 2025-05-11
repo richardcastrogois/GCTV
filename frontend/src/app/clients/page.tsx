@@ -1,5 +1,3 @@
-//frontend/src/app/clients/page.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,6 +14,7 @@ import {
   deleteClient,
   updateClient,
   renewClient,
+  updateClientObservations,
 } from "./api";
 import { Client, Plan, PaymentMethod, EditFormData } from "./types";
 import { useAuth } from "@/hooks/useAuth";
@@ -53,6 +52,7 @@ export default function Clients() {
     dueDate: "",
     grossAmount: "",
     isActive: true,
+    observations: "",
   });
   const [plans, setPlans] = useState<Plan[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -188,6 +188,7 @@ export default function Clients() {
       dueDate: formatDateToLocal(client.dueDate),
       grossAmount: client.grossAmount.toString(),
       isActive: client.isActive,
+      observations: client.observations || "",
     });
     setIsModalOpen(true);
   };
@@ -290,6 +291,20 @@ export default function Clients() {
     }
   };
 
+  // Nova função para atualizar observações
+  const handleUpdateObservations = async (id: number, observations: string) => {
+    try {
+      await updateClientObservations(id, observations);
+      toast.success("Observações atualizadas com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        toast.error(`Erro ao atualizar observações: ${error.message}`);
+        if (error.response?.status === 401) handleUnauthorized();
+      }
+    }
+  };
+
   if (error) {
     return (
       <div className="error-message">Erro: {(error as Error).message}</div>
@@ -322,6 +337,7 @@ export default function Clients() {
               onUpdatePaymentStatus={handleUpdatePaymentStatus}
               isFetching={isFetching}
               isLoading={isLoading}
+              onUpdateObservations={handleUpdateObservations} // Adicionado
             />
           ) : (
             <p className="text-center mt-4">Nenhum cliente encontrado.</p>

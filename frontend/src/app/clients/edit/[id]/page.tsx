@@ -18,6 +18,7 @@ export default function EditClient() {
   const [paymentMethodId, setPaymentMethodId] = useState<number>(0);
   const [dueDate, setDueDate] = useState("");
   const [grossAmount, setGrossAmount] = useState("");
+  const [observations, setObservations] = useState(""); // Novo estado
   const [plans, setPlans] = useState<{ id: number; name: string }[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<
     { id: number; name: string }[]
@@ -67,6 +68,7 @@ export default function EditClient() {
         setPaymentMethodId(clientData.paymentMethod.id);
         setDueDate(clientData.dueDate.split("T")[0]); // Formato YYYY-MM-DD
         setGrossAmount(clientData.grossAmount.toString());
+        setObservations(clientData.observations || ""); // Carrega observações
 
         // Buscar planos e métodos de pagamento para os dropdowns
         const [plansResponse, paymentMethodsResponse] = await Promise.all([
@@ -153,6 +155,7 @@ export default function EditClient() {
           dueDate: parsedDueDate.toISOString(),
           grossAmount: grossAmountNum,
           isActive: client?.isActive, // Mantém o estado atual de isActive
+          observations, // Envia as observações
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -264,6 +267,15 @@ export default function EditClient() {
               onChange={(e) => setGrossAmount(e.target.value)}
               className="p-2 border w-full rounded"
               required
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block mb-1">Observações</label>
+            <textarea
+              value={observations}
+              onChange={(e) => setObservations(e.target.value)}
+              className="p-2 border w-full rounded"
+              placeholder="Sem observações"
             />
           </div>
           <button

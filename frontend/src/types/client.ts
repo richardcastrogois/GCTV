@@ -29,6 +29,7 @@ export interface Client {
   isActive: boolean;
   createdAt?: string; // Adicionei, já que o backend retorna isso
   updatedAt?: string; // Adicionei, já que o backend retorna isso
+  observations?: string; // Novo campo adicionado
 }
 
 export interface DashboardStats {

@@ -623,8 +623,9 @@
   }
 
   .action-menu {
-    @apply absolute right-0 top-full mt-2 w-48 bg-[var(--table-bg)] backdrop-blur-md rounded-lg shadow-lg z-50 border border-[rgba(255,255,255,0.1)];
+    @apply absolute right-0 top-full mt-2 w-48 bg-[var(--table-bg)] backdrop-blur-md rounded-lg shadow-lg border border-[rgba(255,255,255,0.1)];
     padding: 0.5rem 0;
+    z-index: 100; /* Valor numérico direto */
   }
 
   .action-menu-item {

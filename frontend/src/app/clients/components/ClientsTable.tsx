@@ -1,5 +1,3 @@
-// frontend/src/app/clients/components/ClientsTable.tsx
-
 import {
   FaEdit,
   FaTrash,
@@ -50,6 +48,7 @@ interface ClientsTableProps {
   ) => void;
   isFetching?: boolean;
   isLoading?: boolean;
+  onUpdateObservations?: (id: number, observations: string) => void;
 }
 
 export default function ClientsTable({
@@ -403,13 +402,14 @@ export default function ClientsTable({
                       <div
                         className="action-menu"
                         ref={menuRef}
-                        style={{ zIndex: 1000 }}
+                        style={{ zIndex: 100 }}
                       >
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onEdit(client);
-                            setOpenMenu(null);
+                            console.log("Editando cliente:", client.id); // Depuração
+                            setOpenMenu(null); // Fecha o menu primeiro
+                            onEdit(client); // Chama a função de edição
                           }}
                           className="action-menu-item"
                         >
@@ -422,8 +422,8 @@ export default function ClientsTable({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onDelete(client.id);
                             setOpenMenu(null);
+                            onDelete(client.id);
                           }}
                           className="action-menu-item"
                         >
@@ -436,8 +436,8 @@ export default function ClientsTable({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onRenew(client);
                             setOpenMenu(null);
+                            onRenew(client);
                           }}
                           className="action-menu-item"
                         >
@@ -513,21 +513,30 @@ export default function ClientsTable({
                 </p>
                 <div className="flex gap-2 mt-2">
                   <button
-                    onClick={() => onEdit(client)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(client);
+                    }}
                     className="action-button edit"
                     title="Editar"
                   >
                     <FaEdit size={16} />
                   </button>
                   <button
-                    onClick={() => onDelete(client.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(client.id);
+                    }}
                     className="action-button delete"
                     title="Excluir"
                   >
                     <FaTrash size={16} />
                   </button>
                   <button
-                    onClick={() => onRenew(client)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRenew(client);
+                    }}
                     className="action-button renew"
                     title="Renovar"
                   >
@@ -638,6 +647,11 @@ export default function ClientsTable({
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Valor Líquido:</strong> R${" "}
                 {selectedClient.netAmount.toFixed(2)}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Observações:</strong>{" "}
+                {selectedClient.observations ||
+                  "Nenhuma observação disponível."}
               </p>
             </div>
             <div className="modal-footer">
