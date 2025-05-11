@@ -1,3 +1,5 @@
+// frontend/src/app/expired/components/ExpiredClientsTable.tsx
+
 import {
   FaSort,
   FaSortUp,
@@ -5,9 +7,10 @@ import {
   FaBolt,
   FaInfoCircle,
   FaTimes,
+  FaPencilAlt,
 } from "react-icons/fa";
 import { Client } from "../../clients/types";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Skeleton } from "@mui/material";
 
 const formatDateToUTC = (date: string | Date): string => {
@@ -40,7 +43,53 @@ export default function ExpiredClientsTable({
 }: ExpiredClientsTableProps) {
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [clientToReactivate, setClientToReactivate] = useState<Client | null>(
+    null
+  );
+
+  // Referências para os modais
+  const infoModalRef = useRef<HTMLDivElement>(null);
+  const confirmModalRef = useRef<HTMLDivElement>(null);
+
+  // Fechar modais com a tecla ESC e clique fora
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeInfoModal();
+        closeConfirmModal();
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      // Verificar se o clique foi fora do modal de informações
+      if (
+        isInfoModalOpen &&
+        infoModalRef.current &&
+        !infoModalRef.current.contains(e.target as Node)
+      ) {
+        closeInfoModal();
+      }
+
+      // Verificar se o clique foi fora do modal de confirmação
+      if (
+        isConfirmModalOpen &&
+        confirmModalRef.current &&
+        !confirmModalRef.current.contains(e.target as Node)
+      ) {
+        closeConfirmModal();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isInfoModalOpen, isConfirmModalOpen]);
 
   const getSortIcon = (columnKey: keyof Client | "plan.name") => {
     if (sortConfig.key !== columnKey) return <FaSort className="sort-icon" />;
@@ -74,6 +123,57 @@ export default function ExpiredClientsTable({
     setSelectedClient(null);
   };
 
+  const openConfirmModal = (client: Client) => {
+    setClientToReactivate(client);
+    setIsConfirmModalOpen(true);
+  };
+
+  const closeConfirmModal = () => {
+    setIsConfirmModalOpen(false);
+    setClientToReactivate(null);
+  };
+
+  const handleConfirmReactivate = () => {
+    if (clientToReactivate) {
+      onReactivate(clientToReactivate);
+    }
+    closeConfirmModal();
+  };
+
+  const getStatusClass = (isActive: boolean) => {
+    return isActive ? "status-text--ativo" : "status-text--inativo";
+  };
+
+  const getPlanClass = (planName: string) => {
+    switch (planName.toLowerCase()) {
+      case "p2p":
+        return "plan-text--p2p";
+      case "platinum":
+        return "plan-text--platinum";
+      case "comum":
+        return "plan-text--comum";
+      default:
+        return "plan-text--outros";
+    }
+  };
+
+  const getMethodClass = (methodName: string) => {
+    switch (methodName.toLowerCase()) {
+      case "nubank":
+        return "method-text--nubank";
+      case "banco do brasil":
+        return "method-text--banco-do-brasil";
+      case "caixa":
+        return "method-text--caixa";
+      case "picpay":
+        return "method-text--picpay";
+      case "pagseguro":
+        return "method-text--pagseguro";
+      default:
+        return "method-text--outros";
+    }
+  };
+
   if (isLoading) {
     return (
       <>
@@ -82,9 +182,6 @@ export default function ExpiredClientsTable({
             <table className="clients-table">
               <thead>
                 <tr>
-                  <th className="status-column">
-                    <Skeleton variant="text" width={50} />
-                  </th>
                   <th className="name-column">
                     <Skeleton variant="text" width={150} />
                   </th>
@@ -108,9 +205,6 @@ export default function ExpiredClientsTable({
               <tbody>
                 {[...Array(5)].map((_, index) => (
                   <tr key={index}>
-                    <td className="status-column">
-                      <Skeleton variant="text" width={50} />
-                    </td>
                     <td className="name-column">
                       <Skeleton variant="text" width={150} />
                     </td>
@@ -174,7 +268,6 @@ export default function ExpiredClientsTable({
           <table className={`clients-table ${isFetching ? "fade" : ""}`}>
             <thead>
               <tr>
-                <th className="status-column"></th>
                 <th className="name-column" onClick={() => onSort("fullName")}>
                   Nome {getSortIcon("fullName")}
                 </th>
@@ -209,26 +302,24 @@ export default function ExpiredClientsTable({
                   className={expandedRows.includes(client.id) ? "expanded" : ""}
                   onClick={(e) => handleCardClick(client.id, e)}
                 >
-                  <td className="status-column text-center"></td>
-                  <td className="name-column text-center">{client.fullName}</td>
-                  <td className="email-column hidden lg:table-cell text-center">
+                  <td className="name-column">{client.fullName}</td>
+                  <td className="email-column hidden lg:table-cell">
                     {client.email}
                   </td>
-                  <td className="plan-column text-center">
-                    {client.plan.name}
+                  <td className="plan-column">
+                    <span className={getPlanClass(client.plan.name)}>
+                      {client.plan.name}
+                    </span>
                   </td>
-                  <td className="due-date-column text-center">
+                  <td className="due-date-column">
                     {formatDateToUTC(client.dueDate)}
                   </td>
-                  <td className="status-column text-center">
-                    <span
-                      className={`status-dot ${
-                        client.isActive ? "bg-green-500" : "bg-red-500"
-                      }`}
-                    ></span>
-                    {client.isActive ? "Ativo" : "Inativo"}
+                  <td className="status-column">
+                    <span className={getStatusClass(client.isActive)}>
+                      {client.isActive ? "Ativo" : "Inativo"}
+                    </span>
                   </td>
-                  <td className="actions-column text-center">
+                  <td className="actions-column">
                     <div className="flex justify-center space-x-2">
                       <button
                         onClick={() => openInfoModal(client)}
@@ -238,17 +329,11 @@ export default function ExpiredClientsTable({
                         <FaInfoCircle size={16} />
                       </button>
                       <button
-                        onClick={() => onReactivate(client)}
+                        onClick={() => openConfirmModal(client)}
                         className="action-button"
                         title="Reativar"
                       >
                         <FaBolt size={16} />
-                      </button>
-                      <button className="action-button" title="Observação">
-                        <FaInfoCircle
-                          size={16}
-                          style={{ transform: "rotate(45deg)" }}
-                        />
                       </button>
                     </div>
                   </td>
@@ -274,13 +359,19 @@ export default function ExpiredClientsTable({
                   {client.fullName}
                 </h3>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  Plano: {client.plan.name}
+                  Plano:{" "}
+                  <span className={getPlanClass(client.plan.name)}>
+                    {client.plan.name}
+                  </span>
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
                   Vencimento: {formatDateToUTC(client.dueDate)}
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  Status: {client.isActive ? "Ativo" : "Inativo"}
+                  Status:{" "}
+                  <span className={getStatusClass(client.isActive)}>
+                    {client.isActive ? "Ativo" : "Inativo"}
+                  </span>
                 </p>
               </div>
             </div>
@@ -299,17 +390,11 @@ export default function ExpiredClientsTable({
                     <FaInfoCircle size={16} />
                   </button>
                   <button
-                    onClick={() => onReactivate(client)}
+                    onClick={() => openConfirmModal(client)}
                     className="action-button"
                     title="Reativar"
                   >
                     <FaBolt size={16} />
-                  </button>
-                  <button className="action-button" title="Observação">
-                    <FaInfoCircle
-                      size={16}
-                      style={{ transform: "rotate(45deg)" }}
-                    />
                   </button>
                 </div>
               </div>
@@ -319,13 +404,8 @@ export default function ExpiredClientsTable({
       </div>
 
       {isInfoModalOpen && selectedClient && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeInfoModal();
-          }}
-        >
-          <div className="modal-content">
+        <div className="modal-overlay">
+          <div className="modal-content" ref={infoModalRef}>
             <div className="modal-header">
               <h2 className="modal-title">Detalhes do Cliente</h2>
               <button onClick={closeInfoModal} className="modal-close-button">
@@ -340,11 +420,43 @@ export default function ExpiredClientsTable({
                 <strong>Email:</strong> {selectedClient.email}
               </p>
               <p className="text-[var(--text-primary)] mb-2">
-                <strong>Plano:</strong> {selectedClient.plan.name}
+                <strong>Telefone:</strong>{" "}
+                {selectedClient.phone || "Não informado"}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Plano:</strong>{" "}
+                <span className={getPlanClass(selectedClient.plan.name)}>
+                  {selectedClient.plan.name}
+                </span>
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Método de Pagamento:</strong>{" "}
+                <span
+                  className={getMethodClass(selectedClient.paymentMethod.name)}
+                >
+                  {selectedClient.paymentMethod.name}
+                </span>
               </p>
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Data de Vencimento:</strong>{" "}
                 {formatDateToUTC(selectedClient.dueDate)}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Valor Bruto:</strong> R${" "}
+                {selectedClient.grossAmount.toFixed(2)}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Valor Líquido:</strong> R${" "}
+                {selectedClient.netAmount.toFixed(2)}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2 flex items-center">
+                <strong>Observações:</strong>{" "}
+                {selectedClient.observations || "Nenhuma observação"}{" "}
+                <FaPencilAlt
+                  size={14}
+                  className="ml-2 cursor-pointer text-[var(--accent-blue)]"
+                  title="Editar Observações"
+                />
               </p>
             </div>
             <div className="modal-footer">
@@ -353,6 +465,51 @@ export default function ExpiredClientsTable({
                 className="modal-button modal-button-cancel"
               >
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isConfirmModalOpen && clientToReactivate && (
+        <div className="modal-overlay">
+          <div className="modal-content" ref={confirmModalRef}>
+            <div className="modal-header">
+              <h2 className="modal-title">Confirmar Reativação</h2>
+              <button
+                onClick={closeConfirmModal}
+                className="modal-close-button"
+              >
+                <FaTimes size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-[var(--text-primary)] mb-2">
+                Tem certeza que deseja reativar o cliente?
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Nome:</strong> {clientToReactivate.fullName}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Email:</strong> {clientToReactivate.email}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Telefone:</strong>{" "}
+                {clientToReactivate.phone || "Não informado"}
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                onClick={closeConfirmModal}
+                className="modal-button modal-button-cancel"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmReactivate}
+                className="modal-button modal-button-save"
+              >
+                Reativar
               </button>
             </div>
           </div>

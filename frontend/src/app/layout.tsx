@@ -1,6 +1,7 @@
 "use client";
 
 import "./globals.css";
+import "./toast.css"; // Importação do estilo personalizado para o react-toastify
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -30,7 +31,18 @@ function AppContent({ children }: { children: React.ReactNode }) {
         className={`min-h-screen flex flex-col ${hasNavbar ? "pt-16" : ""}`}
       >
         {children}
-        <ToastContainer position="top-right" autoClose={3000} />
+        <ToastContainer
+          position="top-right"
+          autoClose={2000} // 2 segundos
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss={false} // Não pausar ao mudar de tela
+          draggable={false}
+          pauseOnHover={false} // Não pausar ao passar o mouse
+          theme="dark"
+        />
       </main>
     </SearchProvider>
   );

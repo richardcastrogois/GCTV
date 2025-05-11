@@ -1,3 +1,4 @@
+//frontend/src/types/client.ts
 export interface Plan {
   id: number;
   name: string;

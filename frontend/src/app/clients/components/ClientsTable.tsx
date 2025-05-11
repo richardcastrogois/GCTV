@@ -1,3 +1,5 @@
+// frontend/src/app/clients/components/ClientsTable.tsx
+
 import {
   FaEdit,
   FaTrash,
@@ -68,7 +70,7 @@ export default function ClientsTable({
   const [modalClientId, setModalClientId] = useState<number | null>(null);
   const [modalIsVerified, setModalIsVerified] = useState<boolean>(false);
   const [modalDate, setModalDate] = useState<string>("");
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null); // Correção aqui
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -152,6 +154,36 @@ export default function ClientsTable({
     }
     closeModal();
     setOpenMenu(null);
+  };
+
+  const getPlanClass = (planName: string) => {
+    switch (planName.toLowerCase()) {
+      case "p2p":
+        return "plan-text--p2p";
+      case "platinum":
+        return "plan-text--platinum";
+      case "comum":
+        return "plan-text--comum";
+      default:
+        return "plan-text--outros";
+    }
+  };
+
+  const getMethodClass = (methodName: string) => {
+    switch (methodName.toLowerCase()) {
+      case "nubank":
+        return "method-text--nubank";
+      case "banco do brasil":
+        return "method-text--banco-do-brasil";
+      case "caixa":
+        return "method-text--caixa";
+      case "picpay":
+        return "method-text--picpay";
+      case "pagseguro":
+        return "method-text--pagseguro";
+      default:
+        return "method-text--outros";
+    }
   };
 
   if (isLoading) {
@@ -331,9 +363,15 @@ export default function ClientsTable({
                   <td className="email-column hidden lg:table-cell">
                     {client.email}
                   </td>
-                  <td className="plan-column">{client.plan.name}</td>
+                  <td className="plan-column">
+                    <span className={getPlanClass(client.plan.name)}>
+                      {client.plan.name}
+                    </span>
+                  </td>
                   <td className="method-column hidden lg:table-cell">
-                    {client.paymentMethod.name}
+                    <span className={getMethodClass(client.paymentMethod.name)}>
+                      {client.paymentMethod.name}
+                    </span>
                   </td>
                   <td className="due-date-column">
                     {formatDateToUTC(client.dueDate)}
@@ -434,10 +472,16 @@ export default function ClientsTable({
                   {client.fullName}
                 </h3>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  Plano: {client.plan.name}
+                  Plano:{" "}
+                  <span className={getPlanClass(client.plan.name)}>
+                    {client.plan.name}
+                  </span>
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  Método: {client.paymentMethod.name}
+                  Método:{" "}
+                  <span className={getMethodClass(client.paymentMethod.name)}>
+                    {client.paymentMethod.name}
+                  </span>
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
                   Vencimento: {formatDateToUTC(client.dueDate)}
@@ -570,11 +614,18 @@ export default function ClientsTable({
                 <strong>Email:</strong> {selectedClient.email}
               </p>
               <p className="text-[var(--text-primary)] mb-2">
-                <strong>Plano:</strong> {selectedClient.plan.name}
+                <strong>Plano:</strong>{" "}
+                <span className={getPlanClass(selectedClient.plan.name)}>
+                  {selectedClient.plan.name}
+                </span>
               </p>
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Método de Pagamento:</strong>{" "}
-                {selectedClient.paymentMethod.name}
+                <span
+                  className={getMethodClass(selectedClient.paymentMethod.name)}
+                >
+                  {selectedClient.paymentMethod.name}
+                </span>
               </p>
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Data de Vencimento:</strong>{" "}

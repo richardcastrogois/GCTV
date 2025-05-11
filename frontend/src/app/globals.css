@@ -307,7 +307,7 @@
 
   .clients-table th,
   .clients-table td {
-    @apply py-2 px-3 text-left;
+    @apply py-2 px-3 text-center;
     vertical-align: middle;
     transition: all 0.3s ease-in-out;
   }
@@ -372,13 +372,14 @@
   }
 
   .clients-table th {
-    @apply text-[var(--text-primary)] font-medium cursor-pointer transition-colors duration-300;
+    @apply text-[var(--text-primary)] font-bold cursor-pointer transition-colors duration-300;
     background: var(--table-header-bg);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    font-size: 0.9rem;
-    font-weight: 500;
+    font-size: 1.1rem;
+    font-weight: 600;
     letter-spacing: 0.02em;
     padding: 0.75rem 1rem;
+    white-space: nowrap;
   }
 
   .clients-table td {
@@ -400,6 +401,74 @@
 
   .clients-table .sort-icon {
     @apply ml-1 inline-block align-middle text-[var(--text-primary)];
+    margin-left: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  /* Cores condicionais para Status */
+  .status-text--inativo {
+    color: #ff4d4f;
+  }
+
+  .status-text--ativo,
+  .status-text--verificado {
+    color: #00da77;
+  }
+
+  .status-text--nao-verificado {
+    color: #ff4d4f;
+  }
+
+  /* Cores condicionais para Plano */
+  .plan-text--p2p {
+    color: #F1916D;
+    font-weight: bold;
+  }
+
+  .plan-text--platinum {
+    color: #a64dff;
+    font-weight: bold;
+  }
+
+  .plan-text--comum {
+    color: #4d8cff;
+    font-weight: bold;
+  }
+
+  .plan-text--outros {
+    color: #F3DADF;
+    font-weight: bold;
+  }
+
+  /* Cores condicionais para Método de Pagamento */
+  .method-text--nubank {
+    color: #a64dff;
+    font-weight: bold;
+  }
+
+  .method-text--banco-do-brasil {
+    color: #ffd700;
+    font-weight: bold;
+  }
+
+  .method-text--caixa {
+    color: #4d8cff;
+    font-weight: bold;
+  }
+
+  .method-text--picpay {
+    color: #00da77;
+    font-weight: bold;
+  }
+
+  .method-text--pagseguro {
+    color: #ffa000;
+    font-weight: bold;
+  }
+
+  .method-text--outros {
+    color: #F3DADF;
+    font-weight: bold;
   }
 
   /* Ajustes de responsividade */

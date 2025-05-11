@@ -1,3 +1,5 @@
+//backend/src/routes/clientRoutes.ts
+
 import { Router } from "express";
 import {
   getClients,

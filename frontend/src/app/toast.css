@@ -1,0 +1,47 @@
+/* Personalização do react-toastify */
+.Toastify__toast-container {
+  z-index: 9999;
+}
+
+.Toastify__toast {
+  background: var(--table-bg) !important;
+  color: var(--text-primary) !important;
+  border-radius: 0.5rem !important;
+  backdrop-filter: blur(5px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  font-family: "Inter", sans-serif !important;
+}
+
+.Toastify__toast--success {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 218, 119, 0.2),
+    rgba(30, 41, 59, 0.9)
+  ) !important;
+}
+
+.Toastify__toast--error {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 77, 79, 0.2),
+    rgba(30, 41, 59, 0.9)
+  ) !important;
+}
+
+.Toastify__toast-body {
+  font-size: 0.9rem !important;
+}
+
+.Toastify__progress-bar {
+  background: var(--accent-blue) !important;
+}
+
+.Toastify__close-button {
+  color: var(--text-primary) !important;
+  opacity: 0.7 !important;
+}
+
+.Toastify__close-button:hover {
+  opacity: 1 !important;
+}

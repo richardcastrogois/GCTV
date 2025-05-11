@@ -22,6 +22,7 @@ export interface Client {
   isActive: boolean;
   paymentVerified: boolean; // Adicionado
   paymentVerifiedDate: string | null; // Adicionado
+  observations?: string; // Novo campo, opcional
 }
 
 export interface EditFormData {
@@ -33,4 +34,5 @@ export interface EditFormData {
   dueDate: string;
   grossAmount: string;
   isActive: boolean;
+  observations?: string;
 }

@@ -6,13 +6,12 @@ import { toast } from "react-toastify";
 import { AxiosError } from "axios";
 import dynamic from "next/dynamic";
 import ClientSearch from "@/components/ClientSearch";
-import { fetchExpiredClients, reactivateClient } from "./api.ts"; // Importação explícita com .ts
+import { fetchExpiredClients, reactivateClient } from "./api.ts";
 import { Client } from "../clients/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearch } from "@/hooks/useSearch";
 import Loading from "@/components/Loading";
 
-// [OTIMIZAÇÃO] Lazy loading do componente ExpiredClientsTable
 const ExpiredClientsTable = dynamic(
   () => import("./components/ExpiredClientsTable"),
   {
@@ -31,7 +30,6 @@ export default function Expired() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
 
-  // [OTIMIZAÇÃO] Busca clientes expirados com parâmetro de busca no backend
   const {
     data: clientsResponse,
     isLoading,
@@ -97,11 +95,19 @@ export default function Expired() {
   const handleReactivate = async (client: Client) => {
     try {
       await reactivateClient(client.id);
-      toast.success("Cliente reativado com sucesso!");
+      toast.success("Cliente reativado com sucesso!", {
+        autoClose: 2000,
+        pauseOnHover: false,
+        pauseOnFocusLoss: false,
+      });
       queryClient.invalidateQueries({ queryKey: ["expiredClients"] });
     } catch (error) {
       if (error instanceof AxiosError) {
-        toast.error(`Erro ao reativar cliente: ${error.message}`);
+        toast.error(`Erro ao reativar cliente: ${error.message}`, {
+          autoClose: 2000,
+          pauseOnHover: false,
+          pauseOnFocusLoss: false,
+        });
         if (error.response?.status === 401) handleUnauthorized();
       }
     }

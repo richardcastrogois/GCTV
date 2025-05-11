@@ -1,3 +1,5 @@
+//frontend/src/app/clients/page.tsx
+
 import api from "@/utils/api";
 import { Client, Plan, PaymentMethod } from "./types";
 
