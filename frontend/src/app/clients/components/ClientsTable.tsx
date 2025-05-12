@@ -12,6 +12,7 @@ import {
 } from "react-icons/fa";
 import { Client } from "../types";
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Skeleton } from "@mui/material";
 
 const formatDateToUTC = (date: string | Date): string => {
@@ -64,6 +65,10 @@ export default function ClientsTable({
 }: ClientsTableProps) {
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+  }>({ top: 0, left: 0 });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [modalClientId, setModalClientId] = useState<number | null>(null);
@@ -71,16 +76,36 @@ export default function ClientsTable({
   const [modalDate, setModalDate] = useState<string>("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
+  const infoModalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setOpenMenu(null);
       }
+      if (
+        infoModalRef.current &&
+        !infoModalRef.current.contains(event.target as Node) &&
+        (event.target as HTMLElement).closest(".modal-overlay")
+      ) {
+        closeInfoModal();
+      }
+    };
+
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenMenu(null);
+        closeInfoModal();
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscKey);
+    };
   }, []);
 
   const getSortIcon = (
@@ -112,6 +137,26 @@ export default function ClientsTable({
 
   const toggleMenu = (clientId: number, e: React.MouseEvent) => {
     e.stopPropagation();
+    const button = buttonRefs.current.get(clientId);
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const menuWidth = 192; // w-48 em pixels (12rem * 16px/rem)
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+
+    let top = rect.bottom + window.scrollY + 4; // Pequeno espaço abaixo do botão
+    let left = rect.left + window.scrollX; // Alinha à esquerda do botão
+
+    // Ajustar a posição para evitar que o menu saia da tela
+    if (left + menuWidth > windowWidth) {
+      left = windowWidth - menuWidth - 10; // 10px de margem
+    }
+    if (top + 150 > windowHeight + window.scrollY) {
+      top = rect.top + window.scrollY - 150; // Posicionar acima do botão
+    }
+
+    setMenuPosition({ top, left });
     setOpenMenu((prev) => (prev === clientId ? null : clientId));
   };
 
@@ -298,7 +343,7 @@ export default function ClientsTable({
           <table className={`clients-table ${isFetching ? "fade" : ""}`}>
             <thead>
               <tr>
-                <th className="status-column">Status</th>
+                <th className="status-column">Status Pag</th>
                 <th className="name-column" onClick={() => onSort("fullName")}>
                   Nome {getSortIcon("fullName")}
                 </th>
@@ -391,6 +436,9 @@ export default function ClientsTable({
                         <FaInfoCircle size={16} />
                       </button>
                       <button
+                        ref={(el) => {
+                          if (el) buttonRefs.current.set(client.id, el);
+                        }}
                         onClick={(e) => toggleMenu(client.id, e)}
                         className="action-button"
                         title="Ações"
@@ -398,57 +446,6 @@ export default function ClientsTable({
                         <FaEllipsisV size={16} />
                       </button>
                     </div>
-                    {openMenu === client.id && (
-                      <div
-                        className="action-menu"
-                        ref={menuRef}
-                        style={{ zIndex: 100 }}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            console.log("Editando cliente:", client.id); // Depuração
-                            setOpenMenu(null); // Fecha o menu primeiro
-                            onEdit(client); // Chama a função de edição
-                          }}
-                          className="action-menu-item"
-                        >
-                          <FaEdit
-                            size={16}
-                            className="text-[var(--accent-blue)]"
-                          />{" "}
-                          Editar
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenu(null);
-                            onDelete(client.id);
-                          }}
-                          className="action-menu-item"
-                        >
-                          <FaTrash
-                            size={16}
-                            className="text-[var(--accent-blue)]"
-                          />{" "}
-                          Excluir
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenu(null);
-                            onRenew(client);
-                          }}
-                          className="action-menu-item"
-                        >
-                          <FaBolt
-                            size={16}
-                            className="text-[var(--accent-blue)]"
-                          />{" "}
-                          Renovar
-                        </button>
-                      </div>
-                    )}
                   </td>
                 </tr>
               ))}
@@ -549,6 +546,54 @@ export default function ClientsTable({
         ))}
       </div>
 
+      {openMenu !== null &&
+        clients.find((client) => client.id === openMenu) &&
+        createPortal(
+          <div
+            className="action-menu"
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              top: `${menuPosition.top}px`,
+              left: `${menuPosition.left}px`,
+              zIndex: 1000, // Garante que fique acima de tudo
+            }}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenu(null);
+                onEdit(clients.find((client) => client.id === openMenu)!);
+              }}
+              className="action-menu-item"
+            >
+              <FaEdit size={16} className="text-[var(--accent-blue)]" /> Editar
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenu(null);
+                onDelete(openMenu);
+              }}
+              className="action-menu-item"
+            >
+              <FaTrash size={16} className="text-[var(--accent-blue)]" />{" "}
+              Excluir
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenu(null);
+                onRenew(clients.find((client) => client.id === openMenu)!);
+              }}
+              className="action-menu-item"
+            >
+              <FaBolt size={16} className="text-[var(--accent-blue)]" /> Renovar
+            </button>
+          </div>,
+          document.body
+        )}
+
       {isModalOpen && (
         <div
           className="modal-overlay"
@@ -607,6 +652,7 @@ export default function ClientsTable({
           onClick={(e) => {
             if (e.target === e.currentTarget) closeInfoModal();
           }}
+          ref={infoModalRef}
         >
           <div className="modal-content">
             <div className="modal-header">
