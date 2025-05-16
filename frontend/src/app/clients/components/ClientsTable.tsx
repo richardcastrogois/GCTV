@@ -1,3 +1,5 @@
+//frontend/src/app/clients/components/ClientsTable.tsx
+
 import {
   FaEdit,
   FaTrash,
