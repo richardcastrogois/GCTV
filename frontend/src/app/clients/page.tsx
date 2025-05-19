@@ -258,6 +258,20 @@ export default function Clients() {
     setClientToRenew(null);
     setNewDueDate("");
   };
+
+  // Adicionar fechamento com ESC para o modal de renovação
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isRenewModalOpen) {
+        closeRenewModal();
+      }
+    };
+    document.addEventListener("keydown", handleEscKey);
+    return () => {
+      document.removeEventListener("keydown", handleEscKey);
+    };
+  }, [isRenewModalOpen]);
+
   const handlePageChange = (newPage: number) => {
     if (
       clientsResponse &&

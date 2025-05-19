@@ -4,6 +4,7 @@ import { FaTimes } from "react-icons/fa";
 import { EditFormData, Plan, PaymentMethod } from "../types";
 import { createPortal } from "react-dom";
 import Select, { StylesConfig } from "react-select";
+import { useEffect } from "react"; // Adicionado import do useEffect
 
 // Definir o tipo para as opções do react-select
 type SelectOption = { value: string; label: string } | null;
@@ -12,7 +13,7 @@ type SelectOption = { value: string; label: string } | null;
 const customStyles: StylesConfig<SelectOption, false> = {
   control: (provided) => ({
     ...provided,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "rgba(255, 255支部, 255, 0.1)",
     backdropFilter: "blur(5px)",
     border: "1px solid rgba(255, 255, 255, 0.3)",
     borderRadius: "0.5rem",
@@ -160,6 +161,18 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
     console.log("Dados enviados para o submit:", formData);
     onSubmit(e);
   };
+
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleEscKey);
+    return () => {
+      document.removeEventListener("keydown", handleEscKey);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

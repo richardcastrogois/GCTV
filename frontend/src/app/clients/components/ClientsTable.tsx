@@ -89,7 +89,22 @@ export default function ClientsTable({
       if (
         infoModalRef.current &&
         !infoModalRef.current.contains(event.target as Node) &&
-        (event.target as HTMLElement).closest(".modal-overlay")
+        event.target instanceof Element &&
+        event.target.closest(".modal-overlay")
+      ) {
+        closeInfoModal();
+      }
+      if (
+        isModalOpen &&
+        event.target instanceof Element &&
+        !event.target.closest(".modal-content")
+      ) {
+        closeModal();
+      }
+      if (
+        isInfoModalOpen &&
+        event.target instanceof Element &&
+        !event.target.closest(".modal-content")
       ) {
         closeInfoModal();
       }
@@ -99,6 +114,8 @@ export default function ClientsTable({
       if (event.key === "Escape") {
         setOpenMenu(null);
         closeInfoModal();
+        if (isModalOpen) closeModal();
+        if (isInfoModalOpen) closeInfoModal();
       }
     };
 
@@ -108,7 +125,7 @@ export default function ClientsTable({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscKey);
     };
-  }, []);
+  }, [isModalOpen, isInfoModalOpen]);
 
   const getSortIcon = (
     columnKey:
@@ -133,7 +150,8 @@ export default function ClientsTable({
   };
 
   const handleCardClick = (clientId: number, e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest(".action-button")) return;
+    if (e.target instanceof Element && e.target.closest(".action-button"))
+      return;
     toggleRow(clientId);
   };
 
@@ -558,7 +576,7 @@ export default function ClientsTable({
               position: "fixed",
               top: `${menuPosition.top}px`,
               left: `${menuPosition.left}px`,
-              zIndex: 1000, // Garante que fique acima de tudo
+              zIndex: 1000,
             }}
           >
             <button
@@ -597,13 +615,8 @@ export default function ClientsTable({
         )}
 
       {isModalOpen && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeModal();
-          }}
-        >
-          <div className="modal-content">
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">
                 {modalIsVerified
@@ -649,14 +662,8 @@ export default function ClientsTable({
       )}
 
       {isInfoModalOpen && selectedClient && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeInfoModal();
-          }}
-          ref={infoModalRef}
-        >
-          <div className="modal-content">
+        <div className="modal-overlay" onClick={closeInfoModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Detalhes do Cliente</h2>
               <button onClick={closeInfoModal} className="modal-close-button">

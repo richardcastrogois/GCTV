@@ -1,3 +1,5 @@
+//backend/src/seed.ts
+
 import { PrismaClient } from "@prisma/client";
 import { Faker, pt_BR } from "@faker-js/faker";
 

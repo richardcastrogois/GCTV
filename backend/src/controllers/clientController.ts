@@ -16,10 +16,15 @@ type ClientBody = {
   dueDate: string;
   grossAmount: number;
   isActive: boolean;
-  observations?: string; // Adicionado
+  observations?: string;
 };
 type RenewClientBody = { dueDate: string };
 type ObservationBody = { observations: string };
+
+// Tipo para o resultado da consulta raw
+type RawClient = {
+  id: number;
+};
 
 export const getClients: RequestHandler = async (
   req: Request,
@@ -31,19 +36,87 @@ export const getClients: RequestHandler = async (
     const skip = (page - 1) * limit;
     const searchTerm = (req.query.search as string)?.toLowerCase() || "";
 
-    const whereClause: Prisma.ClientWhereInput = { isActive: true };
+    let whereClause: Prisma.ClientWhereInput = { isActive: true };
+    let clientIds: number[] = [];
+
     if (searchTerm) {
-      whereClause.OR = [
-        { fullName: { contains: searchTerm, mode: "insensitive" } },
-        { email: { contains: searchTerm, mode: "insensitive" } },
-        { phone: { contains: searchTerm, mode: "insensitive" } },
-        { plan: { name: { contains: searchTerm, mode: "insensitive" } } },
-        {
-          paymentMethod: {
-            name: { contains: searchTerm, mode: "insensitive" },
-          },
-        },
-      ];
+      const searchPattern = `%${searchTerm}%`; // Busca parcial em qualquer posição
+
+      // Verificar se o searchTerm é um número (com ou sem decimal)
+      const isNumeric = /^\d+([.,]\d+)?$/.test(searchTerm.replace(/[,]/g, "."));
+
+      if (isNumeric) {
+        // Busca específica para números em grossAmount e netAmount
+        const numericQuery = `
+          SELECT c.id
+          FROM "Client" c
+          WHERE c."isActive" = true
+            AND (
+              LOWER(CAST(c."grossAmount" AS TEXT)) LIKE '${searchPattern}'
+              OR LOWER(CAST(c."netAmount" AS TEXT)) LIKE '${searchPattern}'
+            )
+        `;
+        const numericClients = await prisma.$queryRawUnsafe<RawClient[]>(
+          numericQuery
+        );
+        const numericClientIds = numericClients.map((client) => client.id);
+
+        if (numericClientIds.length > 0) {
+          // Se houver resultados nos valores, usa apenas eles
+          clientIds = numericClientIds;
+        } else {
+          // Se não houver resultados nos valores, busca nos outros campos
+          const otherFieldsQuery = `
+            SELECT c.id
+            FROM "Client" c
+            LEFT JOIN "Plan" p ON c."planId" = p.id
+            LEFT JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id
+            WHERE c."isActive" = true
+              AND (
+                LOWER(c."fullName") LIKE '${searchPattern}'
+                OR LOWER(c."email") LIKE '${searchPattern}'
+                OR LOWER(c."phone") LIKE '${searchPattern}'
+                OR LOWER(p."name") LIKE '${searchPattern}'
+                OR LOWER(pm."name") LIKE '${searchPattern}'
+                OR LOWER(c."observations") LIKE '${searchPattern}'
+                OR LOWER(TO_CHAR(c."dueDate", 'DD/MM/YYYY')) LIKE '${searchPattern}'
+              )
+          `;
+          const otherFieldsClients = await prisma.$queryRawUnsafe<RawClient[]>(
+            otherFieldsQuery
+          );
+          clientIds = otherFieldsClients.map((client) => client.id);
+        }
+      } else {
+        // Busca unificada para não números (como antes)
+        const rawQuery = `
+          SELECT c.id
+          FROM "Client" c
+          LEFT JOIN "Plan" p ON c."planId" = p.id
+          LEFT JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id
+          WHERE c."isActive" = true
+            AND (
+              LOWER(c."fullName") LIKE '${searchPattern}'
+              OR LOWER(c."email") LIKE '${searchPattern}'
+              OR LOWER(c."phone") LIKE '${searchPattern}'
+              OR LOWER(p."name") LIKE '${searchPattern}'
+              OR LOWER(pm."name") LIKE '${searchPattern}'
+              OR LOWER(c."observations") LIKE '${searchPattern}'
+              OR LOWER(TO_CHAR(c."dueDate", 'DD/MM/YYYY')) LIKE '${searchPattern}'
+              OR LOWER(CAST(c."grossAmount" AS TEXT)) LIKE '${searchPattern}'
+              OR LOWER(CAST(c."netAmount" AS TEXT)) LIKE '${searchPattern}'
+            )
+        `;
+        const rawClients = await prisma.$queryRawUnsafe<RawClient[]>(rawQuery);
+        clientIds = rawClients.map((client) => client.id);
+      }
+
+      if (clientIds.length > 0) {
+        whereClause = { isActive: true, id: { in: clientIds } };
+      } else {
+        // Se não houver correspondências, retornar nenhum cliente
+        whereClause = { isActive: true, id: { in: [] } };
+      }
     }
 
     const clients = await prisma.client.findMany({
@@ -52,7 +125,9 @@ export const getClients: RequestHandler = async (
       skip,
       take: limit,
     });
+
     const total = await prisma.client.count({ where: whereClause });
+
     res.json({ data: clients, total, page, limit });
   } catch (error) {
     console.error("Erro ao buscar clientes:", error);
@@ -99,19 +174,87 @@ export const getExpiredClients: RequestHandler = async (
     const skip = (page - 1) * limit;
     const searchTerm = (req.query.search as string)?.toLowerCase() || "";
 
-    const whereClause: Prisma.ClientWhereInput = { isActive: false };
+    let whereClause: Prisma.ClientWhereInput = { isActive: false };
+    let clientIds: number[] = [];
+
     if (searchTerm) {
-      whereClause.OR = [
-        { fullName: { contains: searchTerm, mode: "insensitive" } },
-        { email: { contains: searchTerm, mode: "insensitive" } },
-        { phone: { contains: searchTerm, mode: "insensitive" } },
-        { plan: { name: { contains: searchTerm, mode: "insensitive" } } },
-        {
-          paymentMethod: {
-            name: { contains: searchTerm, mode: "insensitive" },
-          },
-        },
-      ];
+      const searchPattern = `%${searchTerm}%`; // Busca parcial em qualquer posição
+
+      // Verificar se o searchTerm é um número (com ou sem decimal)
+      const isNumeric = /^\d+([.,]\d+)?$/.test(searchTerm.replace(/[,]/g, "."));
+
+      if (isNumeric) {
+        // Busca específica para números em grossAmount e netAmount
+        const numericQuery = `
+          SELECT c.id
+          FROM "Client" c
+          WHERE c."isActive" = false
+            AND (
+              LOWER(CAST(c."grossAmount" AS TEXT)) LIKE '${searchPattern}'
+              OR LOWER(CAST(c."netAmount" AS TEXT)) LIKE '${searchPattern}'
+            )
+        `;
+        const numericClients = await prisma.$queryRawUnsafe<RawClient[]>(
+          numericQuery
+        );
+        const numericClientIds = numericClients.map((client) => client.id);
+
+        if (numericClientIds.length > 0) {
+          // Se houver resultados nos valores, usa apenas eles
+          clientIds = numericClientIds;
+        } else {
+          // Se não houver resultados nos valores, busca nos outros campos
+          const otherFieldsQuery = `
+            SELECT c.id
+            FROM "Client" c
+            LEFT JOIN "Plan" p ON c."planId" = p.id
+            LEFT JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id
+            WHERE c."isActive" = false
+              AND (
+                LOWER(c."fullName") LIKE '${searchPattern}'
+                OR LOWER(c."email") LIKE '${searchPattern}'
+                OR LOWER(c."phone") LIKE '${searchPattern}'
+                OR LOWER(p."name") LIKE '${searchPattern}'
+                OR LOWER(pm."name") LIKE '${searchPattern}'
+                OR LOWER(c."observations") LIKE '${searchPattern}'
+                OR LOWER(TO_CHAR(c."dueDate", 'DD/MM/YYYY')) LIKE '${searchPattern}'
+              )
+          `;
+          const otherFieldsClients = await prisma.$queryRawUnsafe<RawClient[]>(
+            otherFieldsQuery
+          );
+          clientIds = otherFieldsClients.map((client) => client.id);
+        }
+      } else {
+        // Busca unificada para não números
+        const rawQuery = `
+          SELECT c.id
+          FROM "Client" c
+          LEFT JOIN "Plan" p ON c."planId" = p.id
+          LEFT JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id
+          WHERE c."isActive" = false
+            AND (
+              LOWER(c."fullName") LIKE '${searchPattern}'
+              OR LOWER(c."email") LIKE '${searchPattern}'
+              OR LOWER(c."phone") LIKE '${searchPattern}'
+              OR LOWER(p."name") LIKE '${searchPattern}'
+              OR LOWER(pm."name") LIKE '${searchPattern}'
+              OR LOWER(c."observations") LIKE '${searchPattern}'
+              OR LOWER(TO_CHAR(c."dueDate", 'DD/MM/YYYY')) LIKE '${searchPattern}'
+              OR LOWER(CAST(c."grossAmount" AS TEXT)) LIKE '${searchPattern}'
+              OR LOWER(CAST(c."netAmount" AS TEXT)) LIKE '${searchPattern}'
+            )
+        `;
+        const rawClients = await prisma.$queryRawUnsafe<RawClient[]>(rawQuery);
+        clientIds = rawClients.map((client) => client.id);
+      }
+
+      if (clientIds.length > 0) {
+        whereClause = { isActive: false, id: { in: clientIds } };
+      } else {
+        // Se não houver correspondências, retornar nenhum cliente
+        whereClause = { isActive: false, id: { in: [] } };
+      }
     }
 
     const clients = await prisma.client.findMany({
@@ -120,7 +263,9 @@ export const getExpiredClients: RequestHandler = async (
       skip,
       take: limit,
     });
+
     const total = await prisma.client.count({ where: whereClause });
+
     res.json({ data: clients, total, page, limit });
   } catch (error) {
     console.error("Erro ao buscar clientes expirados:", error);
@@ -501,7 +646,6 @@ export const updatePaymentStatus: RequestHandler<ParamsWithId> = async (
   }
 };
 
-// Nova função para atualizar apenas o campo observations
 export const updateClientObservations: RequestHandler<
   ParamsWithId,
   unknown,

@@ -1,4 +1,4 @@
-//frontend/src/app/clients/page.tsx
+//frontend/src/app/clients/api.ts
 
 import api from "@/utils/api";
 import { Client, Plan, PaymentMethod } from "./types";
@@ -18,6 +18,8 @@ export const fetchClients = async (
   limit: number,
   search: string
 ): Promise<{ data: Client[]; total: number; page: number; limit: number }> => {
+  // Nota: O parâmetro 'search' é enviado ao backend. O backend deve incluir o campo 'observations'
+  // na lógica de busca para que funcione conforme solicitado. Verifique a implementação do endpoint /api/clients.
   const response = await api.get("/api/clients", {
     params: { page, limit, search },
   });
@@ -39,7 +41,7 @@ export const updateClient = async (
     dueDate: string;
     grossAmount: number;
     isActive: boolean;
-    observations?: string; // Adicionado ao tipo de dados
+    observations?: string;
   }
 ): Promise<Client> => {
   const response = await api.put(`/api/clients/${id}`, data);
@@ -62,7 +64,6 @@ export const renewClient = async (
   return response.data;
 };
 
-// Nova função para atualizar apenas as observações
 export const updateClientObservations = async (
   id: number,
   observations: string
