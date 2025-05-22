@@ -71,8 +71,8 @@
     background: var(--dashboard-bg);
     backdrop-filter: blur(20px);
     border-radius: 1rem;
-    padding: 1.25rem;
-    margin: 1.25rem;
+    padding: 1rem;
+    margin: 1rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     max-width: 100%;
     overflow-x: hidden;
@@ -310,6 +310,9 @@
     @apply py-2 px-3 text-center;
     vertical-align: middle;
     transition: all 0.3s ease-in-out;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Definir larguras mínimas e máximas para cada coluna */
@@ -329,9 +332,12 @@
   .clients-table td.email-column {
     min-width: 180px;
     max-width: 220px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  }
+
+  .clients-table th.phone-column,
+  .clients-table td.phone-column {
+    min-width: 100px;
+    max-width: 120px;
   }
 
   .clients-table th.plan-column,
@@ -471,7 +477,7 @@
     font-weight: bold;
   }
 
-  /* Ajustes de responsividade */
+  /* Ajustes de responsividade para a tabela (apenas md:block) */
   /* Desktop Grande (≥1280px) */
   @media (min-width: 1280px) {
     .clients-table th,
@@ -492,6 +498,12 @@
       max-width: 220px;
     }
 
+    .clients-table th.phone-column,
+    .clients-table td.phone-column {
+      min-width: 100px;
+      max-width: 120px;
+    }
+
     .clients-table th.plan-column,
     .clients-table td.plan-column {
       min-width: 120px;
@@ -509,20 +521,33 @@
       min-width: 110px;
       max-width: 140px;
     }
+
+    .clients-table th.gross-amount-column,
+    .clients-table td.gross-amount-column {
+      min-width: 100px;
+      max-width: 120px;
+    }
+
+    .clients-table th.net-amount-column,
+    .clients-table td.net-amount-column {
+      min-width: 100px;
+      max-width: 120px;
+    }
   }
 
   /* Desktop Médio (1024px - 1279px) */
   @media (min-width: 1024px) and (max-width: 1279px) {
-    .clients-table th,
-    .clients-table td {
-      font-size: 0.85rem;
-      padding: 0.6rem 0.8rem;
+    .clients-table th.gross-amount-column,
+    .clients-table td.gross-amount-column,
+    .clients-table th.net-amount-column,
+    .clients-table td.net-amount-column {
+      display: none;
     }
 
     .clients-table th.name-column,
     .clients-table td.name-column {
-      min-width: 160px;
-      max-width: 220px;
+      min-width: 140px;
+      max-width: 180px;
     }
 
     .clients-table th.email-column,
@@ -531,49 +556,66 @@
       max-width: 200px;
     }
 
+    .clients-table th.phone-column,
+    .clients-table td.phone-column {
+      min-width: 90px;
+      max-width: 110px;
+    }
+
     .clients-table th.plan-column,
     .clients-table td.plan-column {
-      min-width: 130px;
-      max-width: 160px;
+      min-width: 110px;
+      max-width: 130px;
     }
 
     .clients-table th.method-column,
     .clients-table td.method-column {
-      min-width: 150px;
-      max-width: 170px;
+      min-width: 130px;
+      max-width: 150px;
     }
 
     .clients-table th.due-date-column,
     .clients-table td.due-date-column {
-      min-width: 120px;
-      max-width: 150px;
+      min-width: 100px;
+      max-width: 120px;
     }
   }
 
   /* Tablet (768px - 1023px) */
   @media (min-width: 768px) and (max-width: 1023px) {
-    .clients-table th,
-    .clients-table td {
-      font-size: 0.8rem;
-      padding: 0.5rem 0.6rem;
+    .clients-table th.method-column,
+    .clients-table td.method-column,
+    .clients-table th.due-date-column,
+    .clients-table td.due-date-column,
+    .clients-table th.gross-amount-column,
+    .clients-table td.gross-amount-column,
+    .clients-table th.net-amount-column,
+    .clients-table td.net-amount-column {
+      display: none;
     }
 
     .clients-table th.name-column,
     .clients-table td.name-column {
-      min-width: 180px;
-      max-width: 250px;
+      min-width: 120px;
+      max-width: 150px;
+    }
+
+    .clients-table th.email-column,
+    .clients-table td.email-column {
+      min-width: 140px;
+      max-width: 170px;
+    }
+
+    .clients-table th.phone-column,
+    .clients-table td.phone-column {
+      min-width: 90px;
+      max-width: 110px;
     }
 
     .clients-table th.plan-column,
     .clients-table td.plan-column {
-      min-width: 140px;
-      max-width: 180px;
-    }
-
-    .clients-table th.due-date-column,
-    .clients-table td.due-date-column {
-      min-width: 130px;
-      max-width: 160px;
+      min-width: 100px;
+      max-width: 120px;
     }
   }
 
@@ -593,6 +635,10 @@
 
     .client-card p {
       @apply text-xs;
+    }
+
+    .expanded-content {
+      @apply mt-3 space-y-2;
     }
   }
 
@@ -625,7 +671,7 @@
   .action-menu {
     @apply absolute right-0 top-full mt-2 w-48 bg-[var(--table-bg)] backdrop-blur-md rounded-lg shadow-lg border border-[rgba(255,255,255,0.1)];
     padding: 0.5rem 0;
-    z-index: 100; /* Valor numérico direto */
+    z-index: 100;
   }
 
   .action-menu-item {

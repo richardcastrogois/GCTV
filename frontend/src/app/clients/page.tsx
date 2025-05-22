@@ -1,4 +1,4 @@
-//frotend/src/app/clients/page.tsx
+//frontend/src/app/clients/page.tsx
 
 "use client";
 
@@ -72,6 +72,9 @@ export default function Clients() {
   const [newDueDate, setNewDueDate] = useState<string>("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
+  // Novo estado para o modal de exclusão
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<number | null>(null);
 
   // [OTIMIZAÇÃO] Carrega planos e métodos de pagamento com cache
   useEffect(() => {
@@ -165,20 +168,33 @@ export default function Clients() {
   };
 
   const handleNewClient = () => router.push("/clients/new");
-  const handleDelete = async (id: number) => {
-    if (window.confirm("Tem certeza?")) {
-      try {
-        await deleteClient(id);
-        toast.success("Cliente excluído!");
-        queryClient.invalidateQueries({ queryKey: ["clients"] });
-      } catch (error) {
-        if (error instanceof AxiosError) {
-          toast.error(`Erro: ${error.message}`);
-          if (error.response?.status === 401) handleUnauthorized();
-        }
+
+  const handleDelete = (id: number) => {
+    setClientToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (clientToDelete === null) return;
+    try {
+      await deleteClient(clientToDelete);
+      toast.success("Cliente excluído!");
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      setIsDeleteModalOpen(false);
+      setClientToDelete(null);
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        toast.error(`Erro: ${error.message}`);
+        if (error.response?.status === 401) handleUnauthorized();
       }
     }
   };
+
+  const closeDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setClientToDelete(null);
+  };
+
   const handleEdit = (client: Client) => {
     setSelectedClient(client);
     setEditFormData({
@@ -194,6 +210,7 @@ export default function Clients() {
     });
     setIsModalOpen(true);
   };
+
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (
@@ -230,11 +247,13 @@ export default function Clients() {
       }
     }
   };
+
   const handleRenew = (client: Client) => {
     setClientToRenew(client);
     setNewDueDate("");
     setIsRenewModalOpen(true);
   };
+
   const handleRenewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientToRenew || !newDueDate) {
@@ -253,24 +272,26 @@ export default function Clients() {
       }
     }
   };
+
   const closeRenewModal = () => {
     setIsRenewModalOpen(false);
     setClientToRenew(null);
     setNewDueDate("");
   };
 
-  // Adicionar fechamento com ESC para o modal de renovação
+  // Adicionar fechamento com ESC para o modal de renovação e exclusão
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isRenewModalOpen) {
-        closeRenewModal();
+      if (event.key === "Escape") {
+        if (isRenewModalOpen) closeRenewModal();
+        if (isDeleteModalOpen) closeDeleteModal();
       }
     };
     document.addEventListener("keydown", handleEscKey);
     return () => {
       document.removeEventListener("keydown", handleEscKey);
     };
-  }, [isRenewModalOpen]);
+  }, [isRenewModalOpen, isDeleteModalOpen]);
 
   const handlePageChange = (newPage: number) => {
     if (
@@ -280,10 +301,12 @@ export default function Clients() {
     )
       setPage(newPage);
   };
+
   const handleLimitChange = (newLimit: number) => {
     setLimit(newLimit);
     setPage(1);
   };
+
   const handleUpdatePaymentStatus = async (
     clientId: number,
     verified: boolean,
@@ -353,7 +376,7 @@ export default function Clients() {
               onUpdatePaymentStatus={handleUpdatePaymentStatus}
               isFetching={isFetching}
               isLoading={isLoading}
-              onUpdateObservations={handleUpdateObservations} // Adicionado
+              onUpdateObservations={handleUpdateObservations}
             />
           ) : (
             <p className="text-center mt-4">Nenhum cliente encontrado.</p>
@@ -437,6 +460,40 @@ export default function Clients() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {isDeleteModalOpen && (
+        <div className="modal-overlay" onClick={closeDeleteModal}>
+          <div
+            className="modal-content delete-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2 className="modal-title">Confirmar Exclusão</h2>
+              <button onClick={closeDeleteModal} className="modal-close-button">
+                <FaTimes size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-[var(--text-primary)]">
+                Tem certeza que deseja excluir este cliente?
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                onClick={closeDeleteModal}
+                className="modal-button modal-button-cancel delete-modal-button"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="modal-button modal-button-save delete-modal-button"
+              >
+                Excluir
+              </button>
+            </div>
           </div>
         </div>
       )}

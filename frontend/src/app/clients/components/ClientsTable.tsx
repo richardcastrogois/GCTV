@@ -145,7 +145,7 @@ export default function ClientsTable({
     setExpandedRows((prev) =>
       prev.includes(clientId)
         ? prev.filter((id) => id !== clientId)
-        : [clientId]
+        : [...prev, clientId]
     );
   };
 
@@ -161,19 +161,18 @@ export default function ClientsTable({
     if (!button) return;
 
     const rect = button.getBoundingClientRect();
-    const menuWidth = 192; // w-48 em pixels (12rem * 16px/rem)
+    const menuWidth = 192;
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
 
-    let top = rect.bottom + window.scrollY + 4; // Pequeno espaço abaixo do botão
-    let left = rect.left + window.scrollX; // Alinha à esquerda do botão
+    let top = rect.bottom + window.scrollY + 4;
+    let left = rect.left + window.scrollX;
 
-    // Ajustar a posição para evitar que o menu saia da tela
     if (left + menuWidth > windowWidth) {
-      left = windowWidth - menuWidth - 10; // 10px de margem
+      left = windowWidth - menuWidth - 10;
     }
     if (top + 150 > windowHeight + window.scrollY) {
-      top = rect.top + window.scrollY - 150; // Posicionar acima do botão
+      top = rect.top + window.scrollY - 150;
     }
 
     setMenuPosition({ top, left });
@@ -264,22 +263,25 @@ export default function ClientsTable({
                   <th className="name-column">
                     <Skeleton variant="text" width={150} />
                   </th>
-                  <th className="email-column hidden lg:table-cell">
+                  <th className="email-column hidden md:table-cell">
                     <Skeleton variant="text" width={200} />
                   </th>
-                  <th className="plan-column">
-                    <Skeleton variant="text" width={120} />
-                  </th>
-                  <th className="method-column hidden lg:table-cell">
-                    <Skeleton variant="text" width={120} />
-                  </th>
-                  <th className="due-date-column">
+                  <th className="phone-column hidden sm:table-cell">
                     <Skeleton variant="text" width={100} />
                   </th>
-                  <th className="gross-amount-column hidden xl:table-cell">
+                  <th className="plan-column hidden lg:table-cell">
+                    <Skeleton variant="text" width={120} />
+                  </th>
+                  <th className="method-column hidden xl:table-cell">
+                    <Skeleton variant="text" width={120} />
+                  </th>
+                  <th className="due-date-column hidden xl:table-cell">
+                    <Skeleton variant="text" width={100} />
+                  </th>
+                  <th className="gross-amount-column hidden 2xl:table-cell">
                     <Skeleton variant="text" width={80} />
                   </th>
-                  <th className="net-amount-column hidden xl:table-cell">
+                  <th className="net-amount-column hidden 2xl:table-cell">
                     <Skeleton variant="text" width={80} />
                   </th>
                   <th className="actions-column">
@@ -296,22 +298,25 @@ export default function ClientsTable({
                     <td className="name-column">
                       <Skeleton variant="text" width={150} />
                     </td>
-                    <td className="email-column hidden lg:table-cell">
+                    <td className="email-column hidden md:table-cell">
                       <Skeleton variant="text" width={200} />
                     </td>
-                    <td className="plan-column">
-                      <Skeleton variant="text" width={120} />
-                    </td>
-                    <td className="method-column hidden lg:table-cell">
-                      <Skeleton variant="text" width={120} />
-                    </td>
-                    <td className="due-date-column">
+                    <td className="phone-column hidden sm:table-cell">
                       <Skeleton variant="text" width={100} />
                     </td>
-                    <td className="gross-amount-column hidden xl:table-cell">
+                    <td className="plan-column hidden lg:table-cell">
+                      <Skeleton variant="text" width={120} />
+                    </td>
+                    <td className="method-column hidden xl:table-cell">
+                      <Skeleton variant="text" width={120} />
+                    </td>
+                    <td className="due-date-column hidden xl:table-cell">
+                      <Skeleton variant="text" width={100} />
+                    </td>
+                    <td className="gross-amount-column hidden 2xl:table-cell">
                       <Skeleton variant="text" width={80} />
                     </td>
-                    <td className="net-amount-column hidden xl:table-cell">
+                    <td className="net-amount-column hidden 2xl:table-cell">
                       <Skeleton variant="text" width={80} />
                     </td>
                     <td className="actions-column">
@@ -368,34 +373,43 @@ export default function ClientsTable({
                   Nome {getSortIcon("fullName")}
                 </th>
                 <th
-                  className="email-column hidden lg:table-cell"
+                  className="email-column hidden md:table-cell"
                   onClick={() => onSort("email")}
                 >
                   Email {getSortIcon("email")}
                 </th>
-                <th className="plan-column" onClick={() => onSort("plan.name")}>
+                <th
+                  className="phone-column hidden sm:table-cell"
+                  onClick={() => onSort("phone")}
+                >
+                  Telefone {getSortIcon("phone")}
+                </th>
+                <th
+                  className="plan-column hidden lg:table-cell"
+                  onClick={() => onSort("plan.name")}
+                >
                   Plano {getSortIcon("plan.name")}
                 </th>
                 <th
-                  className="method-column hidden lg:table-cell"
+                  className="method-column hidden xl:table-cell"
                   onClick={() => onSort("paymentMethod.name")}
                 >
                   Método de Pagamento {getSortIcon("paymentMethod.name")}
                 </th>
                 <th
-                  className="due-date-column"
+                  className="due-date-column hidden xl:table-cell"
                   onClick={() => onSort("dueDate")}
                 >
                   Data de Vencimento {getSortIcon("dueDate")}
                 </th>
                 <th
-                  className="gross-amount-column hidden xl:table-cell"
+                  className="gross-amount-column hidden 2xl:table-cell"
                   onClick={() => onSort("grossAmount")}
                 >
                   Valor Bruto {getSortIcon("grossAmount")}
                 </th>
                 <th
-                  className="net-amount-column hidden xl:table-cell"
+                  className="net-amount-column hidden 2xl:table-cell"
                   onClick={() => onSort("netAmount")}
                 >
                   Valor Líquido {getSortIcon("netAmount")}
@@ -424,26 +438,29 @@ export default function ClientsTable({
                     </button>
                   </td>
                   <td className="name-column">{client.fullName}</td>
-                  <td className="email-column hidden lg:table-cell">
+                  <td className="email-column hidden md:table-cell">
                     {client.email}
                   </td>
-                  <td className="plan-column">
+                  <td className="phone-column hidden sm:table-cell">
+                    {client.phone}
+                  </td>
+                  <td className="plan-column hidden lg:table-cell">
                     <span className={getPlanClass(client.plan.name)}>
                       {client.plan.name}
                     </span>
                   </td>
-                  <td className="method-column hidden lg:table-cell">
+                  <td className="method-column hidden xl:table-cell">
                     <span className={getMethodClass(client.paymentMethod.name)}>
                       {client.paymentMethod.name}
                     </span>
                   </td>
-                  <td className="due-date-column">
+                  <td className="due-date-column hidden xl:table-cell">
                     {formatDateToUTC(client.dueDate)}
                   </td>
-                  <td className="gross-amount-column hidden xl:table-cell">
+                  <td className="gross-amount-column hidden 2xl:table-cell">
                     R$ {client.grossAmount.toFixed(2)}
                   </td>
-                  <td className="net-amount-column hidden xl:table-cell">
+                  <td className="net-amount-column hidden 2xl:table-cell">
                     R$ {client.netAmount.toFixed(2)}
                   </td>
                   <td className="actions-column relative">
@@ -523,12 +540,22 @@ export default function ClientsTable({
                   Email: {client.email}
                 </p>
                 <p className="text-sm text-[var(--text-primary)]">
+                  Telefone: {client.phone}
+                </p>
+                <p className="text-sm text-[var(--text-primary)]">
                   Valor Bruto: R$ {client.grossAmount.toFixed(2)}
                 </p>
                 <p className="text-sm text-[var(--text-primary)]">
                   Valor Líquido: R$ {client.netAmount.toFixed(2)}
                 </p>
                 <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => openInfoModal(client)}
+                    className="action-button"
+                    title="Mais Informações"
+                  >
+                    <FaInfoCircle size={16} />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -676,6 +703,9 @@ export default function ClientsTable({
               </p>
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Email:</strong> {selectedClient.email}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Telefone:</strong> {selectedClient.phone}
               </p>
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Plano:</strong>{" "}
