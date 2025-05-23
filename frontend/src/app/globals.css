@@ -310,9 +310,31 @@
     @apply py-2 px-3 text-center;
     vertical-align: middle;
     transition: all 0.3s ease-in-out;
+  }
+
+  /* Ajuste específico para th (títulos das colunas) - Alterado para permitir texto completo */
+  .clients-table th {
+    @apply text-[var(--text-primary)] font-bold cursor-pointer transition-colors duration-300;
+    background: var(--table-header-bg);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 0.75rem 1rem;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.2;
+  }
+
+  /* Ajuste específico para td (células de dados) - Mantém comportamento original com ellipsis */
+  .clients-table td {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    font-size: 0.9rem;
   }
 
   /* Definir larguras mínimas e máximas para cada coluna */
@@ -375,22 +397,6 @@
     min-width: 100px;
     max-width: 120px;
     position: relative;
-  }
-
-  .clients-table th {
-    @apply text-[var(--text-primary)] font-bold cursor-pointer transition-colors duration-300;
-    background: var(--table-header-bg);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    font-size: 1.1rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    padding: 0.75rem 1rem;
-    white-space: nowrap;
-  }
-
-  .clients-table td {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    font-size: 0.9rem;
   }
 
   .clients-table tr {
@@ -535,8 +541,13 @@
     }
   }
 
-  /* Desktop Médio (1024px - 1279px) */
+  /* Desktop Médio (1024px - 1279px) - Ajuste para reduzir tamanho do título */
   @media (min-width: 1024px) and (max-width: 1279px) {
+    .clients-table th {
+      font-size: 0.9rem; /* Reduz o tamanho da fonte */
+      padding: 0.5rem 0.75rem; /* Ajusta o padding */
+    }
+
     .clients-table th.gross-amount-column,
     .clients-table td.gross-amount-column,
     .clients-table th.net-amount-column,
@@ -583,6 +594,10 @@
 
   /* Tablet (768px - 1023px) */
   @media (min-width: 768px) and (max-width: 1023px) {
+    .clients-table th {
+      font-size: 1rem; /* Mantém um tamanho razoável */
+    }
+
     .clients-table th.method-column,
     .clients-table td.method-column,
     .clients-table th.due-date-column,
@@ -708,6 +723,14 @@
     background-color: #00ae5f;
   }
 
+  /* Ajuste do botão para telas maiores a partir de 1024px */
+  @media (min-width: 1024px) {
+    .new-client-button {
+      @apply px-6 py-3 text-base;
+      min-width: 200px; /* Garante um tamanho mínimo proporcional */
+    }
+  }
+
   @media (max-width: 640px) {
     .new-client-button {
       @apply px-3 py-1 text-xs;
@@ -724,7 +747,8 @@
 
   @media (min-width: 640px) {
     .dashboard-container h1 {
-      @apply text-3xl;
+      @apply text-4xl font-bold border-b-2 border-[var(--accent-blue)] pb-2 animate-fadeIn;
+      animation: fadeIn 0.5s ease-in-out;
     }
   }
 
@@ -851,5 +875,11 @@
     to {
       opacity: 1;
     }
+  }
+}
+
+@layer utilities {
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-in-out;
   }
 }

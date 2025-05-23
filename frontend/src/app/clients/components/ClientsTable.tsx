@@ -13,7 +13,7 @@ import {
   FaInfoCircle,
 } from "react-icons/fa";
 import { Client } from "../types";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Skeleton } from "@mui/material";
 
@@ -23,6 +23,22 @@ const formatDateToUTC = (date: string | Date): string => {
   const month = String(d.getUTCMonth() + 1).padStart(2, "0");
   const year = d.getUTCFullYear();
   return `${day}/${month}/${year}`;
+};
+
+// Função para determinar a classe CSS da data de vencimento
+const getDueDateClass = (dueDate: string, currentDate: Date): string => {
+  const due = new Date(dueDate);
+  const timeDiff = due.getTime() - currentDate.getTime();
+  const daysDiff = timeDiff / (1000 * 60 * 60 * 24); // Diferença em dias
+
+  if (due < currentDate) {
+    // Data vencida
+    return "text-[#ff4d4f]"; // Vermelho
+  } else if (daysDiff <= 7) {
+    // Dentro de 7 dias para vencer
+    return "text-[#ff7f50]"; // Laranja
+  }
+  return ""; // Sem estilização especial
 };
 
 interface ClientsTableProps {
@@ -51,7 +67,6 @@ interface ClientsTableProps {
   ) => void;
   isFetching?: boolean;
   isLoading?: boolean;
-  onUpdateObservations?: (id: number, observations: string) => void;
 }
 
 export default function ClientsTable({
@@ -80,6 +95,9 @@ export default function ClientsTable({
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   const infoModalRef = useRef<HTMLDivElement>(null);
+
+  // Memoize a data atual para evitar recriações desnecessárias
+  const currentDate = useMemo(() => new Date(), []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -368,7 +386,7 @@ export default function ClientsTable({
           <table className={`clients-table ${isFetching ? "fade" : ""}`}>
             <thead>
               <tr>
-                <th className="status-column">Status Pag</th>
+                <th className="status-column">Pago</th>
                 <th className="name-column" onClick={() => onSort("fullName")}>
                   Nome {getSortIcon("fullName")}
                 </th>
@@ -394,25 +412,25 @@ export default function ClientsTable({
                   className="method-column hidden xl:table-cell"
                   onClick={() => onSort("paymentMethod.name")}
                 >
-                  Método de Pagamento {getSortIcon("paymentMethod.name")}
+                  Pagamento {getSortIcon("paymentMethod.name")}
                 </th>
                 <th
                   className="due-date-column hidden xl:table-cell"
                   onClick={() => onSort("dueDate")}
                 >
-                  Data de Vencimento {getSortIcon("dueDate")}
+                  Vencimento {getSortIcon("dueDate")}
                 </th>
                 <th
                   className="gross-amount-column hidden 2xl:table-cell"
                   onClick={() => onSort("grossAmount")}
                 >
-                  Valor Bruto {getSortIcon("grossAmount")}
+                  $ Bruto {getSortIcon("grossAmount")}
                 </th>
                 <th
                   className="net-amount-column hidden 2xl:table-cell"
                   onClick={() => onSort("netAmount")}
                 >
-                  Valor Líquido {getSortIcon("netAmount")}
+                  $ Líquido {getSortIcon("netAmount")}
                 </th>
                 <th className="actions-column">Ações</th>
               </tr>
@@ -455,7 +473,11 @@ export default function ClientsTable({
                     </span>
                   </td>
                   <td className="due-date-column hidden xl:table-cell">
-                    {formatDateToUTC(client.dueDate)}
+                    <span
+                      className={getDueDateClass(client.dueDate, currentDate)}
+                    >
+                      {formatDateToUTC(client.dueDate)}
+                    </span>
                   </td>
                   <td className="gross-amount-column hidden 2xl:table-cell">
                     R$ {client.grossAmount.toFixed(2)}
@@ -518,7 +540,12 @@ export default function ClientsTable({
                   </span>
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  Vencimento: {formatDateToUTC(client.dueDate)}
+                  Vencimento:{" "}
+                  <span
+                    className={getDueDateClass(client.dueDate, currentDate)}
+                  >
+                    {formatDateToUTC(client.dueDate)}
+                  </span>
                 </p>
               </div>
               <button
@@ -723,7 +750,14 @@ export default function ClientsTable({
               </p>
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Data de Vencimento:</strong>{" "}
-                {formatDateToUTC(selectedClient.dueDate)}
+                <span
+                  className={getDueDateClass(
+                    selectedClient.dueDate,
+                    currentDate
+                  )}
+                >
+                  {formatDateToUTC(selectedClient.dueDate)}
+                </span>
               </p>
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Valor Bruto:</strong> R${" "}

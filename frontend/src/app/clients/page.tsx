@@ -1,4 +1,4 @@
-//frontend/src/app/clients/page.tsx
+// frontend/src/app/clients/page.tsx
 
 "use client";
 
@@ -16,7 +16,6 @@ import {
   deleteClient,
   updateClient,
   renewClient,
-  updateClientObservations,
 } from "./api";
 import { Client, Plan, PaymentMethod, EditFormData } from "./types";
 import { useAuth } from "@/hooks/useAuth";
@@ -72,7 +71,6 @@ export default function Clients() {
   const [newDueDate, setNewDueDate] = useState<string>("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  // Novo estado para o modal de exclusão
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<number | null>(null);
 
@@ -118,6 +116,59 @@ export default function Clients() {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
+
+  // Verificar clientes vencidos há mais de 30 dias e atualizar para inativos
+  useEffect(() => {
+    const checkExpiredClients = async () => {
+      if (!clientsResponse?.data) return;
+
+      const currentDate = new Date(); // Movido para dentro do useEffect
+      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000; // 30 dias em milissegundos
+      const clientsToDeactivate: Client[] = [];
+
+      for (const client of clientsResponse.data) {
+        const dueDate = new Date(client.dueDate);
+        const timeDiff = currentDate.getTime() - dueDate.getTime();
+
+        // Se o cliente está ativo e a data de vencimento passou há mais de 30 dias
+        if (client.isActive && timeDiff > thirtyDaysInMs) {
+          clientsToDeactivate.push(client);
+        }
+      }
+
+      // Atualizar clientes para inativos
+      for (const client of clientsToDeactivate) {
+        try {
+          await updateClient(client.id, {
+            fullName: client.fullName,
+            email: client.email,
+            phone: client.phone || "", // phone pode ser null
+            planId: client.plan.id, // Mapeando de plan.id para planId
+            paymentMethodId: client.paymentMethod.id, // Mapeando de paymentMethod.id para paymentMethodId
+            dueDate: client.dueDate,
+            grossAmount: client.grossAmount,
+            isActive: false, // Desativa o cliente
+            observations: client.observations || "", // observations pode ser undefined
+          });
+          toast.info(`Cliente ${client.fullName} movido para inativos.`);
+        } catch (error) {
+          if (error instanceof AxiosError) {
+            toast.error(
+              `Erro ao mover cliente ${client.fullName} para inativos: ${error.message}`
+            );
+            if (error.response?.status === 401) handleUnauthorized();
+          }
+        }
+      }
+
+      // Invalidar a query para recarregar a tabela
+      if (clientsToDeactivate.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ["clients"] });
+      }
+    };
+
+    checkExpiredClients();
+  }, [clientsResponse, queryClient, handleUnauthorized]);
 
   const sortedClients = [...(clientsResponse?.data || [])].sort((a, b) => {
     if (!sortConfig.key) return 0;
@@ -330,20 +381,6 @@ export default function Clients() {
     }
   };
 
-  // Nova função para atualizar observações
-  const handleUpdateObservations = async (id: number, observations: string) => {
-    try {
-      await updateClientObservations(id, observations);
-      toast.success("Observações atualizadas com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["clients"] });
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        toast.error(`Erro ao atualizar observações: ${error.message}`);
-        if (error.response?.status === 401) handleUnauthorized();
-      }
-    }
-  };
-
   if (error) {
     return (
       <div className="error-message">Erro: {(error as Error).message}</div>
@@ -376,7 +413,6 @@ export default function Clients() {
               onUpdatePaymentStatus={handleUpdatePaymentStatus}
               isFetching={isFetching}
               isLoading={isLoading}
-              onUpdateObservations={handleUpdateObservations}
             />
           ) : (
             <p className="text-center mt-4">Nenhum cliente encontrado.</p>
