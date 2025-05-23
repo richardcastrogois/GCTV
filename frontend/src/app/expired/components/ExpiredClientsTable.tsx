@@ -24,7 +24,7 @@ const formatDateToUTC = (date: string | Date): string => {
 interface ExpiredClientsTableProps {
   clients: Client[];
   onSort: (key: keyof Client | "plan.name") => void;
-  onReactivate: (client: Client) => void;
+  onReactivate: (client: Client, newDueDate: string) => void;
   sortConfig: {
     key: keyof Client | "plan.name" | null;
     direction: "asc" | "desc";
@@ -48,6 +48,7 @@ export default function ExpiredClientsTable({
   const [clientToReactivate, setClientToReactivate] = useState<Client | null>(
     null
   );
+  const [newDueDate, setNewDueDate] = useState<string>("");
 
   // Referências para os modais
   const infoModalRef = useRef<HTMLDivElement>(null);
@@ -125,17 +126,23 @@ export default function ExpiredClientsTable({
 
   const openConfirmModal = (client: Client) => {
     setClientToReactivate(client);
+    setNewDueDate(new Date().toISOString().split("T")[0]); // Data atual como padrão
     setIsConfirmModalOpen(true);
   };
 
   const closeConfirmModal = () => {
     setIsConfirmModalOpen(false);
     setClientToReactivate(null);
+    setNewDueDate("");
   };
 
   const handleConfirmReactivate = () => {
-    if (clientToReactivate) {
-      onReactivate(clientToReactivate);
+    if (clientToReactivate && newDueDate) {
+      if (isNaN(new Date(newDueDate).getTime())) {
+        alert("Data inválida. Use o formato YYYY-MM-DD.");
+        return;
+      }
+      onReactivate(clientToReactivate, newDueDate);
     }
     closeConfirmModal();
   };
@@ -246,9 +253,9 @@ export default function ExpiredClientsTable({
                 <Skeleton variant="circular" width={24} height={24} />
               </div>
               <div className="mt-3 space-y-2 expanded-content">
-                <Skeleton variant="text" width={200} height={20} />
-                <Skeleton variant="text" width={150} height={20} />
-                <Skeleton variant="text" width={150} height={20} />
+                <p>
+                  <Skeleton variant="text" width={200} height={20} />
+                </p>
                 <div className="flex gap-2 mt-2">
                   <Skeleton variant="rectangular" width={40} height={40} />
                   <Skeleton variant="rectangular" width={40} height={40} />
@@ -497,6 +504,36 @@ export default function ExpiredClientsTable({
                 <strong>Telefone:</strong>{" "}
                 {clientToReactivate.phone || "Não informado"}
               </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Plano:</strong>{" "}
+                <span className={getPlanClass(clientToReactivate.plan.name)}>
+                  {clientToReactivate.plan.name}
+                </span>
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Método de Pagamento:</strong>{" "}
+                <span
+                  className={getMethodClass(
+                    clientToReactivate.paymentMethod.name
+                  )}
+                >
+                  {clientToReactivate.paymentMethod.name}
+                </span>
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Data de Vencimento Atual:</strong>{" "}
+                {formatDateToUTC(clientToReactivate.dueDate)}
+              </p>
+              <div className="mb-4">
+                <label className="modal-label">Nova Data de Vencimento</label>
+                <input
+                  type="date"
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
+                  className="modal-input"
+                  required
+                />
+              </div>
             </div>
             <div className="modal-footer">
               <button
@@ -508,6 +545,7 @@ export default function ExpiredClientsTable({
               <button
                 onClick={handleConfirmReactivate}
                 className="modal-button modal-button-save"
+                disabled={!newDueDate}
               >
                 Reativar
               </button>

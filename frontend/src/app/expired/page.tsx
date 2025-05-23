@@ -94,15 +94,16 @@ export default function Expired() {
     }));
   };
 
-  const handleReactivate = async (client: Client) => {
+  const handleReactivate = async (client: Client, newDueDate: string) => {
     try {
-      await reactivateClient(client.id);
+      await reactivateClient(client.id, newDueDate);
       toast.success("Cliente reativado com sucesso!", {
         autoClose: 2000,
         pauseOnHover: false,
         pauseOnFocusLoss: false,
       });
       queryClient.invalidateQueries({ queryKey: ["expiredClients"] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] }); // Atualiza também a tabela de clientes ativos
     } catch (error) {
       if (error instanceof AxiosError) {
         toast.error(`Erro ao reativar cliente: ${error.message}`, {

@@ -20,6 +20,7 @@ type ClientBody = {
 };
 type RenewClientBody = { dueDate: string };
 type ObservationBody = { observations: string };
+type ReactivateClientBody = { dueDate: string }; // Novo tipo para reativação
 
 // Tipo para o resultado da consulta raw
 type RawClient = {
@@ -40,13 +41,11 @@ export const getClients: RequestHandler = async (
     let clientIds: number[] = [];
 
     if (searchTerm) {
-      const searchPattern = `%${searchTerm}%`; // Busca parcial em qualquer posição
+      const searchPattern = `%${searchTerm}%`;
 
-      // Verificar se o searchTerm é um número (com ou sem decimal)
       const isNumeric = /^\d+([.,]\d+)?$/.test(searchTerm.replace(/[,]/g, "."));
 
       if (isNumeric) {
-        // Busca específica para números em grossAmount e netAmount
         const numericQuery = `
           SELECT c.id
           FROM "Client" c
@@ -62,10 +61,8 @@ export const getClients: RequestHandler = async (
         const numericClientIds = numericClients.map((client) => client.id);
 
         if (numericClientIds.length > 0) {
-          // Se houver resultados nos valores, usa apenas eles
           clientIds = numericClientIds;
         } else {
-          // Se não houver resultados nos valores, busca nos outros campos
           const otherFieldsQuery = `
             SELECT c.id
             FROM "Client" c
@@ -88,7 +85,6 @@ export const getClients: RequestHandler = async (
           clientIds = otherFieldsClients.map((client) => client.id);
         }
       } else {
-        // Busca unificada para não números (como antes)
         const rawQuery = `
           SELECT c.id
           FROM "Client" c
@@ -114,7 +110,6 @@ export const getClients: RequestHandler = async (
       if (clientIds.length > 0) {
         whereClause = { isActive: true, id: { in: clientIds } };
       } else {
-        // Se não houver correspondências, retornar nenhum cliente
         whereClause = { isActive: true, id: { in: [] } };
       }
     }
@@ -178,13 +173,11 @@ export const getExpiredClients: RequestHandler = async (
     let clientIds: number[] = [];
 
     if (searchTerm) {
-      const searchPattern = `%${searchTerm}%`; // Busca parcial em qualquer posição
+      const searchPattern = `%${searchTerm}%`;
 
-      // Verificar se o searchTerm é um número (com ou sem decimal)
       const isNumeric = /^\d+([.,]\d+)?$/.test(searchTerm.replace(/[,]/g, "."));
 
       if (isNumeric) {
-        // Busca específica para números em grossAmount e netAmount
         const numericQuery = `
           SELECT c.id
           FROM "Client" c
@@ -200,10 +193,8 @@ export const getExpiredClients: RequestHandler = async (
         const numericClientIds = numericClients.map((client) => client.id);
 
         if (numericClientIds.length > 0) {
-          // Se houver resultados nos valores, usa apenas eles
           clientIds = numericClientIds;
         } else {
-          // Se não houver resultados nos valores, busca nos outros campos
           const otherFieldsQuery = `
             SELECT c.id
             FROM "Client" c
@@ -226,7 +217,6 @@ export const getExpiredClients: RequestHandler = async (
           clientIds = otherFieldsClients.map((client) => client.id);
         }
       } else {
-        // Busca unificada para não números
         const rawQuery = `
           SELECT c.id
           FROM "Client" c
@@ -252,7 +242,6 @@ export const getExpiredClients: RequestHandler = async (
       if (clientIds.length > 0) {
         whereClause = { isActive: false, id: { in: clientIds } };
       } else {
-        // Se não houver correspondências, retornar nenhum cliente
         whereClause = { isActive: false, id: { in: [] } };
       }
     }
@@ -570,11 +559,17 @@ export const renewClient: RequestHandler<
   }
 };
 
-export const reactivateClient: RequestHandler<ParamsWithId> = async (
-  req: Request<ParamsWithId>,
+export const reactivateClient: RequestHandler<
+  ParamsWithId,
+  unknown,
+  ReactivateClientBody,
+  ParsedQs
+> = async (
+  req: Request<ParamsWithId, unknown, ReactivateClientBody, ParsedQs>,
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
+  const { dueDate } = req.body;
 
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
@@ -582,6 +577,12 @@ export const reactivateClient: RequestHandler<ParamsWithId> = async (
   }
 
   try {
+    const parsedDueDate = new Date(dueDate);
+    if (isNaN(parsedDueDate.getTime())) {
+      res.status(400).json({ message: "Data de vencimento inválida" });
+      return;
+    }
+
     const clientExists = await prisma.client.findUnique({
       where: { id: parseInt(id) },
     });
@@ -593,7 +594,7 @@ export const reactivateClient: RequestHandler<ParamsWithId> = async (
 
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
-      data: { isActive: true },
+      data: { isActive: true, dueDate: parsedDueDate },
       include: { plan: true, paymentMethod: true },
     });
 
