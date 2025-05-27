@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Request, Response, RequestHandler } from "express";
 
+// Restaurando os usuários hardcoded
 const users = [
   { username: "admin1", password: bcrypt.hashSync("senha123", 10) },
   { username: "admin2", password: bcrypt.hashSync("outrasenha456", 10) },
@@ -21,7 +22,6 @@ export const login: RequestHandler = async (
     return;
   }
 
-  // Use o JWT_SECRET do .env
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     console.error("JWT_SECRET não definido no .env");

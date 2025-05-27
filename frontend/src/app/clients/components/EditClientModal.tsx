@@ -1,19 +1,17 @@
 //frontend/src/app/clients/components/EditClientModal.tsx
 
 import { FaTimes } from "react-icons/fa";
-import { EditFormData, Plan, PaymentMethod } from "../types";
+import { EditFormData, Plan, PaymentMethod, User } from "../types";
 import { createPortal } from "react-dom";
 import Select, { StylesConfig } from "react-select";
-import { useEffect } from "react"; // Adicionado import do useEffect
+import { useEffect } from "react";
 
-// Definir o tipo para as opções do react-select
 type SelectOption = { value: string; label: string } | null;
 
-// Estilos customizados para o react-select, replicados do Filter.tsx
 const customStyles: StylesConfig<SelectOption, false> = {
   control: (provided) => ({
     ...provided,
-    backgroundColor: "rgba(255, 255支部, 255, 0.1)",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     backdropFilter: "blur(5px)",
     border: "1px solid rgba(255, 255, 255, 0.3)",
     borderRadius: "0.5rem",
@@ -103,6 +101,7 @@ interface EditClientModalProps {
   onSubmit: (e: React.FormEvent) => void;
   plans: Plan[];
   paymentMethods: PaymentMethod[];
+  user?: User | null;
 }
 
 const EditClientModal: React.FC<EditClientModalProps> = ({
@@ -113,6 +112,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
   onSubmit,
   plans,
   paymentMethods,
+  user,
 }) => {
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -120,13 +120,12 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
     >
   ) => {
     const { name, value } = e.target;
-
     let updatedValue: string | number | boolean = value;
 
     if (name === "planId" || name === "paymentMethodId") {
       updatedValue = parseInt(value, 10);
     } else if (name === "grossAmount") {
-      updatedValue = parseFloat(value);
+      updatedValue = value === "" ? 0 : parseFloat(value); // Converte para number
     } else if (name === "isActive") {
       updatedValue = value === "true";
     }
@@ -169,19 +168,20 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
       }
     };
     document.addEventListener("keydown", handleEscKey);
-    return () => {
-      document.removeEventListener("keydown", handleEscKey);
-    };
+    return () => document.removeEventListener("keydown", handleEscKey);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (user && !formData.username) {
+      onChange({ ...formData, username: user.username });
+    }
+  }, [user, formData, onChange]);
 
   if (!isOpen) return null;
 
   const planOptions = [
     { value: "0", label: "Selecione um plano" },
-    ...plans.map((plan) => ({
-      value: plan.id.toString(),
-      label: plan.name,
-    })),
+    ...plans.map((plan) => ({ value: plan.id.toString(), label: plan.name })),
   ];
 
   const paymentMethodOptions = [
@@ -222,6 +222,19 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
               type="text"
               name="fullName"
               value={formData.fullName}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
+              required
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm text-[var(--text-primary)] mb-1">
+              Usuário (Username)
+            </label>
+            <input
+              type="text"
+              name="username"
+              value={formData.username}
               onChange={handleInputChange}
               className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
               required
@@ -301,8 +314,9 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
             </label>
             <input
               type="number"
+              step="0.01"
               name="grossAmount"
-              value={formData.grossAmount}
+              value={formData.grossAmount === 0 ? "" : formData.grossAmount} // Exibe vazio se for 0
               onChange={handleInputChange}
               className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
               required

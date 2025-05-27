@@ -287,49 +287,60 @@
     }
   }
 
-  .clients-table-container {
+  /* Estilização genérica para tabelas responsivas */
+  .table-container {
     @apply bg-[var(--table-bg)] backdrop-blur-md rounded-xl p-2 shadow-lg;
     min-height: 400px;
     transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-    overflow-x: hidden;
+    overflow-x: hidden; /* Remove o scroll lateral */
+    width: 100%; /* Garante que o container ocupe toda a largura disponível */
+    box-sizing: border-box;
+    container-type: inline-size; /* Suporte para container queries */
   }
 
-  .clients-table-container.fade {
+  .table-container.fade {
     opacity: 0.5;
     transform: scale(0.98);
   }
 
-  .clients-table {
+  .responsive-table {
     @apply w-full border-collapse text-[var(--text-primary)];
-    table-layout: auto;
+    table-layout: fixed; /* Força as colunas a se ajustarem proporcionalmente */
     transition: all 0.3s ease-in-out;
   }
 
-  .clients-table th,
-  .clients-table td {
+  .responsive-table th,
+  .responsive-table td {
     @apply py-2 px-3 text-center;
     vertical-align: middle;
     transition: all 0.3s ease-in-out;
+    box-sizing: border-box;
   }
 
-  /* Ajuste específico para th (títulos das colunas) - Alterado para permitir texto completo */
-  .clients-table th {
+  /* Ajuste específico para th (títulos das colunas) */
+  .responsive-table th {
     @apply text-[var(--text-primary)] font-bold cursor-pointer transition-colors duration-300;
     background: var(--table-header-bg);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    font-size: 1.1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     letter-spacing: 0.02em;
-    padding: 0.75rem 1rem;
-    overflow: visible;
-    text-overflow: clip;
-    white-space: normal;
-    word-break: break-word;
-    line-height: 1.2;
+    padding: 0.5rem 0.75rem;
   }
 
-  /* Ajuste específico para td (células de dados) - Mantém comportamento original com ellipsis */
-  .clients-table td {
+  /* Container para o conteúdo do th (texto + ícone) */
+  .th-content {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    white-space: normal; /* Permite quebra de linha */
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  /* Ajuste específico para td (células de dados) */
+  .responsive-table td {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -337,84 +348,185 @@
     font-size: 0.9rem;
   }
 
-  /* Definir larguras mínimas e máximas para cada coluna */
-  .clients-table th.status-column,
-  .clients-table td.status-column {
-    min-width: 50px;
-    max-width: 60px;
-  }
-
-  .clients-table th.name-column,
-  .clients-table td.name-column {
-    min-width: 150px;
-    max-width: 200px;
-  }
-
-  .clients-table th.email-column,
-  .clients-table td.email-column {
-    min-width: 180px;
-    max-width: 220px;
-  }
-
-  .clients-table th.phone-column,
-  .clients-table td.phone-column {
-    min-width: 100px;
-    max-width: 120px;
-  }
-
-  .clients-table th.plan-column,
-  .clients-table td.plan-column {
-    min-width: 120px;
-    max-width: 150px;
-  }
-
-  .clients-table th.method-column,
-  .clients-table td.method-column {
-    min-width: 140px;
-    max-width: 160px;
-  }
-
-  .clients-table th.due-date-column,
-  .clients-table td.due-date-column {
-    min-width: 110px;
-    max-width: 140px;
-  }
-
-  .clients-table th.gross-amount-column,
-  .clients-table td.gross-amount-column {
-    min-width: 100px;
-    max-width: 120px;
-  }
-
-  .clients-table th.net-amount-column,
-  .clients-table td.net-amount-column {
-    min-width: 100px;
-    max-width: 120px;
-  }
-
-  .clients-table th.actions-column,
-  .clients-table td.actions-column {
-    min-width: 100px;
-    max-width: 120px;
-    position: relative;
-  }
-
-  .clients-table tr {
+  .responsive-table tr {
     @apply transition-all duration-300;
     background: var(--table-row-bg);
     border-radius: 8px;
     margin-bottom: 4px;
   }
 
-  .clients-table tr:hover {
+  .responsive-table tr:hover {
     background: rgba(55, 65, 81, 0.7);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
 
-  .clients-table .sort-icon {
-    @apply ml-1 inline-block align-middle text-[var(--text-primary)];
-    margin-left: 0.5rem;
+  .responsive-table .sort-icon {
+    @apply inline-block align-middle text-[var(--text-primary)];
     font-size: 0.9rem;
+  }
+
+  /* Definir larguras relativas para cada coluna (proporcionais) */
+  .responsive-table th,
+  .responsive-table td {
+    width: calc(100% / 11); /* Divide igualmente entre 11 colunas inicialmente */
+    min-width: 80px; /* Garante um tamanho mínimo */
+  }
+
+  /* Ajustes de responsividade para a tabela com container queries */
+  @container (max-width: 1100px) {
+    .responsive-table th[data-priority="10"],
+    .responsive-table td[data-priority="10"],
+    .responsive-table th[data-priority="9"],
+    .responsive-table td[data-priority="9"] {
+      display: none;
+    }
+    /* Redistribuir o espaço das colunas visíveis (9 colunas restantes) */
+    .responsive-table th,
+    .responsive-table td {
+      width: calc(100% / 9);
+      min-width: 80px;
+    }
+  }
+
+  @container (max-width: 900px) {
+    .responsive-table th[data-priority="8"],
+    .responsive-table td[data-priority="8"],
+    .responsive-table th[data-priority="7"],
+    .responsive-table td[data-priority="7"] {
+      display: none;
+    }
+    /* Redistribuir o espaço das colunas visíveis (7 colunas restantes) */
+    .responsive-table th,
+    .responsive-table td {
+      width: calc(100% / 7);
+      min-width: 80px;
+    }
+  }
+
+  @container (max-width: 700px) {
+    .responsive-table th[data-priority="6"],
+    .responsive-table td[data-priority="6"],
+    .responsive-table th[data-priority="5"],
+    .responsive-table td[data-priority="5"] {
+      display: none;
+    }
+    /* Redistribuir o espaço das colunas visíveis (5 colunas restantes) */
+    .responsive-table th,
+    .responsive-table td {
+      width: calc(100% / 5);
+      min-width: 80px;
+    }
+  }
+
+  @container (max-width: 500px) {
+    .responsive-table th[data-priority="4"],
+    .responsive-table td[data-priority="4"] {
+      display: none;
+    }
+    /* Redistribuir o espaço das colunas visíveis (4 colunas restantes) */
+    .responsive-table th,
+    .responsive-table td {
+      width: calc(100% / 4);
+      min-width: 80px;
+    }
+  }
+
+  /* Fallback com media queries para navegadores que não suportam container queries */
+  @media (max-width: 1100px) {
+    .responsive-table th[data-priority="10"],
+    .responsive-table td[data-priority="10"],
+    .responsive-table th[data-priority="9"],
+    .responsive-table td[data-priority="9"] {
+      display: none;
+    }
+    .responsive-table th,
+    .responsive-table td {
+      width: calc(100% / 9);
+      min-width: 80px;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .responsive-table th[data-priority="8"],
+    .responsive-table td[data-priority="8"],
+    .responsive-table th[data-priority="7"],
+    .responsive-table td[data-priority="7"] {
+      display: none;
+    }
+    .responsive-table th,
+    .responsive-table td {
+      width: calc(100% / 7);
+      min-width: 80px;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .responsive-table th[data-priority="6"],
+    .responsive-table td[data-priority="6"],
+    .responsive-table th[data-priority="5"],
+    .responsive-table td[data-priority="5"] {
+      display: none;
+    }
+    .responsive-table th,
+    .responsive-table td {
+      width: calc(100% / 5);
+      min-width: 80px;
+    }
+  }
+
+  @media (max-width: 500px) {
+    .responsive-table th[data-priority="4"],
+    .responsive-table td[data-priority="4"] {
+      display: none;
+    }
+    .responsive-table th,
+    .responsive-table td {
+      width: calc(100% / 4);
+      min-width: 80px;
+    }
+  }
+
+  /* Ajustes específicos para o ClientsTable */
+  .clients-table-container {
+    @apply table-container;
+  }
+
+  .clients-table {
+    @apply responsive-table;
+  }
+
+  /* Ajustes específicos para os títulos (th) da tabela de clientes */
+  .clients-table th {
+    font-size: 0.9rem; /* Tamanho base para telas menores */
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    white-space: nowrap; /* Evita quebras de linha nos títulos */
+    min-width: 100px; /* Largura mínima para suportar textos maiores */
+    transition: font-size 0.3s ease-in-out; /* Transição suave ao redimensionar */
+  }
+
+  /* Ajuste para telas médias (640px a 1024px) */
+  @media (min-width: 640px) and (max-width: 1024px) {
+    .clients-table th {
+      font-size: 1rem; /* Tamanho intermediário */
+      min-width: 120px; /* Aumenta a largura mínima */
+    }
+  }
+
+  /* Ajuste para telas grandes (acima de 1024px) */
+  @media (min-width: 1024px) {
+    .clients-table th {
+      font-size: 1.2rem; /* Tamanho maior para telas grandes */
+      min-width: 150px; /* Aumenta mais a largura mínima */
+    }
+  }
+  /* Caso não goste dos tamanhos, ajuste os valores de font-size (ex.: 0.8rem, 0.9rem, 1rem) ou min-width (ex.: 80px, 100px, 120px) conforme preferir. */
+
+  /* Garante que o conteúdo interno da célula (os botões) também esteja centralizado */
+  .actions-column > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   /* Cores condicionais para Status */
@@ -483,160 +595,9 @@
     font-weight: bold;
   }
 
-  /* Ajustes de responsividade para a tabela (apenas md:block) */
-  /* Desktop Grande (≥1280px) */
-  @media (min-width: 1280px) {
-    .clients-table th,
-    .clients-table td {
-      font-size: 0.9rem;
-      padding: 0.75rem 1rem;
-    }
-
-    .clients-table th.name-column,
-    .clients-table td.name-column {
-      min-width: 150px;
-      max-width: 200px;
-    }
-
-    .clients-table th.email-column,
-    .clients-table td.email-column {
-      min-width: 180px;
-      max-width: 220px;
-    }
-
-    .clients-table th.phone-column,
-    .clients-table td.phone-column {
-      min-width: 100px;
-      max-width: 120px;
-    }
-
-    .clients-table th.plan-column,
-    .clients-table td.plan-column {
-      min-width: 120px;
-      max-width: 150px;
-    }
-
-    .clients-table th.method-column,
-    .clients-table td.method-column {
-      min-width: 140px;
-      max-width: 160px;
-    }
-
-    .clients-table th.due-date-column,
-    .clients-table td.due-date-column {
-      min-width: 110px;
-      max-width: 140px;
-    }
-
-    .clients-table th.gross-amount-column,
-    .clients-table td.gross-amount-column {
-      min-width: 100px;
-      max-width: 120px;
-    }
-
-    .clients-table th.net-amount-column,
-    .clients-table td.net-amount-column {
-      min-width: 100px;
-      max-width: 120px;
-    }
-  }
-
-  /* Desktop Médio (1024px - 1279px) - Ajuste para reduzir tamanho do título */
-  @media (min-width: 1024px) and (max-width: 1279px) {
-    .clients-table th {
-      font-size: 0.9rem; /* Reduz o tamanho da fonte */
-      padding: 0.5rem 0.75rem; /* Ajusta o padding */
-    }
-
-    .clients-table th.gross-amount-column,
-    .clients-table td.gross-amount-column,
-    .clients-table th.net-amount-column,
-    .clients-table td.net-amount-column {
-      display: none;
-    }
-
-    .clients-table th.name-column,
-    .clients-table td.name-column {
-      min-width: 140px;
-      max-width: 180px;
-    }
-
-    .clients-table th.email-column,
-    .clients-table td.email-column {
-      min-width: 160px;
-      max-width: 200px;
-    }
-
-    .clients-table th.phone-column,
-    .clients-table td.phone-column {
-      min-width: 90px;
-      max-width: 110px;
-    }
-
-    .clients-table th.plan-column,
-    .clients-table td.plan-column {
-      min-width: 110px;
-      max-width: 130px;
-    }
-
-    .clients-table th.method-column,
-    .clients-table td.method-column {
-      min-width: 130px;
-      max-width: 150px;
-    }
-
-    .clients-table th.due-date-column,
-    .clients-table td.due-date-column {
-      min-width: 100px;
-      max-width: 120px;
-    }
-  }
-
-  /* Tablet (768px - 1023px) */
-  @media (min-width: 768px) and (max-width: 1023px) {
-    .clients-table th {
-      font-size: 1rem; /* Mantém um tamanho razoável */
-    }
-
-    .clients-table th.method-column,
-    .clients-table td.method-column,
-    .clients-table th.due-date-column,
-    .clients-table td.due-date-column,
-    .clients-table th.gross-amount-column,
-    .clients-table td.gross-amount-column,
-    .clients-table th.net-amount-column,
-    .clients-table td.net-amount-column {
-      display: none;
-    }
-
-    .clients-table th.name-column,
-    .clients-table td.name-column {
-      min-width: 120px;
-      max-width: 150px;
-    }
-
-    .clients-table th.email-column,
-    .clients-table td.email-column {
-      min-width: 140px;
-      max-width: 170px;
-    }
-
-    .clients-table th.phone-column,
-    .clients-table td.phone-column {
-      min-width: 90px;
-      max-width: 110px;
-    }
-
-    .clients-table th.plan-column,
-    .clients-table td.plan-column {
-      min-width: 100px;
-      max-width: 120px;
-    }
-  }
-
-  /* Mobile (<768px) */
+  /* Ajustes para telas pequenas (mobile) */
   @media (max-width: 767px) {
-    .clients-table-container {
+    .table-container {
       @apply p-1;
     }
 
@@ -658,7 +619,7 @@
   }
 
   @media (max-width: 639px) {
-    .clients-table-container {
+    .table-container {
       @apply p-1;
     }
 
@@ -731,6 +692,22 @@
     }
   }
 
+  /* Estilo base para o h1 em todas as resoluções */
+  .dashboard-container h1 {
+    background: linear-gradient(90deg, #F1916D 30%, #AE7DAC 70%); /* Ajuste no gradiente */
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    animation: fadeIn 0.5s ease-in-out;
+    @apply font-bold pb-2 animate-fadeIn;
+    /* Tamanho fluido que escala com a tela */
+    font-size: clamp(1.5rem, 3.5vw + 0.5rem, 3rem); /* Vai de 24px a 48px */
+    /* Ajuste para descer o título e evitar corte */
+    padding-top: 1rem; /* Adiciona 16px de padding superior */
+  }
+
+  /* Ajustes para telas menores (abaixo de 640px) */
   @media (max-width: 640px) {
     .new-client-button {
       @apply px-3 py-1 text-xs;
@@ -741,14 +718,15 @@
     }
 
     .dashboard-container h1 {
-      @apply text-2xl text-center;
+      @apply text-center;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); /* Sombra mais sutil */
     }
   }
 
+  /* Ajustes para telas maiores (acima de 640px) */
   @media (min-width: 640px) {
     .dashboard-container h1 {
-      @apply text-4xl font-bold border-b-2 border-[var(--accent-blue)] pb-2 animate-fadeIn;
-      animation: fadeIn 0.5s ease-in-out;
+      /* Mantemos o clamp definindo o tamanho, sem necessidade de ajuste extra aqui */
     }
   }
 

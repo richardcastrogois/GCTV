@@ -23,10 +23,10 @@ const formatDateToUTC = (date: string | Date): string => {
 
 interface ExpiredClientsTableProps {
   clients: Client[];
-  onSort: (key: keyof Client | "plan.name") => void;
+  onSort: (key: keyof Client | "plan.name" | "user.username") => void;
   onReactivate: (client: Client, newDueDate: string) => void;
   sortConfig: {
-    key: keyof Client | "plan.name" | null;
+    key: keyof Client | "plan.name" | "user.username" | null;
     direction: "asc" | "desc";
   };
   isFetching?: boolean;
@@ -92,7 +92,9 @@ export default function ExpiredClientsTable({
     };
   }, [isInfoModalOpen, isConfirmModalOpen]);
 
-  const getSortIcon = (columnKey: keyof Client | "plan.name") => {
+  const getSortIcon = (
+    columnKey: keyof Client | "plan.name" | "user.username"
+  ) => {
     if (sortConfig.key !== columnKey) return <FaSort className="sort-icon" />;
     return sortConfig.direction === "asc" ? (
       <FaSortUp className="sort-icon" />
@@ -189,6 +191,9 @@ export default function ExpiredClientsTable({
             <table className="clients-table">
               <thead>
                 <tr>
+                  <th className="user-column">
+                    <Skeleton variant="text" width={120} />
+                  </th>
                   <th className="name-column">
                     <Skeleton variant="text" width={150} />
                   </th>
@@ -212,6 +217,9 @@ export default function ExpiredClientsTable({
               <tbody>
                 {[...Array(5)].map((_, index) => (
                   <tr key={index}>
+                    <td className="user-column">
+                      <Skeleton variant="text" width={120} />
+                    </td>
                     <td className="name-column">
                       <Skeleton variant="text" width={150} />
                     </td>
@@ -245,6 +253,7 @@ export default function ExpiredClientsTable({
             >
               <div className="flex justify-between items-start">
                 <div>
+                  <Skeleton variant="text" width={120} height={20} />
                   <Skeleton variant="text" width={150} height={30} />
                   <Skeleton variant="text" width={120} height={20} />
                   <Skeleton variant="text" width={100} height={20} />
@@ -275,6 +284,12 @@ export default function ExpiredClientsTable({
           <table className={`clients-table ${isFetching ? "fade" : ""}`}>
             <thead>
               <tr>
+                <th
+                  className="user-column"
+                  onClick={() => onSort("user.username")}
+                >
+                  Usuário {getSortIcon("user.username")}
+                </th>
                 <th className="name-column" onClick={() => onSort("fullName")}>
                   Nome {getSortIcon("fullName")}
                 </th>
@@ -309,6 +324,9 @@ export default function ExpiredClientsTable({
                   className={expandedRows.includes(client.id) ? "expanded" : ""}
                   onClick={(e) => handleCardClick(client.id, e)}
                 >
+                  <td className="user-column">
+                    {client.user?.username || "Sem usuário"}
+                  </td>
                   <td className="name-column">{client.fullName}</td>
                   <td className="email-column hidden lg:table-cell">
                     {client.email}
@@ -362,6 +380,9 @@ export default function ExpiredClientsTable({
           >
             <div className="flex justify-between items-start">
               <div>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Usuário: {client.user?.username || "Sem usuário"}
+                </p>
                 <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                   {client.fullName}
                 </h3>
@@ -420,6 +441,10 @@ export default function ExpiredClientsTable({
               </button>
             </div>
             <div className="modal-body">
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Usuário:</strong>{" "}
+                {selectedClient.user?.username || "Sem usuário"}
+              </p>
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Nome:</strong> {selectedClient.fullName}
               </p>
@@ -493,6 +518,10 @@ export default function ExpiredClientsTable({
             <div className="modal-body">
               <p className="text-[var(--text-primary)] mb-2">
                 Tem certeza que deseja reativar o cliente?
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Usuário:</strong>{" "}
+                {clientToReactivate.user?.username || "Sem usuário"}
               </p>
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Nome:</strong> {clientToReactivate.fullName}

@@ -1,8 +1,11 @@
 //backend/src/controllers/clientController.ts
 
+// backend/src/controllers/clientController.ts
+
 import { RequestHandler, Request, Response } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { ParsedQs } from "qs";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -17,12 +20,12 @@ type ClientBody = {
   grossAmount: number;
   isActive: boolean;
   observations?: string;
+  username: string;
 };
 type RenewClientBody = { dueDate: string };
 type ObservationBody = { observations: string };
-type ReactivateClientBody = { dueDate: string }; // Novo tipo para reativação
+type ReactivateClientBody = { dueDate: string };
 
-// Tipo para o resultado da consulta raw
 type RawClient = {
   id: number;
 };
@@ -68,6 +71,7 @@ export const getClients: RequestHandler = async (
             FROM "Client" c
             LEFT JOIN "Plan" p ON c."planId" = p.id
             LEFT JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id
+            LEFT JOIN "User" u ON c."userId" = u.id
             WHERE c."isActive" = true
               AND (
                 LOWER(c."fullName") LIKE '${searchPattern}'
@@ -77,6 +81,7 @@ export const getClients: RequestHandler = async (
                 OR LOWER(pm."name") LIKE '${searchPattern}'
                 OR LOWER(c."observations") LIKE '${searchPattern}'
                 OR LOWER(TO_CHAR(c."dueDate", 'DD/MM/YYYY')) LIKE '${searchPattern}'
+                OR LOWER(u."username") LIKE '${searchPattern}'
               )
           `;
           const otherFieldsClients = await prisma.$queryRawUnsafe<RawClient[]>(
@@ -90,6 +95,7 @@ export const getClients: RequestHandler = async (
           FROM "Client" c
           LEFT JOIN "Plan" p ON c."planId" = p.id
           LEFT JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id
+          LEFT JOIN "User" u ON c."userId" = u.id
           WHERE c."isActive" = true
             AND (
               LOWER(c."fullName") LIKE '${searchPattern}'
@@ -101,6 +107,7 @@ export const getClients: RequestHandler = async (
               OR LOWER(TO_CHAR(c."dueDate", 'DD/MM/YYYY')) LIKE '${searchPattern}'
               OR LOWER(CAST(c."grossAmount" AS TEXT)) LIKE '${searchPattern}'
               OR LOWER(CAST(c."netAmount" AS TEXT)) LIKE '${searchPattern}'
+              OR LOWER(u."username") LIKE '${searchPattern}'
             )
         `;
         const rawClients = await prisma.$queryRawUnsafe<RawClient[]>(rawQuery);
@@ -116,7 +123,7 @@ export const getClients: RequestHandler = async (
 
     const clients = await prisma.client.findMany({
       where: whereClause,
-      include: { plan: true, paymentMethod: true },
+      include: { plan: true, paymentMethod: true, user: true },
       skip,
       take: limit,
     });
@@ -129,6 +136,8 @@ export const getClients: RequestHandler = async (
     res.status(500).json({ message: "Erro ao buscar clientes" });
   }
 };
+
+// ... (o restante do código permanece inalterado)
 
 export const getClientById: RequestHandler<ParamsWithId> = async (
   req: Request<ParamsWithId>,
@@ -144,7 +153,7 @@ export const getClientById: RequestHandler<ParamsWithId> = async (
   try {
     const client = await prisma.client.findUnique({
       where: { id: parseInt(id) },
-      include: { plan: true, paymentMethod: true },
+      include: { plan: true, paymentMethod: true, user: true },
     });
 
     if (!client) {
@@ -200,6 +209,7 @@ export const getExpiredClients: RequestHandler = async (
             FROM "Client" c
             LEFT JOIN "Plan" p ON c."planId" = p.id
             LEFT JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id
+            LEFT JOIN "User" u ON c."userId" = u.id
             WHERE c."isActive" = false
               AND (
                 LOWER(c."fullName") LIKE '${searchPattern}'
@@ -209,6 +219,7 @@ export const getExpiredClients: RequestHandler = async (
                 OR LOWER(pm."name") LIKE '${searchPattern}'
                 OR LOWER(c."observations") LIKE '${searchPattern}'
                 OR LOWER(TO_CHAR(c."dueDate", 'DD/MM/YYYY')) LIKE '${searchPattern}'
+                OR LOWER(u."username") LIKE '${searchPattern}'
               )
           `;
           const otherFieldsClients = await prisma.$queryRawUnsafe<RawClient[]>(
@@ -222,6 +233,7 @@ export const getExpiredClients: RequestHandler = async (
           FROM "Client" c
           LEFT JOIN "Plan" p ON c."planId" = p.id
           LEFT JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id
+          LEFT JOIN "User" u ON c."userId" = u.id
           WHERE c."isActive" = false
             AND (
               LOWER(c."fullName") LIKE '${searchPattern}'
@@ -233,6 +245,7 @@ export const getExpiredClients: RequestHandler = async (
               OR LOWER(TO_CHAR(c."dueDate", 'DD/MM/YYYY')) LIKE '${searchPattern}'
               OR LOWER(CAST(c."grossAmount" AS TEXT)) LIKE '${searchPattern}'
               OR LOWER(CAST(c."netAmount" AS TEXT)) LIKE '${searchPattern}'
+              OR LOWER(u."username") LIKE '${searchPattern}'
             )
         `;
         const rawClients = await prisma.$queryRawUnsafe<RawClient[]>(rawQuery);
@@ -248,7 +261,7 @@ export const getExpiredClients: RequestHandler = async (
 
     const clients = await prisma.client.findMany({
       where: whereClause,
-      include: { plan: true, paymentMethod: true },
+      include: { plan: true, paymentMethod: true, user: true },
       skip,
       take: limit,
     });
@@ -311,7 +324,13 @@ export const createClient: RequestHandler<
       dueDate,
       grossAmount,
       isActive,
+      username,
     } = req.body;
+
+    if (!username) {
+      res.status(400).json({ message: "Username é obrigatório" });
+      return;
+    }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -346,6 +365,14 @@ export const createClient: RequestHandler<
     const discount = discountEntry ? discountEntry.discount : 0;
     const netAmount = grossAmount - grossAmount * (discount / 100);
 
+    const password = bcrypt.hashSync("tempPassword123", 10);
+    const user = await prisma.user.create({
+      data: {
+        username,
+        password,
+      },
+    });
+
     const newClient = await prisma.client.create({
       data: {
         fullName,
@@ -360,6 +387,7 @@ export const createClient: RequestHandler<
         paymentVerified: false,
         paymentVerifiedDate: null,
         observations: req.body.observations || null,
+        userId: user.id,
       },
     });
 
@@ -371,9 +399,9 @@ export const createClient: RequestHandler<
         error.code === "P2002" &&
         error.meta &&
         Array.isArray((error.meta as any).target) &&
-        (error.meta as any).target.includes("email")
+        (error.meta as any).target.includes("username")
       ) {
-        res.status(400).json({ message: "Email já cadastrado" });
+        res.status(400).json({ message: "Username já cadastrado" });
         return;
       }
     }
@@ -407,7 +435,16 @@ export const updateClient: RequestHandler<
       dueDate,
       grossAmount,
       isActive,
+      username,
     } = req.body;
+
+    // Validação adicional para grossAmount
+    if (typeof grossAmount !== "number" || isNaN(grossAmount)) {
+      res
+        .status(400)
+        .json({ message: "Valor bruto deve ser um número válido" });
+      return;
+    }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -442,6 +479,23 @@ export const updateClient: RequestHandler<
     const discount = discountEntry ? discountEntry.discount : 0;
     const netAmount = grossAmount - grossAmount * (discount / 100);
 
+    const client = await prisma.client.findUnique({
+      where: { id: parseInt(id) },
+      include: { user: true },
+    });
+    if (!client) {
+      res.status(404).json({ message: "Cliente não encontrado" });
+      return;
+    }
+
+    let userId = client.userId;
+    if (username && client.user && username !== client.user.username) {
+      await prisma.user.update({
+        where: { id: client.userId },
+        data: { username },
+      });
+    }
+
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: {
@@ -455,20 +509,22 @@ export const updateClient: RequestHandler<
         netAmount,
         isActive,
         observations: req.body.observations || null,
+        userId,
       },
+      include: { plan: true, paymentMethod: true, user: true },
     });
 
     res.json(updatedClient);
   } catch (error) {
-    console.error("Erro ao atualizar cliente:", error);
+    console.error("Erro detalhado ao atualizar cliente:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (
         error.code === "P2002" &&
         error.meta &&
         Array.isArray((error.meta as any).target) &&
-        (error.meta as any).target.includes("email")
+        (error.meta as any).target.includes("username")
       ) {
-        res.status(400).json({ message: "Email já cadastrado" });
+        res.status(400).json({ message: "Username já cadastrado" });
         return;
       }
       if (error.code === "P2025") {
@@ -476,7 +532,9 @@ export const updateClient: RequestHandler<
         return;
       }
     }
-    res.status(500).json({ message: "Erro ao atualizar cliente" });
+    res
+      .status(500)
+      .json({ message: "Erro ao atualizar cliente", error: String(error) });
   }
 };
 
@@ -543,7 +601,7 @@ export const renewClient: RequestHandler<
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: { dueDate: parsedDueDate },
-      include: { plan: true, paymentMethod: true },
+      include: { plan: true, paymentMethod: true, user: true },
     });
 
     res.status(200).json(updatedClient);
@@ -595,7 +653,7 @@ export const reactivateClient: RequestHandler<
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: { isActive: true, dueDate: parsedDueDate },
-      include: { plan: true, paymentMethod: true },
+      include: { plan: true, paymentMethod: true, user: true },
     });
 
     res.status(200).json(updatedClient);
@@ -632,7 +690,7 @@ export const updatePaymentStatus: RequestHandler<ParamsWithId> = async (
           ? new Date(paymentVerifiedDate)
           : null,
       },
-      include: { plan: true, paymentMethod: true },
+      include: { plan: true, paymentMethod: true, user: true },
     });
     res.json(updatedClient);
   } catch (error) {
@@ -668,7 +726,7 @@ export const updateClientObservations: RequestHandler<
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: { observations: observations || null },
-      include: { plan: true, paymentMethod: true },
+      include: { plan: true, paymentMethod: true, user: true },
     });
     res.json(updatedClient);
   } catch (error) {

@@ -48,15 +48,17 @@ interface ClientsTableProps {
   onRenew: (client: Client) => void;
   onSort: (
     key:
-      | keyof Omit<Client, "plan" | "paymentMethod">
+      | keyof Omit<Client, "plan" | "paymentMethod" | "user">
       | "plan.name"
       | "paymentMethod.name"
+      | "user.username"
   ) => void;
   sortConfig: {
     key:
-      | keyof Omit<Client, "plan" | "paymentMethod">
+      | keyof Omit<Client, "plan" | "paymentMethod" | "user">
       | "plan.name"
       | "paymentMethod.name"
+      | "user.username"
       | null;
     direction: "asc" | "desc";
   };
@@ -147,9 +149,10 @@ export default function ClientsTable({
 
   const getSortIcon = (
     columnKey:
-      | keyof Omit<Client, "plan" | "paymentMethod">
+      | keyof Omit<Client, "plan" | "paymentMethod" | "user">
       | "plan.name"
       | "paymentMethod.name"
+      | "user.username"
   ) => {
     if (sortConfig.key !== columnKey) return <FaSort className="sort-icon" />;
     return sortConfig.direction === "asc" ? (
@@ -278,6 +281,9 @@ export default function ClientsTable({
                   <th className="status-column">
                     <Skeleton variant="text" width={50} />
                   </th>
+                  <th className="user-column">
+                    <Skeleton variant="text" width={150} />
+                  </th>
                   <th className="name-column">
                     <Skeleton variant="text" width={150} />
                   </th>
@@ -312,6 +318,9 @@ export default function ClientsTable({
                   <tr key={index}>
                     <td className="status-column">
                       <Skeleton variant="text" width={50} />
+                    </td>
+                    <td className="user-column">
+                      <Skeleton variant="text" width={150} />
                     </td>
                     <td className="name-column">
                       <Skeleton variant="text" width={150} />
@@ -387,6 +396,12 @@ export default function ClientsTable({
             <thead>
               <tr>
                 <th className="status-column">Pago</th>
+                <th
+                  className="user-column"
+                  onClick={() => onSort("user.username")}
+                >
+                  Usuário {getSortIcon("user.username")}
+                </th>
                 <th className="name-column" onClick={() => onSort("fullName")}>
                   Nome {getSortIcon("fullName")}
                 </th>
@@ -455,6 +470,7 @@ export default function ClientsTable({
                       )}
                     </button>
                   </td>
+                  <td className="user-column">{client.user.username}</td>
                   <td className="name-column">{client.fullName}</td>
                   <td className="email-column hidden md:table-cell">
                     {client.email}
@@ -527,6 +543,9 @@ export default function ClientsTable({
                 <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                   {client.fullName}
                 </h3>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Usuário: {client.user.username}
+                </p>
                 <p className="text-sm text-[var(--text-secondary)]">
                   Plano:{" "}
                   <span className={getPlanClass(client.plan.name)}>
@@ -727,6 +746,9 @@ export default function ClientsTable({
             <div className="modal-body">
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Nome:</strong> {selectedClient.fullName}
+              </p>
+              <p className="text-[var(--text-primary)] mb-2">
+                <strong>Usuário:</strong> {selectedClient.user.username}
               </p>
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Email:</strong> {selectedClient.email}

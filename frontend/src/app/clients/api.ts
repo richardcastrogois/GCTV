@@ -1,7 +1,7 @@
 //frontend/src/app/clients/api.ts
 
 import api from "@/utils/api";
-import { Client, Plan, PaymentMethod } from "./types";
+import { Client, Plan, PaymentMethod, EditFormData } from "./types"; // Adicionado EditFormData na importação
 
 export const fetchPlans = async (): Promise<Plan[]> => {
   const response = await api.get("/api/clients/plans");
@@ -32,17 +32,7 @@ export const deleteClient = async (id: number): Promise<void> => {
 
 export const updateClient = async (
   id: number,
-  data: {
-    fullName: string;
-    email: string;
-    phone: string | null;
-    planId: number;
-    paymentMethodId: number;
-    dueDate: string;
-    grossAmount: number;
-    isActive: boolean;
-    observations?: string;
-  }
+  data: EditFormData // Alterado para usar EditFormData
 ): Promise<Client> => {
   const response = await api.put(`/api/clients/${id}`, data);
   return response.data;

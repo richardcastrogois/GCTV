@@ -25,7 +25,6 @@ import { useSearch } from "@/hooks/useSearch";
 import Loading from "@/components/Loading";
 import EditClientModal from "./components/EditClientModal";
 
-// [OTIMIZAÇÃO] Lazy loading do componente ClientsTable
 const ClientsTable = dynamic(() => import("./components/ClientsTable"), {
   loading: () => <Loading>Carregando tabela...</Loading>,
 });
@@ -51,18 +50,20 @@ export default function Clients() {
     planId: 0,
     paymentMethodId: 0,
     dueDate: "",
-    grossAmount: "",
+    grossAmount: 0, // Alterado para number
     isActive: true,
     observations: "",
+    username: "",
   });
   const [plans, setPlans] = useState<Plan[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const { searchTerm } = useSearch();
   const [sortConfig, setSortConfig] = useState<{
     key:
-      | keyof Omit<Client, "plan" | "paymentMethod">
+      | keyof Omit<Client, "plan" | "paymentMethod" | "user">
       | "plan.name"
       | "paymentMethod.name"
+      | "user.username"
       | null;
     direction: "asc" | "desc";
   }>({ key: null, direction: "asc" });
@@ -74,7 +75,6 @@ export default function Clients() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<number | null>(null);
 
-  // [OTIMIZAÇÃO] Carrega planos e métodos de pagamento com cache
   useEffect(() => {
     const loadPlansAndMethods = async () => {
       try {
@@ -94,7 +94,6 @@ export default function Clients() {
     loadPlansAndMethods();
   }, [handleUnauthorized]);
 
-  // [OTIMIZAÇÃO] Busca clientes com parâmetro de busca no backend
   const {
     data: clientsResponse,
     isLoading,
@@ -117,38 +116,36 @@ export default function Clients() {
     refetchOnReconnect: false,
   });
 
-  // Verificar clientes vencidos há mais de 30 dias e atualizar para inativos
   useEffect(() => {
     const checkExpiredClients = async () => {
       if (!clientsResponse?.data) return;
 
-      const currentDate = new Date(); // Movido para dentro do useEffect
-      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000; // 30 dias em milissegundos
+      const currentDate = new Date();
+      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
       const clientsToDeactivate: Client[] = [];
 
       for (const client of clientsResponse.data) {
         const dueDate = new Date(client.dueDate);
         const timeDiff = currentDate.getTime() - dueDate.getTime();
 
-        // Se o cliente está ativo e a data de vencimento passou há mais de 30 dias
         if (client.isActive && timeDiff > thirtyDaysInMs) {
           clientsToDeactivate.push(client);
         }
       }
 
-      // Atualizar clientes para inativos
       for (const client of clientsToDeactivate) {
         try {
           await updateClient(client.id, {
             fullName: client.fullName,
             email: client.email,
-            phone: client.phone || "", // phone pode ser null
-            planId: client.plan.id, // Mapeando de plan.id para planId
-            paymentMethodId: client.paymentMethod.id, // Mapeando de paymentMethod.id para paymentMethodId
+            phone: client.phone || "",
+            planId: client.plan.id,
+            paymentMethodId: client.paymentMethod.id,
             dueDate: client.dueDate,
-            grossAmount: client.grossAmount,
-            isActive: false, // Desativa o cliente
-            observations: client.observations || "", // observations pode ser undefined
+            grossAmount: client.grossAmount, // Já é number
+            isActive: false,
+            observations: client.observations || "",
+            username: client.user.username,
           });
           toast.info(`Cliente ${client.fullName} movido para inativos.`);
         } catch (error) {
@@ -161,7 +158,6 @@ export default function Clients() {
         }
       }
 
-      // Invalidar a query para recarregar a tabela
       if (clientsToDeactivate.length > 0) {
         queryClient.invalidateQueries({ queryKey: ["clients"] });
       }
@@ -182,6 +178,9 @@ export default function Clients() {
     } else if (sortConfig.key === "paymentMethod.name") {
       valueA = a.paymentMethod?.name?.toLowerCase() ?? "";
       valueB = b.paymentMethod?.name?.toLowerCase() ?? "";
+    } else if (sortConfig.key === "user.username") {
+      valueA = a.user?.username?.toLowerCase() ?? "";
+      valueB = b.user?.username?.toLowerCase() ?? "";
     } else {
       const rawValueA = a[sortConfig.key];
       const rawValueB = b[sortConfig.key];
@@ -208,9 +207,10 @@ export default function Clients() {
 
   const handleSort = (
     key:
-      | keyof Omit<Client, "plan" | "paymentMethod">
+      | keyof Omit<Client, "plan" | "paymentMethod" | "user">
       | "plan.name"
       | "paymentMethod.name"
+      | "user.username"
   ) => {
     setSortConfig((prev) => ({
       key,
@@ -255,9 +255,10 @@ export default function Clients() {
       planId: client.plan.id,
       paymentMethodId: client.paymentMethod.id,
       dueDate: formatDateToLocal(client.dueDate),
-      grossAmount: client.grossAmount.toString(),
+      grossAmount: client.grossAmount, // Já é number
       isActive: client.isActive,
       observations: client.observations || "",
+      username: client.user.username,
     });
     setIsModalOpen(true);
   };
@@ -268,31 +269,35 @@ export default function Clients() {
       !selectedClient ||
       !editFormData.fullName ||
       !editFormData.email ||
+      !editFormData.username ||
       editFormData.planId === 0 ||
       editFormData.paymentMethodId === 0 ||
       !editFormData.dueDate ||
-      !editFormData.grossAmount
+      editFormData.grossAmount === 0
     ) {
       toast.error("Preencha todos os campos!");
       return;
     }
-    const grossAmountNum = parseFloat(editFormData.grossAmount);
+    const grossAmountNum = parseFloat(editFormData.grossAmount.toString());
     if (isNaN(grossAmountNum)) {
-      toast.error("Valor inválido!");
+      toast.error("Valor bruto inválido!");
       return;
     }
     const dueDateISO = new Date(editFormData.dueDate).toISOString();
+    const dataToSend = {
+      ...editFormData,
+      grossAmount: grossAmountNum, // Enviado como number
+      dueDate: dueDateISO,
+    };
+    console.log("Dados enviados para updateClient:", dataToSend);
     try {
-      await updateClient(selectedClient.id, {
-        ...editFormData,
-        grossAmount: grossAmountNum,
-        dueDate: dueDateISO,
-      });
+      await updateClient(selectedClient.id, dataToSend);
       toast.success("Cliente atualizado!");
       setIsModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["clients"] });
     } catch (error) {
       if (error instanceof AxiosError) {
+        console.error("Erro ao atualizar cliente:", error.response?.data);
         toast.error(`Erro: ${error.message}`);
         if (error.response?.status === 401) handleUnauthorized();
       }
@@ -330,7 +335,6 @@ export default function Clients() {
     setNewDueDate("");
   };
 
-  // Adicionar fechamento com ESC para o modal de renovação e exclusão
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -339,9 +343,7 @@ export default function Clients() {
       }
     };
     document.addEventListener("keydown", handleEscKey);
-    return () => {
-      document.removeEventListener("keydown", handleEscKey);
-    };
+    return () => document.removeEventListener("keydown", handleEscKey);
   }, [isRenewModalOpen, isDeleteModalOpen]);
 
   const handlePageChange = (newPage: number) => {
@@ -459,6 +461,7 @@ export default function Clients() {
         onSubmit={handleUpdate}
         plans={plans}
         paymentMethods={paymentMethods}
+        user={selectedClient?.user}
       />
       {isRenewModalOpen && (
         <div className="modal-overlay" onClick={closeRenewModal}>

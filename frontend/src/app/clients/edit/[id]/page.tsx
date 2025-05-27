@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import axios, { AxiosError } from "axios";
 import Navbar from "@/components/Navbar";
-import { Client } from "@/types/client";
+import { Client } from "@/types/client"; // Removido User da importação
 import Link from "next/link";
 import { toast } from "react-toastify";
 
@@ -14,11 +14,12 @@ export default function EditClient() {
   const [client, setClient] = useState<Client | null>(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [planId, setPlanId] = useState<number>(0);
   const [paymentMethodId, setPaymentMethodId] = useState<number>(0);
   const [dueDate, setDueDate] = useState("");
   const [grossAmount, setGrossAmount] = useState("");
-  const [observations, setObservations] = useState(""); // Novo estado
+  const [observations, setObservations] = useState("");
   const [plans, setPlans] = useState<{ id: number; name: string }[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<
     { id: number; name: string }[]
@@ -26,12 +27,11 @@ export default function EditClient() {
   const router = useRouter();
   const { id } = useParams();
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get("returnTo") || "/clients"; // Determina para onde voltar após a edição
+  const returnTo = searchParams.get("returnTo") || "/clients";
   const token = localStorage.getItem("token");
 
   useEffect(() => {
     const fetchClientAndOptions = async () => {
-      // Validar o ID antes de fazer a requisição
       const parsedId = typeof id === "string" ? parseInt(id) : NaN;
       if (isNaN(parsedId)) {
         console.error("ID inválido detectado:", id);
@@ -40,11 +40,10 @@ export default function EditClient() {
         return;
       }
 
-      // Validar o token antes de fazer as requisições
       if (!token) {
         console.error("Token ausente, redirecionando para login...");
         toast.error("Sessão expirada. Faça login novamente.");
-        router.push("/login"); // Ajuste para a sua rota de login
+        router.push("/login");
         return;
       }
 
@@ -52,35 +51,26 @@ export default function EditClient() {
         console.log("Token usado para requisições:", token);
         console.log("ID do cliente:", parsedId);
 
-        // Buscar dados do cliente
         const { data: clientData } = await axios.get(
           `http://localhost:3001/api/clients/${parsedId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
         setClient(clientData);
         setFullName(clientData.fullName);
         setEmail(clientData.email);
+        setUsername(clientData.user?.username || "");
         setPlanId(clientData.plan.id);
         setPaymentMethodId(clientData.paymentMethod.id);
-        setDueDate(clientData.dueDate.split("T")[0]); // Formato YYYY-MM-DD
+        setDueDate(clientData.dueDate.split("T")[0]);
         setGrossAmount(clientData.grossAmount.toString());
-        setObservations(clientData.observations || ""); // Carrega observações
+        setObservations(clientData.observations || "");
 
-        // Buscar planos e métodos de pagamento para os dropdowns
         const [plansResponse, paymentMethodsResponse] = await Promise.all([
           axios.get("http://localhost:3001/api/clients/plans", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }),
           axios.get("http://localhost:3001/api/clients/payment-methods", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
         setPlans(plansResponse.data);
@@ -95,7 +85,7 @@ export default function EditClient() {
         );
         if (axiosError.response?.status === 401) {
           toast.error("Sessão expirada. Faça login novamente.");
-          router.push("/login"); // Ajuste para a sua rota de login
+          router.push("/login");
         } else {
           router.push(returnTo);
         }
@@ -108,14 +98,12 @@ export default function EditClient() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validar o token antes de enviar a requisição
     if (!token) {
       toast.error("Sessão expirada. Faça login novamente.");
-      router.push("/login"); // Ajuste para a sua rota de login
+      router.push("/login");
       return;
     }
 
-    // Validações básicas
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       toast.error("Por favor, insira um email válido.");
@@ -150,16 +138,15 @@ export default function EditClient() {
         {
           fullName,
           email,
+          username,
           planId,
           paymentMethodId,
           dueDate: parsedDueDate.toISOString(),
           grossAmount: grossAmountNum,
-          isActive: client?.isActive, // Mantém o estado atual de isActive
-          observations, // Envia as observações
+          isActive: client?.isActive,
+          observations,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success("Cliente atualizado com sucesso!");
       router.push(returnTo);
@@ -173,7 +160,7 @@ export default function EditClient() {
       );
       if (axiosError.response?.status === 401) {
         toast.error("Sessão expirada. Faça login novamente.");
-        router.push("/login"); // Ajuste para a sua rota de login
+        router.push("/login");
       }
     }
   };
@@ -202,6 +189,16 @@ export default function EditClient() {
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              className="p-2 border w-full rounded"
+              required
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block mb-1">Usuário (Username)</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="p-2 border w-full rounded"
               required
             />

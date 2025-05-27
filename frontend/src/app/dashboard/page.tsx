@@ -1,8 +1,9 @@
+// frontend/src/app/dashboard/page.tsx
+
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
 import axios, { AxiosError } from "axios";
-import Navbar from "@/components/Navbar";
 import Filter from "./components/Filter";
 import { toast } from "react-toastify";
 import { useEffect, useState } from "react";
@@ -268,15 +269,12 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{ background: "var(--background-primary)" }}>
-      <Navbar />
       <div className="dashboard-container">
-        <h1
-          className="text-3xl mb-4 font-bold text-center sm:text-left"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          Dashboard
-        </h1>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">Dashboard</h1>
+          {/* Adicionando um espaço vazio para manter o layout consistente com clients/page.tsx */}
+          <div className="flex-shrink-0 w-0 sm:w-auto"></div>
+        </div>
         <Filter onFilterChange={handleFilterChange} />
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="w-full lg:w-2/3 min-w-0">
@@ -370,6 +368,5 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

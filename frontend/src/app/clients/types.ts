@@ -9,6 +9,11 @@ export interface PaymentMethod {
   name: string;
 }
 
+export interface User {
+  id: number;
+  username: string;
+}
+
 export interface Client {
   id: number;
   fullName: string;
@@ -20,9 +25,10 @@ export interface Client {
   grossAmount: number;
   netAmount: number;
   isActive: boolean;
-  paymentVerified: boolean; // Adicionado
-  paymentVerifiedDate: string | null; // Adicionado
-  observations?: string; // Novo campo, opcional
+  paymentVerified: boolean;
+  paymentVerifiedDate: string | null;
+  observations?: string;
+  user: User;
 }
 
 export interface EditFormData {
@@ -32,7 +38,8 @@ export interface EditFormData {
   planId: number;
   paymentMethodId: number;
   dueDate: string;
-  grossAmount: string;
+  grossAmount: number;
   isActive: boolean;
   observations?: string;
+  username: string; // Adicionado para permitir a edição do username
 }

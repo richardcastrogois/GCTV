@@ -2,6 +2,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { Faker, pt_BR } from "@faker-js/faker";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -19,7 +20,7 @@ async function seed() {
   try {
     // Inserir métodos de pagamento com upsert
     const paymentMethods = [
-      { id: 999, name: "Outros", isActive: true }, // "Outros" com ID fixo
+      { id: 999, name: "Outros", isActive: true },
       { name: "Nubank", isActive: true },
       { name: "Banco do Brasil", isActive: true },
       { name: "Caixa", isActive: true },
@@ -32,7 +33,7 @@ async function seed() {
         where: { name: method.name },
         update: { isActive: method.isActive },
         create: {
-          id: method.id, // Apenas para "Outros"
+          id: method.id,
           name: method.name,
           isActive: method.isActive,
           createdAt: new Date(),
@@ -44,7 +45,7 @@ async function seed() {
 
     // Inserir planos com upsert
     const plans = [
-      { id: 999, name: "Outros", isActive: true }, // "Outros" com ID fixo
+      { id: 999, name: "Outros", isActive: true },
       { name: "Comum", isActive: true },
       { name: "Platinum", isActive: true },
       { name: "P2P", isActive: true },
@@ -55,7 +56,7 @@ async function seed() {
         where: { name: plan.name },
         update: { isActive: plan.isActive },
         create: {
-          id: plan.id, // Apenas para "Outros"
+          id: plan.id,
           name: plan.name,
           isActive: plan.isActive,
           createdAt: new Date(),
@@ -65,7 +66,7 @@ async function seed() {
     }
     console.log("Planos inseridos/atualizados com sucesso!");
 
-    // Inserir taxas de desconto na nova tabela PlanPaymentMethodDiscount
+    // Inserir taxas de desconto
     const pagSeguro = await prisma.paymentMethod.findFirst({
       where: { name: "PagSeguro" },
     });
@@ -107,13 +108,10 @@ async function seed() {
       outrosPlan
     ) {
       const discounts = [
-        // PagSeguro
-        { planId: comum.id, paymentMethodId: pagSeguro.id, discount: 0.5666 }, // 56,66% para Comum
-        { planId: platinum.id, paymentMethodId: pagSeguro.id, discount: 0.49 }, // 49% para Platinum
-        { planId: p2p.id, paymentMethodId: pagSeguro.id, discount: 0.49 }, // 49% para P2P
-        { planId: outrosPlan.id, paymentMethodId: pagSeguro.id, discount: 0 }, // 0% para Outros
-
-        // Outros (forma de pagamento)
+        { planId: comum.id, paymentMethodId: pagSeguro.id, discount: 0.5666 },
+        { planId: platinum.id, paymentMethodId: pagSeguro.id, discount: 0.49 },
+        { planId: p2p.id, paymentMethodId: pagSeguro.id, discount: 0.49 },
+        { planId: outrosPlan.id, paymentMethodId: pagSeguro.id, discount: 0 },
         { planId: comum.id, paymentMethodId: outrosPayment.id, discount: 0 },
         { planId: platinum.id, paymentMethodId: outrosPayment.id, discount: 0 },
         { planId: p2p.id, paymentMethodId: outrosPayment.id, discount: 0 },
@@ -122,14 +120,10 @@ async function seed() {
           paymentMethodId: outrosPayment.id,
           discount: 0,
         },
-
-        // Nubank
         { planId: comum.id, paymentMethodId: nubank.id, discount: 0 },
         { planId: platinum.id, paymentMethodId: nubank.id, discount: 0 },
         { planId: p2p.id, paymentMethodId: nubank.id, discount: 0 },
         { planId: outrosPlan.id, paymentMethodId: nubank.id, discount: 0 },
-
-        // Banco do Brasil
         { planId: comum.id, paymentMethodId: bancoDoBrasil.id, discount: 0 },
         { planId: platinum.id, paymentMethodId: bancoDoBrasil.id, discount: 0 },
         { planId: p2p.id, paymentMethodId: bancoDoBrasil.id, discount: 0 },
@@ -138,14 +132,10 @@ async function seed() {
           paymentMethodId: bancoDoBrasil.id,
           discount: 0,
         },
-
-        // Caixa
         { planId: comum.id, paymentMethodId: caixa.id, discount: 0 },
         { planId: platinum.id, paymentMethodId: caixa.id, discount: 0 },
         { planId: p2p.id, paymentMethodId: caixa.id, discount: 0 },
         { planId: outrosPlan.id, paymentMethodId: caixa.id, discount: 0 },
-
-        // Picpay
         { planId: comum.id, paymentMethodId: picpay.id, discount: 0 },
         { planId: platinum.id, paymentMethodId: picpay.id, discount: 0 },
         { planId: p2p.id, paymentMethodId: picpay.id, discount: 0 },
@@ -185,33 +175,28 @@ async function seed() {
     const allPlans = await prisma.plan.findMany();
     const allPaymentMethods = await prisma.paymentMethod.findMany();
 
-    // Criar 300 clientes fictícios
+    // Criar 300 clientes fictícios com usuários associados
     const clients = [];
     for (let i = 0; i < 300; i++) {
       const fullName = faker.person.fullName();
-      // Garantir e-mail único adicionando um sufixo incremental
-      const emailBase = faker.internet.email({
+      const email = faker.internet.email({
         firstName: fullName.split(" ")[0],
         lastName: fullName.split(" ")[1],
       });
-      const email = `${emailBase.split("@")[0]}.${i}@${
-        emailBase.split("@")[1]
-      }`; // Ex.: joao.silva.0@gmail.com
-      const phone = faker.phone.number(); // Formato padrão do pt_BR
-      const plan = faker.helpers.arrayElement(allPlans); // Escolhe um plano aleatório
-      const paymentMethod = faker.helpers.arrayElement(allPaymentMethods); // Escolhe um método de pagamento aleatório
+      const phone = faker.phone.number();
+      const plan = faker.helpers.arrayElement(allPlans);
+      const paymentMethod = faker.helpers.arrayElement(allPaymentMethods);
       const dueDate = randomDate(
         new Date("2023-01-01"),
         new Date("2025-04-30")
-      ); // Data entre 01/01/2023 e 30/04/2025
+      );
       const grossAmount = faker.number.float({
         min: 50,
         max: 500,
         fractionDigits: 2,
-      }); // Valor bruto entre R$ 50 e R$ 500
-      const isActive = faker.datatype.boolean(0.8); // 80% de chance de estar ativo
+      });
+      const isActive = faker.datatype.boolean(0.8);
 
-      // Buscar a taxa de desconto para a combinação de plano e método de pagamento
       const discountEntry = await prisma.planPaymentMethodDiscount.findUnique({
         where: {
           planId_paymentMethodId: {
@@ -221,7 +206,13 @@ async function seed() {
         },
       });
       const discount = discountEntry?.discount || 0;
-      const netAmount = grossAmount * (1 - discount); // Calcular o valor líquido
+      const netAmount = grossAmount * (1 - discount);
+
+      const username = `${fullName.split(" ")[0].toLowerCase()}.${i}`;
+      const password = bcrypt.hashSync("tempPassword123", 10);
+      const user = await prisma.user.create({
+        data: { username, password },
+      });
 
       clients.push({
         fullName,
@@ -235,6 +226,7 @@ async function seed() {
         isActive,
         createdAt: new Date(),
         updatedAt: new Date(),
+        userId: user.id,
       });
     }
 
@@ -248,7 +240,6 @@ async function seed() {
         createdCount++;
       } catch (error) {
         console.error(`Erro ao criar cliente ${client.email}:`, error);
-        // Continuar com os próximos clientes mesmo se houver erro
       }
     }
 

@@ -10,20 +10,8 @@ import Navbar from "@/components/Navbar";
 import { FaArrowLeft } from "react-icons/fa";
 import Select, { StylesConfig } from "react-select";
 
-interface Plan {
-  id: number;
-  name: string;
-}
-
-interface PaymentMethod {
-  id: number;
-  name: string;
-}
-
-// Definir o tipo para as opções do react-select
 type SelectOption = { value: string; label: string } | null;
 
-// Estilos customizados para o react-select, replicados do EditClientModal.tsx e Filter.tsx
 const customStyles: StylesConfig<SelectOption, false> = {
   control: (provided) => ({
     ...provided,
@@ -109,17 +97,28 @@ const customStyles: StylesConfig<SelectOption, false> = {
   }),
 };
 
+interface Plan {
+  id: number;
+  name: string;
+}
+
+interface PaymentMethod {
+  id: number;
+  name: string;
+}
+
 export default function NewClient() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [username, setUsername] = useState(""); // Novo estado para username
   const [planId, setPlanId] = useState<number>(0);
   const [paymentMethodId, setPaymentMethodId] = useState<number>(0);
   const [dueDate, setDueDate] = useState("");
   const [grossAmount, setGrossAmount] = useState("");
   const [isActive, setIsActive] = useState(true);
-  const [observations, setObservations] = useState(""); // Novo estado
+  const [observations, setObservations] = useState("");
   const [token, setToken] = useState<string | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -212,6 +211,7 @@ export default function NewClient() {
     if (
       !fullName ||
       !email ||
+      !username || // Validação para username
       planId === 0 ||
       paymentMethodId === 0 ||
       !dueDate ||
@@ -244,21 +244,20 @@ export default function NewClient() {
       fullName,
       email,
       phone,
+      username, // Envia o username
       planId,
       paymentMethodId,
       dueDate: dueDateISO,
       grossAmount: grossAmountNum,
       isActive,
-      observations, // Adicionado ao envio
+      observations,
     };
 
     try {
       const response = await axios.post(
         "http://localhost:3001/api/clients",
         clientData,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       console.log("Resposta da API:", response.data);
       toast.success("Cliente cadastrado com sucesso!", {
@@ -298,10 +297,7 @@ export default function NewClient() {
 
   const planOptions = [
     { value: "0", label: "Selecione um plano" },
-    ...plans.map((plan) => ({
-      value: plan.id.toString(),
-      label: plan.name,
-    })),
+    ...plans.map((plan) => ({ value: plan.id.toString(), label: plan.name })),
   ];
 
   const paymentMethodOptions = [
@@ -339,6 +335,19 @@ export default function NewClient() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm text-[var(--text-primary)] mb-1">
+                Usuário (Username)
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
+                placeholder="Exemplo: joao.silva"
                 required
               />
             </div>

@@ -1,4 +1,5 @@
 //frontend/src/types/client.ts
+
 export interface Plan {
   id: number;
   name: string;
@@ -16,6 +17,11 @@ export interface PaymentMethod {
   updatedAt: string;
 }
 
+export interface User {
+  id: number;
+  username: string;
+}
+
 export interface Client {
   id: number;
   fullName: string;
@@ -27,9 +33,12 @@ export interface Client {
   grossAmount: number;
   netAmount: number;
   isActive: boolean;
+  paymentVerified: boolean; // Adicionado
+  paymentVerifiedDate: string | null; // Adicionado
+  observations?: string; // Novo campo adicionado
+  user: User; // Novo campo adicionado para a relação com User
   createdAt?: string; // Adicionei, já que o backend retorna isso
   updatedAt?: string; // Adicionei, já que o backend retorna isso
-  observations?: string; // Novo campo adicionado
 }
 
 export interface DashboardStats {

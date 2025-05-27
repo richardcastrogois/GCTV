@@ -26,7 +26,7 @@ export default function Expired() {
   const queryClient = useQueryClient();
   const { searchTerm } = useSearch();
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof Client | "plan.name" | null;
+    key: keyof Client | "plan.name" | "user.username" | null;
     direction: "asc" | "desc";
   }>({ key: null, direction: "asc" });
   const [page, setPage] = useState(1);
@@ -63,6 +63,9 @@ export default function Expired() {
     if (sortConfig.key === "plan.name") {
       valueA = a.plan?.name?.toLowerCase() ?? "";
       valueB = b.plan?.name?.toLowerCase() ?? "";
+    } else if (sortConfig.key === "user.username") {
+      valueA = a.user?.username?.toLowerCase() ?? "";
+      valueB = b.user?.username?.toLowerCase() ?? "";
     } else {
       const rawValueA = a[sortConfig.key];
       const rawValueB = b[sortConfig.key];
@@ -87,7 +90,7 @@ export default function Expired() {
     return 0;
   });
 
-  const handleSort = (key: keyof Client | "plan.name") => {
+  const handleSort = (key: keyof Client | "plan.name" | "user.username") => {
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
