@@ -1,5 +1,7 @@
 //frontend/src/app/clients/components/ClientsTable.tsx
 
+// frontend/src/app/clients/components/ClientsTable.tsx
+
 import {
   FaEdit,
   FaTrash,
@@ -11,11 +13,14 @@ import {
   FaCheck,
   FaTimes,
   FaInfoCircle,
+  FaSave,
 } from "react-icons/fa";
-import { Client } from "../types";
+import { Client } from "@/types/client";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Skeleton } from "@mui/material";
+import axios from "axios";
+import { toast } from "react-toastify";
 
 const formatDateToUTC = (date: string | Date): string => {
   const d = new Date(date);
@@ -25,24 +30,38 @@ const formatDateToUTC = (date: string | Date): string => {
   return `${day}/${month}/${year}`;
 };
 
-// Função para determinar a classe CSS da data de vencimento
+const formatDateToLocal = (date: string | Date): string => {
+  const d = new Date(date);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const getDueDateClass = (dueDate: string, currentDate: Date): string => {
   const due = new Date(dueDate);
   const timeDiff = due.getTime() - currentDate.getTime();
-  const daysDiff = timeDiff / (1000 * 60 * 60 * 24); // Diferença em dias
+  const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
 
   if (due < currentDate) {
-    // Data vencida
-    return "text-[#ff4d4f]"; // Vermelho
+    return "text-[#ff4d4f]";
   } else if (daysDiff <= 7) {
-    // Dentro de 7 dias para vencer
-    return "text-[#ff7f50]"; // Laranja
+    return "text-[#ff7f50]";
   }
-  return ""; // Sem estilização especial
+  return "";
 };
 
+interface PaymentEntry {
+  paymentDate: string;
+  amount: number;
+}
+
+interface ExtendedClient extends Client {
+  paymentHistory: PaymentEntry[] | null;
+}
+
 interface ClientsTableProps {
-  clients: Client[];
+  clients: ExtendedClient[];
   onEdit: (client: Client) => void;
   onDelete: (id: number) => void;
   onRenew: (client: Client) => void;
@@ -62,13 +81,9 @@ interface ClientsTableProps {
       | null;
     direction: "asc" | "desc";
   };
-  onUpdatePaymentStatus?: (
-    clientId: number,
-    verified: boolean,
-    date?: string
-  ) => void;
   isFetching?: boolean;
   isLoading?: boolean;
+  onPaymentUpdate?: () => void;
 }
 
 export default function ClientsTable({
@@ -78,9 +93,9 @@ export default function ClientsTable({
   onRenew,
   onSort,
   sortConfig,
-  onUpdatePaymentStatus,
   isFetching = false,
   isLoading = false,
+  onPaymentUpdate,
 }: ClientsTableProps) {
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
@@ -90,15 +105,24 @@ export default function ClientsTable({
   }>({ top: 0, left: 0 });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-  const [modalClientId, setModalClientId] = useState<number | null>(null);
-  const [modalIsVerified, setModalIsVerified] = useState<boolean>(false);
-  const [modalDate, setModalDate] = useState<string>("");
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [modalClient, setModalClient] = useState<ExtendedClient | null>(null);
+  const [newPaymentDate, setNewPaymentDate] = useState<string>("");
+  const [newPaymentAmount, setNewPaymentAmount] = useState<number>(0);
+  const [editingPaymentIndex, setEditingPaymentIndex] = useState<number | null>(
+    null
+  );
+  const [editPaymentDate, setEditPaymentDate] = useState<string>("");
+  const [editPaymentAmount, setEditPaymentAmount] = useState<number>(0);
+  const [selectedClient, setSelectedClient] = useState<ExtendedClient | null>(
+    null
+  );
+  const [isPaidVisualStatus, setIsPaidVisualStatus] = useState<
+    Map<number, boolean>
+  >(new Map());
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   const infoModalRef = useRef<HTMLDivElement>(null);
 
-  // Memoize a data atual para evitar recriações desnecessárias
   const currentDate = useMemo(() => new Date(), []);
 
   useEffect(() => {
@@ -200,21 +224,46 @@ export default function ClientsTable({
     setOpenMenu((prev) => (prev === clientId ? null : clientId));
   };
 
-  const openModal = (clientId: number, isVerified: boolean) => {
-    setModalClientId(clientId);
-    setModalIsVerified(isVerified);
-    setIsModalOpen(true);
-    setModalDate(isVerified ? "" : new Date().toISOString().split("T")[0]);
+  const setVisualPaidStatus = (clientId: number, isPaid: boolean) => {
+    setIsPaidVisualStatus((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(clientId, isPaid);
+      return newMap;
+    });
+  };
+
+  const openModal = async (clientId: number) => {
+    const client = clients.find((c) => c.id === clientId);
+    if (!client) return;
+
+    try {
+      const response = await axios.get(
+        `http://localhost:3001/api/clients/${clientId}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+      setModalClient(response.data);
+      setNewPaymentDate(new Date().toISOString().split("T")[0]);
+      setNewPaymentAmount(client.grossAmount);
+      setIsModalOpen(true);
+    } catch (error) {
+      console.error("Erro ao carregar detalhes do cliente:", error);
+      toast.error("Erro ao carregar detalhes do cliente");
+    }
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setModalClientId(null);
-    setModalIsVerified(false);
-    setModalDate("");
+    setModalClient(null);
+    setNewPaymentDate("");
+    setNewPaymentAmount(0);
+    setEditingPaymentIndex(null);
+    setEditPaymentDate("");
+    setEditPaymentAmount(0);
   };
 
-  const openInfoModal = (client: Client) => {
+  const openInfoModal = (client: ExtendedClient) => {
     setSelectedClient(client);
     setIsInfoModalOpen(true);
   };
@@ -224,20 +273,143 @@ export default function ClientsTable({
     setSelectedClient(null);
   };
 
-  const handleModalSubmit = () => {
-    if (!onUpdatePaymentStatus || modalClientId === null) return;
+  const handleAddPayment = async () => {
+    if (!modalClient) return;
 
-    if (modalIsVerified) {
-      onUpdatePaymentStatus(modalClientId, false);
-    } else {
-      if (!modalDate || isNaN(new Date(modalDate).getTime())) {
-        alert("Data inválida. Use o formato YYYY-MM-DD.");
-        return;
-      }
-      onUpdatePaymentStatus(modalClientId, true, modalDate);
+    if (!newPaymentDate || isNaN(new Date(newPaymentDate).getTime())) {
+      toast.error("Data de pagamento inválida");
+      return;
     }
-    closeModal();
-    setOpenMenu(null);
+
+    if (newPaymentAmount <= 0) {
+      toast.error("Valor do pagamento deve ser maior que zero");
+      return;
+    }
+
+    try {
+      console.log("Token:", localStorage.getItem("token"));
+      console.log("Payload:", {
+        paymentDate: new Date(newPaymentDate).toISOString(),
+        amount: newPaymentAmount,
+      });
+      const response = await axios.put(
+        `http://localhost:3001/api/clients/payment-status/${modalClient.id}`,
+        {
+          paymentDate: new Date(newPaymentDate).toISOString(),
+          amount: newPaymentAmount,
+        },
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+      console.log("Response:", response.data);
+      toast.success("Pagamento adicionado!");
+      const clientResponse = await axios.get(
+        `http://localhost:3001/api/clients/${modalClient.id}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+      setModalClient(clientResponse.data);
+      setNewPaymentDate(new Date().toISOString().split("T")[0]);
+      setNewPaymentAmount(modalClient.grossAmount);
+      setIsPaidVisualStatus((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(modalClient.id); // Reseta o status visual para refletir o novo histórico
+        return newMap;
+      });
+      onPaymentUpdate?.();
+    } catch (error) {
+      console.error("Erro ao adicionar pagamento:", error);
+      toast.error("Erro ao adicionar pagamento");
+    }
+  };
+
+  const handleEditPayment = (index: number, payment: PaymentEntry) => {
+    setEditingPaymentIndex(index);
+    setEditPaymentDate(formatDateToLocal(payment.paymentDate));
+    setEditPaymentAmount(payment.amount);
+  };
+
+  const handleSaveEditPayment = async () => {
+    if (!modalClient || editingPaymentIndex === null) return;
+
+    if (!editPaymentDate || isNaN(new Date(editPaymentDate).getTime())) {
+      toast.error("Data de pagamento inválida");
+      return;
+    }
+
+    if (editPaymentAmount <= 0) {
+      toast.error("Valor do pagamento deve ser maior que zero");
+      return;
+    }
+
+    try {
+      const response = await axios.put(
+        `http://localhost:3001/api/clients/payments/edit/${modalClient.id}`,
+        {
+          index: editingPaymentIndex,
+          paymentDate: new Date(editPaymentDate).toISOString(),
+          amount: editPaymentAmount,
+        },
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+      console.log("Response from edit payment:", response.data);
+      toast.success("Pagamento atualizado!");
+      const clientResponse = await axios.get(
+        `http://localhost:3001/api/clients/${modalClient.id}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+      setModalClient(clientResponse.data);
+      setEditingPaymentIndex(null);
+      setEditPaymentDate("");
+      setEditPaymentAmount(0);
+      setIsPaidVisualStatus((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(modalClient.id); // Reseta o status visual
+        return newMap;
+      });
+      onPaymentUpdate?.();
+    } catch (error) {
+      console.error("Erro ao atualizar pagamento:", error);
+      toast.error("Erro ao atualizar pagamento");
+    }
+  };
+
+  const handleDeletePayment = async (index: number) => {
+    if (!modalClient) return;
+
+    try {
+      const response = await axios.delete(
+        `http://localhost:3001/api/clients/payments/delete/${modalClient.id}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          data: { index },
+        }
+      );
+      console.log("Response from delete payment:", response.data);
+      toast.success("Pagamento excluído!");
+      const clientResponse = await axios.get(
+        `http://localhost:3001/api/clients/${modalClient.id}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+      setModalClient(clientResponse.data);
+      setIsPaidVisualStatus((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(modalClient.id); // Reseta o status visual
+        return newMap;
+      });
+      onPaymentUpdate?.();
+    } catch (error) {
+      console.error("Erro ao excluir pagamento:", error);
+      toast.error("Erro ao excluir pagamento");
+    }
   };
 
   const getPlanClass = (planName: string) => {
@@ -455,18 +627,36 @@ export default function ClientsTable({
                 <tr key={client.id}>
                   <td className="status-column">
                     <button
-                      onClick={() =>
-                        openModal(client.id, client.paymentVerified)
-                      }
-                      className="action-button"
+                      onClick={() => openModal(client.id)}
+                      className={`action-button p-2 rounded-full transition-all ${
+                        isPaidVisualStatus.get(client.id)
+                          ? "bg-[rgba(0,218,119,0.2)] border-2 border-[var(--button-active-bg)] scale-110"
+                          : "bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)]"
+                      }`}
                       title={
-                        client.paymentVerified ? "Verificado" : "Não Verificado"
+                        isPaidVisualStatus.get(client.id) ?? false
+                          ? "Verificado (visual)"
+                          : "Não Verificado (visual)"
                       }
                     >
-                      {client.paymentVerified ? (
-                        <FaCheck className="text-green-500" />
+                      {isPaidVisualStatus.get(client.id) ? (
+                        <FaCheck
+                          size={16}
+                          className={`${
+                            isPaidVisualStatus.get(client.id)
+                              ? "text-[var(--button-active-bg)]"
+                              : "text-[var(--text-secondary)]"
+                          }`}
+                        />
                       ) : (
-                        <FaTimes className="text-red-500" />
+                        <FaTimes
+                          size={16}
+                          className={`${
+                            !isPaidVisualStatus.get(client.id)
+                              ? "text-[var(--danger-bg)]"
+                              : "text-[var(--text-secondary)]"
+                          }`}
+                        />
                       )}
                     </button>
                   </td>
@@ -484,8 +674,12 @@ export default function ClientsTable({
                     </span>
                   </td>
                   <td className="method-column hidden xl:table-cell">
-                    <span className={getMethodClass(client.paymentMethod.name)}>
-                      {client.paymentMethod.name}
+                    <span
+                      className={getMethodClass(
+                        client.paymentMethod?.name || ""
+                      )}
+                    >
+                      {client.paymentMethod?.name}
                     </span>
                   </td>
                   <td className="due-date-column hidden xl:table-cell">
@@ -554,8 +748,10 @@ export default function ClientsTable({
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
                   Método:{" "}
-                  <span className={getMethodClass(client.paymentMethod.name)}>
-                    {client.paymentMethod.name}
+                  <span
+                    className={getMethodClass(client.paymentMethod?.name || "")}
+                  >
+                    {client.paymentMethod?.name}
                   </span>
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
@@ -568,14 +764,36 @@ export default function ClientsTable({
                 </p>
               </div>
               <button
-                onClick={() => openModal(client.id, client.paymentVerified)}
-                className="action-button"
-                title={client.paymentVerified ? "Verificado" : "Não Verificado"}
+                onClick={() => openModal(client.id)}
+                className={`action-button p-2 rounded-full transition-all ${
+                  isPaidVisualStatus.get(client.id)
+                    ? "bg-[rgba(0,218,119,0.2)] border-2 border-[var(--button-active-bg)] scale-110"
+                    : "bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)]"
+                }`}
+                title={
+                  isPaidVisualStatus.get(client.id) ?? false
+                    ? "Verificado (visual)"
+                    : "Não Verificado (visual)"
+                }
               >
-                {client.paymentVerified ? (
-                  <FaCheck className="text-green-500" />
+                {isPaidVisualStatus.get(client.id) ? (
+                  <FaCheck
+                    size={16}
+                    className={`${
+                      isPaidVisualStatus.get(client.id)
+                        ? "text-[var(--button-active-bg)]"
+                        : "text-[var(--text-secondary)]"
+                    }`}
+                  />
                 ) : (
-                  <FaTimes className="text-red-500" />
+                  <FaTimes
+                    size={16}
+                    className={`${
+                      !isPaidVisualStatus.get(client.id)
+                        ? "text-[var(--danger-bg)]"
+                        : "text-[var(--text-secondary)]"
+                    }`}
+                  />
                 )}
               </button>
             </div>
@@ -687,54 +905,208 @@ export default function ClientsTable({
           document.body
         )}
 
-      {isModalOpen && (
+      {isModalOpen && modalClient && createPortal(
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">
-                {modalIsVerified
-                  ? "Marcar como Não Verificado?"
-                  : "Marcar como Verificado?"}
-              </h2>
+              <h2 className="modal-title">Gerenciar Pagamentos</h2>
               <button onClick={closeModal} className="modal-close-button">
                 <FaTimes size={20} />
               </button>
             </div>
             <div className="modal-body">
-              {!modalIsVerified && (
+              <h3 className="text-lg font-semibold mb-3 mt-2 flex items-center">
+                Status Visual
+                <button
+                  onClick={() => setVisualPaidStatus(modalClient.id, true)}
+                  className={`p-2 ml-2 rounded-full transition-all status-visual-button ${
+                    isPaidVisualStatus.get(modalClient.id)
+                      ? "bg-[rgba(0,218,119,0.2)] border-2 border-[var(--button-active-bg)] scale-110"
+                      : "bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)]"
+                  }`}
+                  title="Marcar como Pago (visual)"
+                >
+                  <FaCheck
+                    size={isPaidVisualStatus.get(modalClient.id) ? 18 : 16}
+                    className={`${
+                      isPaidVisualStatus.get(modalClient.id)
+                        ? "text-[var(--button-active-bg)]"
+                        : "text-[var(--text-secondary)]"
+                    }`}
+                  />
+                </button>
+                <button
+                  onClick={() => setVisualPaidStatus(modalClient.id, false)}
+                  className={`p-2 ml-2 rounded-full transition-all status-visual-button ${
+                    !isPaidVisualStatus.get(modalClient.id)
+                      ? "bg-[rgba(255,77,79,0.2)] border-2 border-[var(--danger-bg)] scale-110"
+                      : "bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)]"
+                  }`}
+                  title="Marcar como Não Pago (visual)"
+                >
+                  <FaTimes
+                    size={!isPaidVisualStatus.get(modalClient.id) ? 18 : 16}
+                    className={`${
+                      !isPaidVisualStatus.get(modalClient.id)
+                        ? "text-[var(--danger-bg)]"
+                        : "text-[var(--text-secondary)]"
+                    }`}
+                  />
+                </button>
+              </h3>
+
+              <h3 className="text-lg font-semibold mb-2">
+                Adicionar Pagamento
+              </h3>
+              <div className="flex space-x-4 mb-4">
                 <div>
-                  <label className="modal-label">Data de Recebimento</label>
+                  <label className="modal-label">Data de Pagamento</label>
                   <input
                     type="date"
-                    value={modalDate}
-                    onChange={(e) => setModalDate(e.target.value)}
+                    value={newPaymentDate}
+                    onChange={(e) => setNewPaymentDate(e.target.value)}
                     className="modal-input"
                   />
                 </div>
+                <div>
+                  <label className="modal-label">Valor (R$)</label>
+                  <input
+                    type="number"
+                    value={newPaymentAmount}
+                    onChange={(e) =>
+                      setNewPaymentAmount(parseFloat(e.target.value))
+                    }
+                    className="modal-input"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <button
+                  onClick={handleAddPayment}
+                  className="modal-button modal-button-save mt-6"
+                >
+                  Adicionar
+                </button>
+              </div>
+
+              <h3 className="text-lg font-semibold mb-2">
+                Pagamentos Registrados
+              </h3>
+              {modalClient.paymentHistory !== null &&
+              modalClient.paymentHistory.length > 0 ? (
+                <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="border p-2 sticky top-0 bg-[var(--table-bg)] z-10">
+                          Data
+                        </th>
+                        <th className="border p-2 sticky top-0 bg-[var(--table-bg)] z-10">
+                          Valor (R$)
+                        </th>
+                        <th className="border p-2 sticky top-0 bg-[var(--table-bg)] z-10">
+                          Ações
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modalClient.paymentHistory.map((payment, index) => (
+                        <tr key={index}>
+                          {editingPaymentIndex === index ? (
+                            <>
+                              <td className="border p-2">
+                                <input
+                                  type="date"
+                                  value={editPaymentDate}
+                                  onChange={(e) =>
+                                    setEditPaymentDate(e.target.value)
+                                  }
+                                  className="modal-input w-full"
+                                />
+                              </td>
+                              <td className="border p-2">
+                                <input
+                                  type="number"
+                                  value={editPaymentAmount}
+                                  onChange={(e) =>
+                                    setEditPaymentAmount(
+                                      parseFloat(e.target.value)
+                                    )
+                                  }
+                                  className="modal-input w-full"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </td>
+                              <td className="border p-2">
+                                <button
+                                  onClick={handleSaveEditPayment}
+                                  className="action-button mr-2"
+                                >
+                                  <FaSave
+                                    size={16}
+                                    className="text-green-500"
+                                  />
+                                </button>
+                                <button
+                                  onClick={() => setEditingPaymentIndex(null)}
+                                  className="action-button"
+                                >
+                                  <FaTimes size={16} className="text-red-500" />
+                                </button>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="border p-2">
+                                {formatDateToUTC(payment.paymentDate)}
+                              </td>
+                              <td className="border p-2">
+                                {payment.amount.toFixed(2)}
+                              </td>
+                              <td className="border p-2">
+                                <button
+                                  onClick={() =>
+                                    handleEditPayment(index, payment)
+                                  }
+                                  className="action-button mr-2"
+                                >
+                                  <FaEdit size={16} className="text-blue-500" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeletePayment(index)}
+                                  className="action-button"
+                                >
+                                  <FaTrash size={16} className="text-red-500" />
+                                </button>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-[var(--text-primary)]">
+                  Nenhum pagamento registrado.
+                </p>
               )}
-              <p className="text-[var(--text-primary)] mt-2">
-                Deseja confirmar esta ação?
-              </p>
             </div>
             <div className="modal-footer">
               <button
                 onClick={closeModal}
                 className="modal-button modal-button-cancel"
               >
-                Cancelar
-              </button>
-              <button
-                onClick={handleModalSubmit}
-                className="modal-button modal-button-save"
-              >
-                OK
+                Fechar
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {isInfoModalOpen && selectedClient && (
+      {isInfoModalOpen && selectedClient && createPortal(
         <div className="modal-overlay" onClick={closeInfoModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -765,9 +1137,11 @@ export default function ClientsTable({
               <p className="text-[var(--text-primary)] mb-2">
                 <strong>Método de Pagamento:</strong>{" "}
                 <span
-                  className={getMethodClass(selectedClient.paymentMethod.name)}
+                  className={getMethodClass(
+                    selectedClient.paymentMethod?.name || ""
+                  )}
                 >
-                  {selectedClient.paymentMethod.name}
+                  {selectedClient.paymentMethod?.name}
                 </span>
               </p>
               <p className="text-[var(--text-primary)] mb-2">
@@ -789,11 +1163,11 @@ export default function ClientsTable({
                 <strong>Valor Líquido:</strong> R${" "}
                 {selectedClient.netAmount.toFixed(2)}
               </p>
-              <p className="text-[var(--text-primary)] mb-2">
-                <strong>Observações:</strong>{" "}
-                {selectedClient.observations ||
-                  "Nenhuma observação disponível."}
-              </p>
+              {selectedClient.observations && (
+                <p className="text-[var(--text-primary)] mb-2">
+                  <strong>Observações:</strong> {selectedClient.observations}
+                </p>
+              )}
             </div>
             <div className="modal-footer">
               <button
@@ -804,7 +1178,8 @@ export default function ClientsTable({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

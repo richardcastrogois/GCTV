@@ -1,7 +1,5 @@
 //backend/src/controllers/clientController.ts
 
-// backend/src/controllers/clientController.ts
-
 import { RequestHandler, Request, Response } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { ParsedQs } from "qs";
@@ -25,6 +23,9 @@ type ClientBody = {
 type RenewClientBody = { dueDate: string };
 type ObservationBody = { observations: string };
 type ReactivateClientBody = { dueDate: string };
+type PaymentBody = { paymentDate: string; amount: number };
+type UpdatePaymentBody = { index: number; paymentDate: string; amount: number };
+type DeletePaymentBody = { index: number };
 
 type RawClient = {
   id: number;
@@ -136,8 +137,6 @@ export const getClients: RequestHandler = async (
     res.status(500).json({ message: "Erro ao buscar clientes" });
   }
 };
-
-// ... (o restante do código permanece inalterado)
 
 export const getClientById: RequestHandler<ParamsWithId> = async (
   req: Request<ParamsWithId>,
@@ -384,10 +383,9 @@ export const createClient: RequestHandler<
         grossAmount,
         netAmount,
         isActive,
-        paymentVerified: false,
-        paymentVerifiedDate: null,
         observations: req.body.observations || null,
         userId: user.id,
+        paymentHistory: [], // Inicializa como array vazio
       },
     });
 
@@ -438,7 +436,6 @@ export const updateClient: RequestHandler<
       username,
     } = req.body;
 
-    // Validação adicional para grossAmount
     if (typeof grossAmount !== "number" || isNaN(grossAmount)) {
       res
         .status(400)
@@ -669,12 +666,17 @@ export const reactivateClient: RequestHandler<
   }
 };
 
-export const updatePaymentStatus: RequestHandler<ParamsWithId> = async (
-  req: Request<ParamsWithId>,
+export const updatePaymentStatus: RequestHandler<
+  ParamsWithId,
+  unknown,
+  PaymentBody,
+  ParsedQs
+> = async (
+  req: Request<ParamsWithId, unknown, PaymentBody, ParsedQs>,
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
-  const { paymentVerified, paymentVerifiedDate } = req.body;
+  const { paymentDate, amount } = req.body;
 
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
@@ -682,17 +684,46 @@ export const updatePaymentStatus: RequestHandler<ParamsWithId> = async (
   }
 
   try {
+    const parsedPaymentDate = new Date(paymentDate);
+    if (isNaN(parsedPaymentDate.getTime())) {
+      res.status(400).json({ message: "Data de pagamento inválida" });
+      return;
+    }
+
+    if (typeof amount !== "number" || amount <= 0) {
+      res.status(400).json({ message: "Valor do pagamento inválido" });
+      return;
+    }
+
+    const client = await prisma.client.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!client) {
+      res.status(404).json({ message: "Cliente não encontrado" });
+      return;
+    }
+
+    const currentPayments = Array.isArray(client.paymentHistory)
+      ? client.paymentHistory
+      : [];
+
+    const newPayment = {
+      paymentDate: parsedPaymentDate.toISOString(),
+      amount,
+    };
+
+    const updatedPayments = [...currentPayments, newPayment];
+
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: {
-        paymentVerified,
-        paymentVerifiedDate: paymentVerified
-          ? new Date(paymentVerifiedDate)
-          : null,
+        paymentHistory: updatedPayments,
       },
       include: { plan: true, paymentMethod: true, user: true },
     });
-    res.json(updatedClient);
+
+    res.status(200).json(updatedClient);
   } catch (error) {
     console.error("Erro ao atualizar status de pagamento:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -702,6 +733,148 @@ export const updatePaymentStatus: RequestHandler<ParamsWithId> = async (
       }
     }
     res.status(500).json({ message: "Erro ao atualizar status de pagamento" });
+  }
+};
+
+export const editPayment: RequestHandler<
+  ParamsWithId,
+  unknown,
+  UpdatePaymentBody,
+  ParsedQs
+> = async (
+  req: Request<ParamsWithId, unknown, UpdatePaymentBody, ParsedQs>,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params;
+  const { index, paymentDate, amount } = req.body;
+
+  if (isNaN(parseInt(id))) {
+    res.status(400).json({ message: "ID inválido" });
+    return;
+  }
+
+  if (!Number.isInteger(index) || index < 0) {
+    res.status(400).json({ message: "Índice inválido" });
+    return;
+  }
+
+  try {
+    const parsedPaymentDate = new Date(paymentDate);
+    if (isNaN(parsedPaymentDate.getTime())) {
+      res.status(400).json({ message: "Data de pagamento inválida" });
+      return;
+    }
+
+    if (typeof amount !== "number" || amount <= 0) {
+      res.status(400).json({ message: "Valor do pagamento inválido" });
+      return;
+    }
+
+    const client = await prisma.client.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!client) {
+      res.status(404).json({ message: "Cliente não encontrado" });
+      return;
+    }
+
+    const currentPayments = Array.isArray(client.paymentHistory)
+      ? client.paymentHistory
+      : [];
+
+    if (index >= currentPayments.length) {
+      res.status(400).json({ message: "Índice de pagamento inválido" });
+      return;
+    }
+
+    currentPayments[index] = {
+      paymentDate: parsedPaymentDate.toISOString(),
+      amount,
+    };
+
+    const updatedClient = await prisma.client.update({
+      where: { id: parseInt(id) },
+      data: {
+        paymentHistory: currentPayments,
+      },
+      include: { plan: true, paymentMethod: true, user: true },
+    });
+
+    res.status(200).json(updatedClient);
+  } catch (error) {
+    console.error("Erro ao editar pagamento:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2025") {
+        res.status(404).json({ message: "Cliente não encontrado" });
+        return;
+      }
+    }
+    res.status(500).json({ message: "Erro ao editar pagamento" });
+  }
+};
+
+export const deletePayment: RequestHandler<
+  ParamsWithId,
+  unknown,
+  DeletePaymentBody,
+  ParsedQs
+> = async (
+  req: Request<ParamsWithId, unknown, DeletePaymentBody, ParsedQs>,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params;
+  const { index } = req.body;
+
+  if (isNaN(parseInt(id))) {
+    res.status(400).json({ message: "ID inválido" });
+    return;
+  }
+
+  if (!Number.isInteger(index) || index < 0) {
+    res.status(400).json({ message: "Índice inválido" });
+    return;
+  }
+
+  try {
+    const client = await prisma.client.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!client) {
+      res.status(404).json({ message: "Cliente não encontrado" });
+      return;
+    }
+
+    const currentPayments = Array.isArray(client.paymentHistory)
+      ? client.paymentHistory
+      : [];
+
+    if (index >= currentPayments.length) {
+      res.status(400).json({ message: "Índice de pagamento inválido" });
+      return;
+    }
+
+    const updatedPayments = currentPayments.filter((_, i) => i !== index);
+
+    const updatedClient = await prisma.client.update({
+      where: { id: parseInt(id) },
+      data: {
+        paymentHistory: updatedPayments,
+      },
+      include: { plan: true, paymentMethod: true, user: true },
+    });
+
+    res.status(200).json(updatedClient);
+  } catch (error) {
+    console.error("Erro ao excluir pagamento:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2025") {
+        res.status(404).json({ message: "Cliente não encontrado" });
+        return;
+      }
+    }
+    res.status(500).json({ message: "Erro ao excluir pagamento" });
   }
 };
 

@@ -12,6 +12,8 @@ import {
   renewClient,
   reactivateClient,
   updatePaymentStatus,
+  editPayment,
+  deletePayment,
   updateClientObservations,
 } from "../controllers/clientController";
 import { authMiddleware } from "../middleware/authMiddleware";
@@ -33,6 +35,8 @@ router.delete("/:id", authMiddleware, deleteClient);
 router.put("/renew/:id", authMiddleware, renewClient);
 router.put("/reactivate/:id", authMiddleware, reactivateClient);
 router.put("/payment-status/:id", authMiddleware, updatePaymentStatus);
+router.put("/payments/edit/:id", authMiddleware, editPayment);
+router.delete("/payments/delete/:id", authMiddleware, deletePayment);
 router.put("/observations/:id", authMiddleware, updateClientObservations);
 
 export default router;

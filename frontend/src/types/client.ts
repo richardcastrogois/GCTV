@@ -20,6 +20,12 @@ export interface PaymentMethod {
 export interface User {
   id: number;
   username: string;
+  createdAt: string; // Adicionado para refletir o schema completo
+}
+
+export interface PaymentEntry {
+  paymentDate: string;
+  amount: number;
 }
 
 export interface Client {
@@ -27,22 +33,37 @@ export interface Client {
   fullName: string;
   email: string;
   phone?: string;
-  plan: Plan; // Agora é um objeto, não uma string
-  paymentMethod?: PaymentMethod; // Agora é um objeto, não uma string
+  plan: Plan;
+  paymentMethod?: PaymentMethod;
   dueDate: string;
   grossAmount: number;
   netAmount: number;
   isActive: boolean;
-  paymentVerified: boolean; // Adicionado
-  paymentVerifiedDate: string | null; // Adicionado
-  observations?: string; // Novo campo adicionado
-  user: User; // Novo campo adicionado para a relação com User
-  createdAt?: string; // Adicionei, já que o backend retorna isso
-  updatedAt?: string; // Adicionei, já que o backend retorna isso
+  observations?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  userId: number;
+  user: User;
+  paymentHistory: PaymentEntry[] | null; // Novo campo para histórico de pagamentos
+  // Removidos: paymentVerified, paymentVerifiedDate (não mais usados)
+}
+
+export interface EditFormData {
+  fullName: string;
+  email: string;
+  phone: string;
+  planId: number;
+  paymentMethodId: number;
+  dueDate: string;
+  grossAmount: number;
+  isActive: boolean;
+  observations?: string;
+  username: string; // Mantido para edição do username
 }
 
 export interface DashboardStats {
   gross_amount: number;
   net_amount: number;
   active_clients: number;
+  // Adicione outros campos conforme necessário para o dashboard (ex.: totalPayments)
 }

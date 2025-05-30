@@ -69,13 +69,12 @@ model Client {
   grossAmount        Float
   netAmount          Float
   isActive           Boolean       @default(true)
-  paymentVerified    Boolean       @default(false)
-  paymentVerifiedDate DateTime?
   observations       String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   userId             Int           @unique
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentHistory     Json?         // Novo campo para armazenar lista de pagamentos
 
   @@index([isActive])
   @@index([dueDate])
