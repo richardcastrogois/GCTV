@@ -1,3 +1,5 @@
+//backend/src/routes/dashboardRoutes.ts
+
 import { Router } from "express";
 import { getDashboardStats } from "../controllers/dashboardController";
 import { authMiddleware } from "../middleware/authMiddleware";

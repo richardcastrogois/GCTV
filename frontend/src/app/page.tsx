@@ -1,3 +1,5 @@
+//frontend/src/app/page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -24,6 +26,40 @@ export default function Login() {
       const currentTime = Date.now();
       const timeUntilExpiration = expirationTime - currentTime;
 
+      // Notificações progressivas
+      const time10min = timeUntilExpiration - 10 * 60 * 1000;
+      if (time10min > 0) {
+        setTimeout(
+          () =>
+            toast.warn(
+              "Sua sessão expirará em 10 minutos. Salve seu progresso."
+            ),
+          time10min
+        );
+      }
+      const time5min = timeUntilExpiration - 5 * 60 * 1000;
+      if (time5min > 0) {
+        setTimeout(
+          () =>
+            toast.warn(
+              "Sua sessão expirará em 5 minutos. Salve seu progresso."
+            ),
+          time5min
+        );
+      }
+      const time1min = timeUntilExpiration - 1 * 60 * 1000;
+      if (time1min > 0) {
+        setTimeout(
+          () =>
+            toast.error(
+              "Atenção: Sua sessão expirará em 1 minuto. Salve e saia agora!",
+              { autoClose: false }
+            ),
+          time1min
+        );
+      }
+
+      // Logout na expiração
       setTimeout(() => {
         localStorage.removeItem("token");
         toast.info("Sua sessão expirou. Por favor, faça login novamente.");

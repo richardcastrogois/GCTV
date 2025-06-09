@@ -1,8 +1,11 @@
+//frontend/src/components/DataPreloader.tsx
+
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import Loading from "@/components/Loading";
+import { useAuth } from "@/hooks/useAuth";
 
 const preloadData = async () => {
   const [plans, paymentMethods] = await Promise.all([
@@ -21,7 +24,8 @@ export default function DataPreloader({
 }: {
   children: React.ReactNode;
 }) {
-  const { isLoading } = useQuery({
+  const { handleUnauthorized } = useAuth();
+  const { isLoading, error } = useQuery({
     queryKey: ["preloadData"],
     queryFn: preloadData,
     staleTime: 300000, // 5 minutos
@@ -29,6 +33,12 @@ export default function DataPreloader({
   });
 
   if (isLoading) return <Loading>Carregando dados iniciais...</Loading>;
+
+  if (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      handleUnauthorized();
+    }
+  }
 
   return <>{children}</>;
 }

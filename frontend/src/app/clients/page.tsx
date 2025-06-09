@@ -1,4 +1,4 @@
-// frontend/src/app/clients/page.tsx
+//frontend/src/app/clients/page.tsx
 
 "use client";
 
@@ -50,7 +50,7 @@ export default function Clients() {
     planId: 0,
     paymentMethodId: 0,
     dueDate: "",
-    grossAmount: 0, // Alterado para number
+    grossAmount: 0,
     isActive: true,
     observations: "",
     username: "",
@@ -142,7 +142,7 @@ export default function Clients() {
             planId: client.plan.id,
             paymentMethodId: client.paymentMethod.id,
             dueDate: client.dueDate,
-            grossAmount: client.grossAmount, // Já é number
+            grossAmount: client.grossAmount,
             isActive: false,
             observations: client.observations || "",
             username: client.user.username,
@@ -166,44 +166,54 @@ export default function Clients() {
     checkExpiredClients();
   }, [clientsResponse, queryClient, handleUnauthorized]);
 
-  const sortedClients = [...(clientsResponse?.data || [])].sort((a, b) => {
-    if (!sortConfig.key) return 0;
+  const sortedClients = [...(clientsResponse?.data || [])]
+    .map((client) => ({
+      ...client,
+      plan: {
+        ...client.plan,
+      },
+      paymentMethod: {
+        ...client.paymentMethod,
+      },
+    }))
+    .sort((a, b) => {
+      if (!sortConfig.key) return 0;
 
-    let valueA: string | number;
-    let valueB: string | number;
+      let valueA: string | number;
+      let valueB: string | number;
 
-    if (sortConfig.key === "plan.name") {
-      valueA = a.plan?.name?.toLowerCase() ?? "";
-      valueB = b.plan?.name?.toLowerCase() ?? "";
-    } else if (sortConfig.key === "paymentMethod.name") {
-      valueA = a.paymentMethod?.name?.toLowerCase() ?? "";
-      valueB = b.paymentMethod?.name?.toLowerCase() ?? "";
-    } else if (sortConfig.key === "user.username") {
-      valueA = a.user?.username?.toLowerCase() ?? "";
-      valueB = b.user?.username?.toLowerCase() ?? "";
-    } else {
-      const rawValueA = a[sortConfig.key];
-      const rawValueB = b[sortConfig.key];
-
-      if (sortConfig.key === "dueDate") {
-        valueA = new Date(rawValueA as string).getTime() || 0;
-        valueB = new Date(rawValueB as string).getTime() || 0;
-      } else if (sortConfig.key === "isActive") {
-        valueA = rawValueA === true ? 1 : 0;
-        valueB = rawValueB === true ? 1 : 0;
-      } else if (typeof rawValueA === "string") {
-        valueA = (rawValueA as string).toLowerCase() ?? "";
-        valueB = (rawValueB as string).toLowerCase() ?? "";
+      if (sortConfig.key === "plan.name") {
+        valueA = a.plan?.name?.toLowerCase() ?? "";
+        valueB = b.plan?.name?.toLowerCase() ?? "";
+      } else if (sortConfig.key === "paymentMethod.name") {
+        valueA = a.paymentMethod?.name?.toLowerCase() ?? "";
+        valueB = b.paymentMethod?.name?.toLowerCase() ?? "";
+      } else if (sortConfig.key === "user.username") {
+        valueA = a.user?.username?.toLowerCase() ?? "";
+        valueB = b.user?.username?.toLowerCase() ?? "";
       } else {
-        valueA = (rawValueA as number) ?? 0;
-        valueB = (rawValueB as number) ?? 0;
-      }
-    }
+        const rawValueA = a[sortConfig.key];
+        const rawValueB = b[sortConfig.key];
 
-    if (valueA < valueB) return sortConfig.direction === "asc" ? -1 : 1;
-    if (valueA > valueB) return sortConfig.direction === "asc" ? 1 : -1;
-    return 0;
-  });
+        if (sortConfig.key === "dueDate") {
+          valueA = new Date(rawValueA as string).getTime() || 0;
+          valueB = new Date(rawValueB as string).getTime() || 0;
+        } else if (sortConfig.key === "isActive") {
+          valueA = rawValueA === true ? 1 : 0;
+          valueB = rawValueB === true ? 1 : 0;
+        } else if (typeof rawValueA === "string") {
+          valueA = (rawValueA as string).toLowerCase() ?? "";
+          valueB = (rawValueB as string).toLowerCase() ?? "";
+        } else {
+          valueA = (rawValueA as number) ?? 0;
+          valueB = (rawValueB as number) ?? 0;
+        }
+      }
+
+      if (valueA < valueB) return sortConfig.direction === "asc" ? -1 : 1;
+      if (valueA > valueB) return sortConfig.direction === "asc" ? 1 : -1;
+      return 0;
+    });
 
   const handleSort = (
     key:
@@ -255,7 +265,7 @@ export default function Clients() {
       planId: client.plan.id,
       paymentMethodId: client.paymentMethod.id,
       dueDate: formatDateToLocal(client.dueDate),
-      grossAmount: client.grossAmount, // Já é number
+      grossAmount: client.grossAmount,
       isActive: client.isActive,
       observations: client.observations || "",
       username: client.user.username,
@@ -286,7 +296,7 @@ export default function Clients() {
     const dueDateISO = new Date(editFormData.dueDate).toISOString();
     const dataToSend = {
       ...editFormData,
-      grossAmount: grossAmountNum, // Enviado como number
+      grossAmount: grossAmountNum,
       dueDate: dueDateISO,
     };
     console.log("Dados enviados para updateClient:", dataToSend);
@@ -362,13 +372,12 @@ export default function Clients() {
 
   const handleUpdatePaymentStatus = async (
     clientId: number,
-    verified: boolean,
-    date?: string
+    verified: boolean
   ) => {
     try {
       await axios.put(
-        `http://localhost:3001/api/clients/payment-status/${clientId}`,
-        { paymentVerified: verified, paymentVerifiedDate: date },
+        `http://localhost:3001/api/clients/visual-payment-status/${clientId}`,
+        { status: verified },
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }

@@ -1,34 +1,51 @@
-// src/app/clients/types.ts
+//frontend/src/app/clients/types.ts
+
 export interface Plan {
   id: number;
   name: string;
+  isActive: boolean;
+  createdAt: string; // Tornar obrigatório
+  updatedAt: string; // Tornar obrigatório
 }
 
 export interface PaymentMethod {
   id: number;
   name: string;
+  discount?: number;
+  isActive: boolean;
+  createdAt: string; // Tornar obrigatório
+  updatedAt: string; // Tornar obrigatório
 }
 
 export interface User {
   id: number;
   username: string;
+  createdAt: string; // Tornar obrigatório
+}
+
+export interface PaymentEntry {
+  paymentDate: string;
+  amount: number;
 }
 
 export interface Client {
   id: number;
   fullName: string;
   email: string;
-  phone: string | null;
-  plan: { id: number; name: string };
-  paymentMethod: { id: number; name: string };
+  phone?: string;
+  plan: Plan;
+  paymentMethod: PaymentMethod;
   dueDate: string;
   grossAmount: number;
   netAmount: number;
   isActive: boolean;
-  paymentVerified: boolean;
-  paymentVerifiedDate: string | null;
   observations?: string;
+  createdAt: string; // Tornar obrigatório
+  updatedAt: string; // Tornar obrigatório
+  userId: number;
   user: User;
+  paymentHistory: PaymentEntry[] | null;
+  visualPaymentConfirmed: boolean;
 }
 
 export interface EditFormData {
@@ -41,5 +58,5 @@ export interface EditFormData {
   grossAmount: number;
   isActive: boolean;
   observations?: string;
-  username: string; // Adicionado para permitir a edição do username
+  username: string;
 }

@@ -1,3 +1,5 @@
+//backend/src/routes/currentMonthRoutes.ts
+
 import { Router } from "express";
 import { getCurrentMonthStats } from "../controllers/dashboardController";
 import { authMiddleware } from "../middleware/authMiddleware";

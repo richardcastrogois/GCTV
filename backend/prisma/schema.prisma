@@ -74,7 +74,8 @@ model Client {
   updatedAt          DateTime      @updatedAt
   userId             Int           @unique
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  paymentHistory     Json?         // Novo campo para armazenar lista de pagamentos
+  paymentHistory     Json?
+  visualPaymentConfirmed Boolean @default(false)         
 
   @@index([isActive])
   @@index([dueDate])

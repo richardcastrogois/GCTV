@@ -31,7 +31,7 @@ export const login: RequestHandler = async (
     return;
   }
 
-  const token = jwt.sign({ username }, secret, { expiresIn: "2h" });
+  const token = jwt.sign({ username }, secret, { expiresIn: "3h" });
   console.log("Token gerado:", token);
   res.json({ token });
 };

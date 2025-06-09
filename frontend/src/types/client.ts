@@ -1,30 +1,32 @@
-//frontend/src/types/client.ts
+// frontend/src/types/client.ts
 
 export interface Plan {
   id: number;
   name: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  isActive: boolean; // Obrigatório no Prisma
+  createdAt: string; // Obrigatório no Prisma
+  updatedAt: string; // Obrigatório no Prisma
 }
 
 export interface PaymentMethod {
   id: number;
   name: string;
-  discount: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  // discount é calculado via PlanPaymentMethodDiscount, não um campo direto de PaymentMethod no Prisma.
+  // Se você o adiciona na API, mantenha-o. Caso contrário, pode ser removido ou gerenciado de outra forma.
+  discount?: number;
+  isActive: boolean; // Obrigatório no Prisma
+  createdAt: string; // Obrigatório no Prisma
+  updatedAt: string; // Obrigatório no Prisma
 }
 
 export interface User {
   id: number;
   username: string;
-  createdAt: string; // Adicionado para refletir o schema completo
+  createdAt: string; // Obrigatório no Prisma
 }
 
 export interface PaymentEntry {
-  paymentDate: string;
+  paymentDate: string; // Deve ser string ISO Date
   amount: number;
 }
 
@@ -33,19 +35,19 @@ export interface Client {
   fullName: string;
   email: string;
   phone?: string;
-  plan: Plan;
-  paymentMethod?: PaymentMethod;
-  dueDate: string;
+  plan: Plan; // Assumindo que a API sempre retorna um objeto Plan (mesmo que "padrão")
+  paymentMethod: PaymentMethod; // Assumindo que a API sempre retorna (mesmo que "padrão")
+  dueDate: string; // Deve ser string ISO Date
   grossAmount: number;
   netAmount: number;
   isActive: boolean;
   observations?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string; // Obrigatório no Prisma
+  updatedAt: string; // Obrigatório no Prisma
   userId: number;
-  user: User;
-  paymentHistory: PaymentEntry[] | null; // Novo campo para histórico de pagamentos
-  // Removidos: paymentVerified, paymentVerifiedDate (não mais usados)
+  user: User; // Assumindo que a API sempre retorna um objeto User
+  paymentHistory: PaymentEntry[] | null;
+  visualPaymentConfirmed: boolean;
 }
 
 export interface EditFormData {
@@ -54,16 +56,15 @@ export interface EditFormData {
   phone: string;
   planId: number;
   paymentMethodId: number;
-  dueDate: string;
+  dueDate: string; // Formato YYYY-MM-DD para input, convertido para ISO no envio
   grossAmount: number;
   isActive: boolean;
   observations?: string;
-  username: string; // Mantido para edição do username
+  username: string;
 }
 
 export interface DashboardStats {
   gross_amount: number;
   net_amount: number;
   active_clients: number;
-  // Adicione outros campos conforme necessário para o dashboard (ex.: totalPayments)
 }
