@@ -16,12 +16,15 @@ const preloadData = async () => {
   }
 
   const [plans, paymentMethods] = await Promise.all([
-    axios.get("https://localhost:3001/api/clients/plans", {
+    axios.get(process.env.NEXT_PUBLIC_API_URL + "/api/clients/plans", {
       headers: { Authorization: `Bearer ${token}` },
     }),
-    axios.get("https://localhost:3001/api/clients/payment-methods", {
-      headers: { Authorization: `Bearer ${token}` },
-    }),
+    axios.get(
+      process.env.NEXT_PUBLIC_API_URL + "/api/clients/payment-methods",
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    ),
   ]);
   return { plans: plans.data, paymentMethods: paymentMethods.data };
 };

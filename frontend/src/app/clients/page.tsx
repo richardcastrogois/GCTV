@@ -376,7 +376,8 @@ export default function Clients() {
   ) => {
     try {
       await axios.put(
-        `https://localhost:3001/api/clients/visual-payment-status/${clientId}`,
+        process.env.NEXT_PUBLIC_API_URL +
+          `/api/clients/visual-payment-status/${clientId}`,
         { status: verified },
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },

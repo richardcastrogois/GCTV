@@ -64,7 +64,8 @@ export default function Dashboard() {
     queryKey: ["dashboard", filterMonth, filterYear],
     queryFn: async (): Promise<DashboardStats> => {
       const { data } = await axios.get(
-        `https://localhost:3001/api/dashboard?month=${filterMonth}&year=${filterYear}`,
+        process.env.NEXT_PUBLIC_API_URL +
+          `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
@@ -82,7 +83,7 @@ export default function Dashboard() {
     queryFn: async (): Promise<CurrentMonthStats> => {
       if (useCurrentMonth) {
         const { data } = await axios.get(
-          "https://localhost:3001/api/current-month",
+          process.env.NEXT_PUBLIC_API_URL + "/api/current-month",
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -101,7 +102,8 @@ export default function Dashboard() {
           } as CurrentMonthStats;
         }
         const { data } = await axios.get(
-          `https://localhost:3001/api/dashboard?month=${filterMonth}&year=${filterYear}`,
+          process.env.NEXT_PUBLIC_API_URL +
+            `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -269,104 +271,105 @@ export default function Dashboard() {
   };
 
   return (
-      <div className="dashboard-container">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">Dashboard</h1>
-          {/* Adicionando um espaço vazio para manter o layout consistente com clients/page.tsx */}
-          <div className="flex-shrink-0 w-0 sm:w-auto"></div>
-        </div>
-        <Filter onFilterChange={handleFilterChange} />
-        <div className="flex flex-col lg:flex-row gap-6">
-          <div className="w-full lg:w-2/3 min-w-0">
-            <h2
-              className="text-xl font-semibold mb-4 text-center sm:text-left"
-              style={{ color: "var(--card-text-secondary)" }}
-            >
-              Meu Saldo
-            </h2>
-            <div className="card-container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 justify-items-center">
-              {Object.entries(stats.grossByPaymentMethod).map(
-                ([method, amount]) => (
-                  <div
-                    key={`${method}-${filterMonth}-${filterYear}`}
-                    className={`card bank-card ${getCardClass(
-                      method
-                    )} p-4 flex flex-col justify-between`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <img
-                        src="/icons/contactless.png"
-                        alt="Contactless"
-                        className="w-6 h-6"
-                      />
+    <div className="dashboard-container">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">
+          Dashboard
+        </h1>
+        {/* Adicionando um espaço vazio para manter o layout consistente com clients/page.tsx */}
+        <div className="flex-shrink-0 w-0 sm:w-auto"></div>
+      </div>
+      <Filter onFilterChange={handleFilterChange} />
+      <div className="flex flex-col lg:flex-row gap-6">
+        <div className="w-full lg:w-2/3 min-w-0">
+          <h2
+            className="text-xl font-semibold mb-4 text-center sm:text-left"
+            style={{ color: "var(--card-text-secondary)" }}
+          >
+            Meu Saldo
+          </h2>
+          <div className="card-container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 justify-items-center">
+            {Object.entries(stats.grossByPaymentMethod).map(
+              ([method, amount]) => (
+                <div
+                  key={`${method}-${filterMonth}-${filterYear}`}
+                  className={`card bank-card ${getCardClass(
+                    method
+                  )} p-4 flex flex-col justify-between`}
+                >
+                  <div className="flex justify-between items-start">
+                    <img
+                      src="/icons/contactless.png"
+                      alt="Contactless"
+                      className="w-6 h-6"
+                    />
+                  </div>
+                  <div className="text-2xl font-bold card-amount">
+                    R$ {amount.toFixed(2)}
+                  </div>
+                  <div className="flex justify-between items-end">
+                    <div className="text-lg font-semibold card-method">
+                      {method}
                     </div>
-                    <div className="text-2xl font-bold card-amount">
-                      R$ {amount.toFixed(2)}
-                    </div>
-                    <div className="flex justify-between items-end">
-                      <div className="text-lg font-semibold card-method">
-                        {method}
-                      </div>
-                      <div className="flex gap-1">
-                        <span className="w-6 h-6 bg-orange-500 rounded-full"></span>
-                        <span className="w-6 h-6 bg-red-500 rounded-full"></span>
-                      </div>
+                    <div className="flex gap-1">
+                      <span className="w-6 h-6 bg-orange-500 rounded-full"></span>
+                      <span className="w-6 h-6 bg-red-500 rounded-full"></span>
                     </div>
                   </div>
-                )
-              )}
+                </div>
+              )
+            )}
+          </div>
+        </div>
+        <div className="w-full lg:w-1/3 min-w-0 flex flex-col gap-4">
+          <div className="card w-full chart-card">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
+              <h2
+                className="text-xl font-semibold text-center sm:text-left"
+                style={{ color: "var(--card-text-secondary)" }}
+              >
+                Lucro Líquido Diário
+              </h2>
+            </div>
+            <div className="h-48">
+              <Line data={chartData} options={chartOptions} />
             </div>
           </div>
-          <div className="w-full lg:w-1/3 min-w-0 flex flex-col gap-4">
-            <div className="card w-full chart-card">
-              <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
-                <h2
-                  className="text-xl font-semibold text-center sm:text-left"
-                  style={{ color: "var(--card-text-secondary)" }}
-                >
-                  Lucro Líquido Diário
-                </h2>
-              </div>
-              <div className="h-48">
-                <Line data={chartData} options={chartOptions} />
-              </div>
+          <div className="card w-full current-month-card">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+              <h2
+                className="text-xl font-semibold text-center sm:text-left"
+                style={{ color: "var(--card-text)" }}
+              >
+                {getCurrentMonthTitle()}
+              </h2>
+              <button
+                onClick={() => setUseCurrentMonth(!useCurrentMonth)}
+                className={`toggle-button ${
+                  useCurrentMonth ? "active" : "inactive"
+                }`}
+              >
+                {useCurrentMonth ? "Usar Mês Atual" : "Usar Filtro Geral"}
+              </button>
             </div>
-            <div className="card w-full current-month-card">
-              <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
-                <h2
-                  className="text-xl font-semibold text-center sm:text-left"
-                  style={{ color: "var(--card-text)" }}
-                >
-                  {getCurrentMonthTitle()}
-                </h2>
-                <button
-                  onClick={() => setUseCurrentMonth(!useCurrentMonth)}
-                  className={`toggle-button ${
-                    useCurrentMonth ? "active" : "inactive"
-                  }`}
-                >
-                  {useCurrentMonth ? "Usar Mês Atual" : "Usar Filtro Geral"}
-                </button>
+            <div className="flex flex-col gap-2 text-center sm:text-left">
+              <div
+                className="text-2xl font-semibold"
+                style={{ color: "var(--card-text)" }}
+              >
+                -R$8/ativação: R$ {currentMonthStats.totalNetAmount8.toFixed(2)}
               </div>
-              <div className="flex flex-col gap-2 text-center sm:text-left">
-                <div
-                  className="text-2xl font-semibold"
-                  style={{ color: "var(--card-text)" }}
-                >
-                  -R$8/ativação: R${" "}
-                  {currentMonthStats.totalNetAmount8.toFixed(2)}
-                </div>
-                <div
-                  className="text-2xl font-semibold"
-                  style={{ color: "var(--card-text)" }}
-                >
-                  -R$15/ativação: R${" "}
-                  {currentMonthStats.totalNetAmount15.toFixed(2)}
-                </div>
+              <div
+                className="text-2xl font-semibold"
+                style={{ color: "var(--card-text)" }}
+              >
+                -R$15/ativação: R${" "}
+                {currentMonthStats.totalNetAmount15.toFixed(2)}
               </div>
             </div>
           </div>
         </div>
       </div>
+    </div>
   );
 }

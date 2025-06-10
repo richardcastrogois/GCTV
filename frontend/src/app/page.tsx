@@ -1,4 +1,5 @@
 // frontend/src/app/page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -86,7 +87,7 @@ export default function Login() {
     try {
       console.log("Tentando login com:", { username, password });
       const { data } = await axios.post(
-        "https://localhost:3001/api/auth/login",
+        process.env.NEXT_PUBLIC_API_URL + "/api/auth/login",
         { username, password },
         {
           headers: { "Content-Type": "application/json" },

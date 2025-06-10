@@ -4,7 +4,7 @@ import axios from "axios";
 import { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
 
 const api = axios.create({
-  baseURL: "https://localhost:3001",
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
 });
 
 api.interceptors.request.use(

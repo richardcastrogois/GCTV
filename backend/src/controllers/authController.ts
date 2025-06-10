@@ -1,21 +1,20 @@
-//backend/src/controllers/authControllers
-
 import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { Request, Response, RequestHandler } from "express";
 
-// Restaurando os usuários hardcoded
-const users = [
-  { username: "admin1", password: bcrypt.hashSync("senha123", 10) },
-  { username: "admin2", password: bcrypt.hashSync("outrasenha456", 10) },
-];
+// Carregar usuários do .env
+const authUsers = process.env.AUTH_USERS
+  ? JSON.parse(process.env.AUTH_USERS)
+  : [];
 
 export const login: RequestHandler = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   const { username, password } = req.body;
-  const user = users.find((u) => u.username === username);
+  const user = authUsers.find(
+    (u: { username: string; password: string }) => u.username === username
+  );
 
   if (!user || !bcrypt.compareSync(password, user.password)) {
     res.status(401).json({ error: "Credenciais inválidas" });

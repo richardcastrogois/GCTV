@@ -252,7 +252,7 @@
 
       try {
         const response = await axios.get(
-          `https://localhost:3001/api/clients/${clientId}`,
+          process.env.NEXT_PUBLIC_API_URL + `/api/clients/${clientId}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -314,7 +314,8 @@
           amount: newPaymentAmount,
         });
         const response = await axios.put(
-          `https://localhost:3001/api/clients/payment-status/${modalClient.id}`,
+          process.env.NEXT_PUBLIC_API_URL +
+            `/api/clients/payment-status/${modalClient.id}`,
           {
             paymentDate: new Date(newPaymentDate).toISOString(),
             amount: newPaymentAmount,
@@ -328,7 +329,7 @@
         console.log("Response:", response.data);
         toast.success("Pagamento adicionado!");
         const clientResponse = await axios.get(
-          `https://localhost:3001/api/clients/${modalClient.id}`,
+          process.env.NEXT_PUBLIC_API_URL + `/api/clients/${modalClient.id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -370,7 +371,8 @@
 
       try {
         const response = await axios.put(
-          `https://localhost:3001/api/clients/payments/edit/${modalClient.id}`,
+          process.env.NEXT_PUBLIC_API_URL +
+            `/api/clients/payments/edit/${modalClient.id}`,
           {
             index: editingPaymentIndex,
             paymentDate: new Date(editPaymentDate).toISOString(),
@@ -385,7 +387,7 @@
         console.log("Response from edit payment:", response.data);
         toast.success("Pagamento atualizado!");
         const clientResponse = await axios.get(
-          `https://localhost:3001/api/clients/${modalClient.id}`,
+          process.env.NEXT_PUBLIC_API_URL + `/api/clients/${modalClient.id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -407,7 +409,8 @@
 
       try {
         const response = await axios.delete(
-          `https://localhost:3001/api/clients/payments/delete/${modalClient.id}`,
+          process.env.NEXT_PUBLIC_API_URL +
+            `/api/clients/payments/delete/${modalClient.id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -418,7 +421,7 @@
         console.log("Response from delete payment:", response.data);
         toast.success("Pagamento excluído!");
         const clientResponse = await axios.get(
-          `https://localhost:3001/api/clients/${modalClient.id}`,
+          process.env.NEXT_PUBLIC_API_URL + `/api/clients/${modalClient.id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,

@@ -52,7 +52,7 @@ export default function EditClient() {
         console.log("ID do cliente:", parsedId);
 
         const { data: clientData } = await axios.get(
-          `https://localhost:3001/api/clients/${parsedId}`,
+          process.env.NEXT_PUBLIC_API_URL + `/api/clients/${parsedId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setClient(clientData);
@@ -66,12 +66,15 @@ export default function EditClient() {
         setObservations(clientData.observations || "");
 
         const [plansResponse, paymentMethodsResponse] = await Promise.all([
-          axios.get("https://localhost:3001/api/clients/plans", {
+          axios.get(process.env.NEXT_PUBLIC_API_URL + "/api/clients/plans", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get("https://localhost:3001/api/clients/payment-methods", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+          axios.get(
+            process.env.NEXT_PUBLIC_API_URL + "/api/clients/payment-methods",
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          ),
         ]);
         setPlans(plansResponse.data);
         setPaymentMethods(paymentMethodsResponse.data);
@@ -134,7 +137,7 @@ export default function EditClient() {
 
     try {
       await axios.put(
-        `https://localhost:3001/api/clients/${id}`,
+        process.env.NEXT_PUBLIC_API_URL + `/api/clients/${id}`,
         {
           fullName,
           email,
