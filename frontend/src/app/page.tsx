@@ -1,5 +1,4 @@
-//frontend/src/app/page.tsx
-
+// frontend/src/app/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -75,7 +74,8 @@ export default function Login() {
       try {
         setupLogoutTimer(token);
         router.push("/dashboard");
-      } catch {
+      } catch (error) {
+        console.error("Token inválido ao carregar:", error);
         localStorage.removeItem("token");
       }
     }
@@ -84,19 +84,31 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      console.log("Tentando login com:", { username, password });
       const { data } = await axios.post(
-        "http://localhost:3001/api/auth/login",
-        { username, password }
+        "https://localhost:3001/api/auth/login",
+        { username, password },
+        {
+          headers: { "Content-Type": "application/json" },
+        }
       );
-      localStorage.setItem("token", data.token);
-      setupLogoutTimer(data.token);
-      toast.success("Login realizado com sucesso!");
-      router.push("/dashboard");
+      console.log("Resposta do servidor:", data);
+      if (data.accessToken) {
+        localStorage.setItem("token", data.accessToken);
+        setupLogoutTimer(data.accessToken);
+        toast.success("Login realizado com sucesso!");
+        router.push("/dashboard");
+      } else {
+        throw new Error("Resposta do servidor não contém accessToken");
+      }
     } catch (error) {
       const axiosError = error as AxiosError<{ error: string }>;
+      console.error("Erro ao logar:", error);
       toast.error(
         `Erro ao logar: ${
-          axiosError.response?.data?.error || axiosError.message
+          axiosError.response?.data?.error ||
+          axiosError.message ||
+          "Erro desconhecido"
         }`
       );
     }

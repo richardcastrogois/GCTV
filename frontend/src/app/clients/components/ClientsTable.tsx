@@ -252,7 +252,7 @@
 
       try {
         const response = await axios.get(
-          `http://localhost:3001/api/clients/${clientId}`,
+          `https://localhost:3001/api/clients/${clientId}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -314,7 +314,7 @@
           amount: newPaymentAmount,
         });
         const response = await axios.put(
-          `http://localhost:3001/api/clients/payment-status/${modalClient.id}`,
+          `https://localhost:3001/api/clients/payment-status/${modalClient.id}`,
           {
             paymentDate: new Date(newPaymentDate).toISOString(),
             amount: newPaymentAmount,
@@ -328,7 +328,7 @@
         console.log("Response:", response.data);
         toast.success("Pagamento adicionado!");
         const clientResponse = await axios.get(
-          `http://localhost:3001/api/clients/${modalClient.id}`,
+          `https://localhost:3001/api/clients/${modalClient.id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -370,7 +370,7 @@
 
       try {
         const response = await axios.put(
-          `http://localhost:3001/api/clients/payments/edit/${modalClient.id}`,
+          `https://localhost:3001/api/clients/payments/edit/${modalClient.id}`,
           {
             index: editingPaymentIndex,
             paymentDate: new Date(editPaymentDate).toISOString(),
@@ -385,7 +385,7 @@
         console.log("Response from edit payment:", response.data);
         toast.success("Pagamento atualizado!");
         const clientResponse = await axios.get(
-          `http://localhost:3001/api/clients/${modalClient.id}`,
+          `https://localhost:3001/api/clients/${modalClient.id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -407,7 +407,7 @@
 
       try {
         const response = await axios.delete(
-          `http://localhost:3001/api/clients/payments/delete/${modalClient.id}`,
+          `https://localhost:3001/api/clients/payments/delete/${modalClient.id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -418,7 +418,7 @@
         console.log("Response from delete payment:", response.data);
         toast.success("Pagamento excluído!");
         const clientResponse = await axios.get(
-          `http://localhost:3001/api/clients/${modalClient.id}`,
+          `https://localhost:3001/api/clients/${modalClient.id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,

@@ -376,7 +376,7 @@ export default function Clients() {
   ) => {
     try {
       await axios.put(
-        `http://localhost:3001/api/clients/visual-payment-status/${clientId}`,
+        `https://localhost:3001/api/clients/visual-payment-status/${clientId}`,
         { status: verified },
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },

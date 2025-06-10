@@ -158,7 +158,7 @@ export default function NewClient() {
     const fetchPlans = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:3001/api/clients/plans",
+          "https://localhost:3001/api/clients/plans",
           {
             headers: { Authorization: `Bearer ${storedToken}` },
           }
@@ -173,7 +173,7 @@ export default function NewClient() {
     const fetchPaymentMethods = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:3001/api/clients/payment-methods",
+          "https://localhost:3001/api/clients/payment-methods",
           {
             headers: { Authorization: `Bearer ${storedToken}` },
           }
@@ -255,7 +255,7 @@ export default function NewClient() {
 
     try {
       const response = await axios.post(
-        "http://localhost:3001/api/clients",
+        "https://localhost:3001/api/clients",
         clientData,
         { headers: { Authorization: `Bearer ${token}` } }
       );

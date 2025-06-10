@@ -16,7 +16,7 @@ export const fetchExpiredClients = async (
   search: string
 ): Promise<ClientResponse> => {
   const response = await axios.get(
-    `http://localhost:3001/api/expired-clients`,
+    `https://localhost:3001/api/expired-clients`,
     {
       params: { page, limit, search },
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -30,7 +30,7 @@ export const reactivateClient = async (
   dueDate: string
 ): Promise<void> => {
   await axios.put(
-    `http://localhost:3001/api/clients/reactivate/${clientId}`,
+    `https://localhost:3001/api/clients/reactivate/${clientId}`,
     { dueDate }, // Enviando a nova data de vencimento no corpo da requisição
     { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
   );

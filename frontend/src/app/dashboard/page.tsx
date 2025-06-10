@@ -64,7 +64,7 @@ export default function Dashboard() {
     queryKey: ["dashboard", filterMonth, filterYear],
     queryFn: async (): Promise<DashboardStats> => {
       const { data } = await axios.get(
-        `http://localhost:3001/api/dashboard?month=${filterMonth}&year=${filterYear}`,
+        `https://localhost:3001/api/dashboard?month=${filterMonth}&year=${filterYear}`,
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
@@ -82,7 +82,7 @@ export default function Dashboard() {
     queryFn: async (): Promise<CurrentMonthStats> => {
       if (useCurrentMonth) {
         const { data } = await axios.get(
-          "http://localhost:3001/api/current-month",
+          "https://localhost:3001/api/current-month",
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -101,7 +101,7 @@ export default function Dashboard() {
           } as CurrentMonthStats;
         }
         const { data } = await axios.get(
-          `http://localhost:3001/api/dashboard?month=${filterMonth}&year=${filterYear}`,
+          `https://localhost:3001/api/dashboard?month=${filterMonth}&year=${filterYear}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,

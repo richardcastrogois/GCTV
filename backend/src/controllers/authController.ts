@@ -1,7 +1,7 @@
-//backend/src/controllers/authController.ts
+//backend/src/controllers/authControllers
 
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import { Request, Response, RequestHandler } from "express";
 
 // Restaurando os usuários hardcoded
@@ -23,6 +23,7 @@ export const login: RequestHandler = async (
   }
 
   const secret = process.env.JWT_SECRET;
+  const refreshSecret = (process.env.JWT_SECRET || "") + "_refresh";
   if (!secret) {
     console.error("JWT_SECRET não definido no .env");
     res
@@ -31,7 +32,12 @@ export const login: RequestHandler = async (
     return;
   }
 
-  const token = jwt.sign({ username }, secret, { expiresIn: "3h" });
-  console.log("Token gerado:", token);
-  res.json({ token });
+  const accessToken = jwt.sign({ username }, secret, {
+    expiresIn: "15m",
+  } as SignOptions);
+  const refreshToken = jwt.sign({ username }, refreshSecret, {
+    expiresIn: "7d",
+  } as SignOptions);
+  console.log("Tokens gerados e enviados:", { accessToken, refreshToken });
+  res.json({ accessToken, refreshToken });
 };

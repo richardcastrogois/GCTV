@@ -1,19 +1,26 @@
-//frontend/src/components/DataPreloader.tsx
-
+// frontend/src/components/DataPreloader.tsx
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import Loading from "@/components/Loading";
 import { useAuth } from "@/hooks/useAuth";
+// import https from "https"; // Comentado, pois não é compatível com "use client" no navegador
 
 const preloadData = async () => {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error(
+      "Token de autenticação não encontrado. Faça login primeiro."
+    );
+  }
+
   const [plans, paymentMethods] = await Promise.all([
-    axios.get("http://localhost:3001/api/clients/plans", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    axios.get("https://localhost:3001/api/clients/plans", {
+      headers: { Authorization: `Bearer ${token}` },
     }),
-    axios.get("http://localhost:3001/api/clients/payment-methods", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    axios.get("https://localhost:3001/api/clients/payment-methods", {
+      headers: { Authorization: `Bearer ${token}` },
     }),
   ]);
   return { plans: plans.data, paymentMethods: paymentMethods.data };
@@ -37,6 +44,8 @@ export default function DataPreloader({
   if (error) {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       handleUnauthorized();
+    } else if (error instanceof Error && error.message.includes("Token")) {
+      // Não faz nada ou exibe uma mensagem, dependendo da lógica do handleUnauthorized
     }
   }
 
