@@ -1,30 +1,24 @@
 //frontend/src/hooks/useAuth.ts
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react"; // Adicione useCallback
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "react-toastify";
 
 export const useAuth = () => {
-  const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
     const storedToken =
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
     setToken(storedToken);
+    // Não redireciona aqui; deixa o DataPreloader ou outro componente lidar
+  }, []);
 
-    if (!storedToken) {
-      toast.error("Você precisa estar logado para acessar esta página.");
-      router.push("/");
-    }
-  }, [router]);
-
-  // Memoize a função handleUnauthorized
   const handleUnauthorized = useCallback(() => {
     localStorage.removeItem("token");
-    router.push("/");
+    localStorage.removeItem("refreshToken");
     toast.error("Sessão expirada. Faça login novamente.");
-  }, [router]); // Adicione router como dependência
+    // Não redireciona aqui; deixa o componente pai decidir
+  }, []);
 
   return { token, handleUnauthorized };
 };

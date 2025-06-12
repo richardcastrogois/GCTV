@@ -1,11 +1,12 @@
 // frontend/src/components/DataPreloader.tsx
+
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import Loading from "@/components/Loading";
 import { useAuth } from "@/hooks/useAuth";
-// import https from "https"; // Comentado, pois não é compatível com "use client" no navegador
+import { useEffect, useState } from "react";
 
 const preloadData = async () => {
   const token = localStorage.getItem("token");
@@ -34,12 +35,24 @@ export default function DataPreloader({
 }: {
   children: React.ReactNode;
 }) {
-  const { handleUnauthorized } = useAuth();
+  const { handleUnauthorized, token } = useAuth(); // Adicionado token para controle
+  const [isReady, setIsReady] = useState(false); // Estado para controlar o carregamento
+
+  // Garante que o carregamento só ocorra após o token estar disponível
+  useEffect(() => {
+    if (token) {
+      setIsReady(true);
+    }
+  }, [token]);
+
   const { isLoading, error } = useQuery({
     queryKey: ["preloadData"],
     queryFn: preloadData,
-    staleTime: 300000, // 5 minutos
-    gcTime: 600000, // 10 minutos
+    staleTime: 600000, // Aumentado para 10 minutos
+    gcTime: 1200000, // Aumentado para 20 minutos
+    retry: 1, // Uma tentativa apenas
+    retryDelay: 2000, // 2 segundos de delay
+    enabled: isReady, // Só executa a query quando isReady for true
   });
 
   if (isLoading) return <Loading>Carregando dados iniciais...</Loading>;
@@ -48,7 +61,9 @@ export default function DataPreloader({
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       handleUnauthorized();
     } else if (error instanceof Error && error.message.includes("Token")) {
-      // Não faz nada ou exibe uma mensagem, dependendo da lógica do handleUnauthorized
+      // Não faz nada ou exibe uma mensagem
+    } else {
+      console.error("Erro ao carregar dados:", error);
     }
   }
 

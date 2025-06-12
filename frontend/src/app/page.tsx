@@ -1,86 +1,123 @@
 // frontend/src/app/page.tsx
-
 "use client";
+
+// Definir interface para a resposta de erro do Axios
+interface ErrorResponse {
+  error?: string;
+}
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios, { AxiosError } from "axios";
 import { toast } from "react-toastify";
-import { jwtDecode } from "jwt-decode";
 import { FaUser, FaLock } from "react-icons/fa";
+import { jwtDecode } from "jwt-decode";
 
-interface DecodedToken {
+// Interface refinada para o payload do JWT
+interface JwtPayload {
   exp: number;
-  username: string;
+  iat?: number;
+  username?: string;
 }
+
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const decoded = jwtDecode<JwtPayload>(token);
+    return decoded.exp < Date.now() / 1000;
+  } catch (error) {
+    console.error("Erro ao decodificar token:", error);
+    return true; // Assume como expirado se houver erro
+  }
+};
+
+// Função auxiliar para obter token com tipagem explícita
+const getToken = (): string | null =>
+  localStorage.getItem("token") as string | null;
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
 
-  const setupLogoutTimer = useCallback(
-    (token: string) => {
-      const decoded = jwtDecode<DecodedToken>(token);
-      const expirationTime = decoded.exp * 1000;
-      const currentTime = Date.now();
-      const timeUntilExpiration = expirationTime - currentTime;
+  const setupLogoutTimer = useCallback(() => {
+    const inactivityTimeout = setTimeout(() => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
+      toast.info("Sua sessão expirou por inatividade. Faça login novamente.");
+      router.push("/");
+    }, 9 * 60 * 1000); // 9 minutos, alinhado com o backend
+    return () => clearTimeout(inactivityTimeout);
+  }, [router]);
 
-      // Notificações progressivas
-      const time10min = timeUntilExpiration - 10 * 60 * 1000;
-      if (time10min > 0) {
-        setTimeout(
-          () =>
-            toast.warn(
-              "Sua sessão expirará em 10 minutos. Salve seu progresso."
-            ),
-          time10min
+  const refreshToken = useCallback(async () => {
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (refreshToken && typeof refreshToken === "string") {
+      try {
+        console.log("Enviando refreshToken para renovação:", refreshToken);
+        const { data } = await axios.post(
+          process.env.NEXT_PUBLIC_API_URL + "/api/auth/refresh",
+          { refreshToken },
+          { headers: { "Content-Type": "application/json" } }
+        );
+        if (data.accessToken && typeof data.accessToken === "string") {
+          localStorage.setItem("token", data.accessToken);
+          if (data.refreshToken && typeof data.refreshToken === "string") {
+            localStorage.setItem("refreshToken", data.refreshToken);
+          }
+          console.log(
+            "Token renovado com sucesso, novo token:",
+            data.accessToken
+          );
+          return true; // Indica sucesso
+        }
+      } catch (error) {
+        const axiosError = error as AxiosError<ErrorResponse>;
+        console.error(
+          "Erro ao renovar token:",
+          axiosError.response?.data?.error ||
+            axiosError.message ||
+            "Erro desconhecido"
         );
       }
-      const time5min = timeUntilExpiration - 5 * 60 * 1000;
-      if (time5min > 0) {
-        setTimeout(
-          () =>
-            toast.warn(
-              "Sua sessão expirará em 5 minutos. Salve seu progresso."
-            ),
-          time5min
-        );
-      }
-      const time1min = timeUntilExpiration - 1 * 60 * 1000;
-      if (time1min > 0) {
-        setTimeout(
-          () =>
-            toast.error(
-              "Atenção: Sua sessão expirará em 1 minuto. Salve e saia agora!",
-              { autoClose: false }
-            ),
-          time1min
-        );
-      }
-
-      // Logout na expiração
-      setTimeout(() => {
-        localStorage.removeItem("token");
-        toast.info("Sua sessão expirou. Por favor, faça login novamente.");
-        router.push("/");
-      }, timeUntilExpiration);
-    },
-    [router]
-  );
+    } else {
+      console.warn("Nenhum refreshToken válido encontrado no localStorage");
+    }
+    return false; // Indica falha
+  }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      try {
-        setupLogoutTimer(token);
-        router.push("/dashboard");
-      } catch (error) {
-        console.error("Token inválido ao carregar:", error);
-        localStorage.removeItem("token");
+    const checkTokens = async () => {
+      const token = getToken();
+      const storedRefreshToken = localStorage.getItem("refreshToken");
+      console.log("Tokens no carregamento:", { token, storedRefreshToken });
+
+      if (
+        !token ||
+        !storedRefreshToken ||
+        typeof token !== "string" ||
+        typeof storedRefreshToken !== "string"
+      ) {
+        console.log("Primeiro acesso ou tokens ausentes, aguardando login...");
+        return;
       }
-    }
-  }, [router, setupLogoutTimer]);
+
+      const safeToken = token.length > 0 ? token : "";
+      if (safeToken && isTokenExpired(safeToken)) {
+        const refreshed = await refreshToken();
+        if (refreshed) {
+          router.push("/dashboard");
+          const cleanup = setupLogoutTimer();
+          return () => cleanup();
+        }
+      } else {
+        router.push("/dashboard");
+        const cleanup = setupLogoutTimer();
+        return () => cleanup();
+      }
+    };
+
+    checkTokens();
+  }, [router, setupLogoutTimer, refreshToken]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,21 +126,31 @@ export default function Login() {
       const { data } = await axios.post(
         process.env.NEXT_PUBLIC_API_URL + "/api/auth/login",
         { username, password },
-        {
-          headers: { "Content-Type": "application/json" },
-        }
+        { headers: { "Content-Type": "application/json" } }
       );
-      console.log("Resposta do servidor:", data);
-      if (data.accessToken) {
+      console.log(
+        "Resposta do servidor (detalhada):",
+        JSON.stringify(data, null, 2)
+      );
+      if (data.accessToken && data.refreshToken) {
         localStorage.setItem("token", data.accessToken);
-        setupLogoutTimer(data.accessToken);
+        localStorage.setItem("refreshToken", data.refreshToken);
+        console.log("refreshToken armazenado:", data.refreshToken);
+        const cleanup = setupLogoutTimer();
+        const refreshInterval = setInterval(refreshToken, 8 * 60 * 1000); // Ajustado para 8 minutos, antes do timeout
         toast.success("Login realizado com sucesso!");
         router.push("/dashboard");
+        return () => {
+          cleanup();
+          clearInterval(refreshInterval);
+        };
       } else {
-        throw new Error("Resposta do servidor não contém accessToken");
+        throw new Error(
+          "Resposta do servidor não contém accessToken ou refreshToken"
+        );
       }
     } catch (error) {
-      const axiosError = error as AxiosError<{ error: string }>;
+      const axiosError = error as AxiosError<ErrorResponse>;
       console.error("Erro ao logar:", error);
       toast.error(
         `Erro ao logar: ${

@@ -1,10 +1,10 @@
 //frontend/src/app/expired/api.ts
 
-import axios from "axios";
-import { Client } from "../clients/types"; // Importando o tipo Client
+import api from "@/utils/api";
+import { Client } from "../clients/types";
 
 interface ClientResponse {
-  data: Client[]; // Substituído 'any[]' por 'Client[]'
+  data: Client[];
   total: number;
   page: number;
   limit: number;
@@ -15,23 +15,22 @@ export const fetchExpiredClients = async (
   limit: number,
   search: string
 ): Promise<ClientResponse> => {
-  const response = await axios.get(
-    process.env.NEXT_PUBLIC_API_URL + `/api/expired-clients`,
-    {
+  try {
+    const response = await api.get<ClientResponse>("/api/expired-clients", {
       params: { page, limit, search },
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    }
-  );
-  return response.data;
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao buscar clientes expirados:", error);
+    throw error;
+  }
 };
 
 export const reactivateClient = async (
   clientId: number,
   dueDate: string
 ): Promise<void> => {
-  await axios.put(
-    process.env.NEXT_PUBLIC_API_URL + `/api/clients/reactivate/${clientId}`,
-    { dueDate }, // Enviando a nova data de vencimento no corpo da requisição
-    { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-  );
+  await api.put(`/api/clients/reactivate/${clientId}`, {
+    dueDate,
+  });
 };

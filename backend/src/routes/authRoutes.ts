@@ -1,6 +1,7 @@
 // backend/src/routes/authRoutes.ts
+
 import { Router, Request, Response } from "express";
-import { login } from "../controllers/authController"; // Apenas login é exportado
+import { login } from "../controllers/authController";
 import jwt, { VerifyErrors } from "jsonwebtoken";
 
 const router: Router = Router();
@@ -15,19 +16,23 @@ router.post("/refresh", (req: Request, res: Response) => {
     return;
   }
 
-  const refreshSecret = (process.env.JWT_SECRET || "") + "_refresh"; // Garante string
+  const refreshSecret = (process.env.JWT_SECRET || "") + "_refresh";
+  console.log("Recebido refreshToken:", refreshToken); // Log para depuração
   jwt.verify(
     refreshToken,
     refreshSecret,
     (err: VerifyErrors | null, user: any) => {
       if (err) {
-        res.status(403).json({ error: "Invalid refresh token" });
+        console.error("Erro na verificação do refreshToken:", err.message);
+        res
+          .status(403)
+          .json({ error: "Invalid refresh token", details: err.message });
         return;
       }
       const accessToken = jwt.sign(
         { username: user.username },
         process.env.JWT_SECRET || "",
-        { expiresIn: "2h" }
+        { expiresIn: "15m" }
       );
       res.json({ accessToken });
     }

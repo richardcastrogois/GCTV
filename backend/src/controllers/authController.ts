@@ -1,3 +1,5 @@
+//backend/src/controllers/authController.ts
+
 import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { Request, Response, RequestHandler } from "express";
@@ -32,10 +34,10 @@ export const login: RequestHandler = async (
   }
 
   const accessToken = jwt.sign({ username }, secret, {
-    expiresIn: "15m",
+    expiresIn: "15m", // Mantido como 15 minutos para renovação frequente
   } as SignOptions);
   const refreshToken = jwt.sign({ username }, refreshSecret, {
-    expiresIn: "7d",
+    expiresIn: "7d", // Mantido como 7 dias
   } as SignOptions);
   console.log("Tokens gerados e enviados:", { accessToken, refreshToken });
   res.json({ accessToken, refreshToken });

@@ -1,4 +1,5 @@
 // backend/src/server.ts
+
 import express, { Express, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -11,12 +12,12 @@ import { authMiddleware } from "./middleware/authMiddleware";
 import https from "https";
 import fs from "fs";
 import session from "express-session";
-import { PrismaClient } from "@prisma/client"; // Importar PrismaClient
+import { PrismaClient } from "@prisma/client";
 
 // Estendendo o tipo Session para incluir inactivityTimeout (opcional, mas mantido para consistência)
 declare module "express-session" {
   interface Session {
-    inactivityTimeout?: NodeJS.Timeout; // Mantido como comentário, pois não será usado diretamente
+    inactivityTimeout?: NodeJS.Timeout;
   }
 }
 
@@ -34,15 +35,15 @@ const prisma = new PrismaClient({
         "postgresql://localhost:5432/yourdb?schema=public",
     },
   },
-  log: ["query", "error", "info", "warn"], // Para depuração
+  log: ["query", "error", "info", "warn"],
 });
 
-// Middleware para liberar conexões após cada requisição (opcional, mas recomendado)
-prisma.$use(async (params, next) => {
-  const result = await next(params);
-  await prisma.$disconnect(); // Libera a conexão após cada operação
-  return result;
-});
+// Comentado temporariamente para teste, pois pode causar atrasos
+// prisma.$use(async (params, next) => {
+//   const result = await next(params);
+//   await prisma.$disconnect();
+//   return result;
+// });
 
 const app: Express = express();
 
@@ -95,27 +96,24 @@ console.log("JWT_SECRET carregado:", JWT_SECRET);
 // Middleware de inatividade ajustado
 app.use((req: Request, res: Response, next: NextFunction) => {
   if (req.session && req.sessionID) {
-    // Limpar timeout existente
     if (sessionTimeouts.has(req.sessionID)) {
       clearTimeout(sessionTimeouts.get(req.sessionID)!);
       sessionTimeouts.delete(req.sessionID);
     }
 
-    // Configurar novo timeout
     const timeout = setTimeout(() => {
       req.session.destroy((err) => {
         if (err) console.error("Erro ao destruir sessão:", err);
         else
           console.log(
-            `Usuário deslogado por inatividade de 1 hora (ID: ${req.sessionID})`
+            `Usuário deslogado por inatividade de 10 minutos (ID: ${req.sessionID})`
           );
         sessionTimeouts.delete(req.sessionID);
       });
-    }, 60 * 60 * 1000); // 1 hora em milissegundos
+    }, 10 * 60 * 1000);
 
     sessionTimeouts.set(req.sessionID, timeout);
 
-    // Limpar timeout quando a resposta for finalizada
     res.on("finish", () => {
       if (sessionTimeouts.has(req.sessionID)) {
         clearTimeout(sessionTimeouts.get(req.sessionID)!);
@@ -131,12 +129,16 @@ const httpsOptions = {
   key: fs.readFileSync("cert.key"),
   cert: fs.readFileSync("cert.pem"),
 };
-https.createServer(httpsOptions, app).listen(PORT, () => {
+const server = https.createServer(httpsOptions, app);
+server.listen(PORT, () => {
   console.log(`Server running on https://localhost:${PORT}`);
 });
 
-// Fechar Prisma ao encerrar o servidor
+// Fechar Prisma e o servidor ao encerrar
 process.on("SIGTERM", async () => {
   await prisma.$disconnect();
-  process.exit(0);
+  server.close(() => {
+    console.log("Servidor encerrado.");
+    process.exit(0);
+  });
 });
