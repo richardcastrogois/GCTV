@@ -110,7 +110,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
           );
         sessionTimeouts.delete(req.sessionID);
       });
-    }, 10 * 60 * 1000);
+    }, 60 * 60 * 1000);
 
     sessionTimeouts.set(req.sessionID, timeout);
 

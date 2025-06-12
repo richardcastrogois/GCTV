@@ -6,7 +6,7 @@ interface ErrorResponse {
   error?: string;
 }
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import axios, { AxiosError } from "axios";
 import { toast } from "react-toastify";
@@ -38,15 +38,22 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const setupLogoutTimer = useCallback(() => {
-    const inactivityTimeout = setTimeout(() => {
+  const setupInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    inactivityTimerRef.current = setTimeout(() => {
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
-      toast.info("Sua sessão expirou por inatividade. Faça login novamente.");
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+      toast.info(
+        "Sua sessão expirou por 1 hora de inatividade. Faça login novamente."
+      );
       router.push("/");
-    }, 9 * 60 * 1000); // 9 minutos, alinhado com o backend
-    return () => clearTimeout(inactivityTimeout);
+    }, 60 * 60 * 1000); // 1 hora de inatividade
   }, [router]);
 
   const refreshToken = useCallback(async () => {
@@ -106,18 +113,16 @@ export default function Login() {
         const refreshed = await refreshToken();
         if (refreshed) {
           router.push("/dashboard");
-          const cleanup = setupLogoutTimer();
-          return () => cleanup();
+          setupInactivityTimer();
         }
       } else {
         router.push("/dashboard");
-        const cleanup = setupLogoutTimer();
-        return () => cleanup();
+        setupInactivityTimer();
       }
     };
 
     checkTokens();
-  }, [router, setupLogoutTimer, refreshToken]);
+  }, [router, setupInactivityTimer, refreshToken]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,13 +141,17 @@ export default function Login() {
         localStorage.setItem("token", data.accessToken);
         localStorage.setItem("refreshToken", data.refreshToken);
         console.log("refreshToken armazenado:", data.refreshToken);
-        const cleanup = setupLogoutTimer();
-        const refreshInterval = setInterval(refreshToken, 8 * 60 * 1000); // Ajustado para 8 minutos, antes do timeout
+        setupInactivityTimer();
+        if (refreshIntervalRef.current)
+          clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = setInterval(refreshToken, 12 * 60 * 1000); // 12 minutos, antes dos 15 minutos de expiração
         toast.success("Login realizado com sucesso!");
         router.push("/dashboard");
         return () => {
-          cleanup();
-          clearInterval(refreshInterval);
+          if (inactivityTimerRef.current)
+            clearTimeout(inactivityTimerRef.current);
+          if (refreshIntervalRef.current)
+            clearInterval(refreshIntervalRef.current);
         };
       } else {
         throw new Error(
