@@ -999,7 +999,7 @@
                   </h3>
                   <div className="flex space-x-4 mb-4">
                     <div>
-                      <label className="modal-label">Data de Pagamento</label>
+                      <label className="modal-label">Data</label>
                       <input
                         type="date"
                         value={newPaymentDate}
@@ -1008,7 +1008,7 @@
                       />
                     </div>
                     <div>
-                      <label className="modal-label">Valor (R$)</label>
+                      <label className="modal-label">Líquido (R$)</label>
                       <input
                         type="number"
                         value={newPaymentAmount === 0 ? "" : newPaymentAmount}
@@ -1029,7 +1029,7 @@
                       onClick={handleAddPayment}
                       className="modal-button modal-button-save mt-6"
                     >
-                      Adicionar
+                      Add
                     </button>
                   </div>
 

@@ -50,10 +50,10 @@ export default function Login() {
       localStorage.removeItem("refreshToken");
       if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
       toast.info(
-        "Sua sessão expirou por 1 hora de inatividade. Faça login novamente."
+        "Sua sessão expirou por 15 minutos de inatividade. Faça login novamente."
       );
       router.push("/");
-    }, 60 * 60 * 1000); // 1 hora de inatividade
+    }, 120 * 60 * 1000); // 2 horas
   }, [router]);
 
   const refreshToken = useCallback(async () => {

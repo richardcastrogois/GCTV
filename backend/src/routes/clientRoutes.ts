@@ -30,9 +30,8 @@ router.use((req, res, next) => {
   next();
 });
 
-// Rotas públicas (se houver, como planos e métodos de pagamento)
-router.get("/plans", getPlans); // Assumindo que esta não precisa de auth, se precisar, adicione authMiddleware
-router.get("/payment-methods", getPaymentMethods); // Idem
+router.get("/plans", authMiddleware, getPlans);
+router.get("/payment-methods", authMiddleware, getPaymentMethods);
 
 // Rotas protegidas por autenticação
 router.get("/", authMiddleware, getClients);

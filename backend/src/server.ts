@@ -106,11 +106,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         if (err) console.error("Erro ao destruir sessão:", err);
         else
           console.log(
-            `Usuário deslogado por inatividade de 10 minutos (ID: ${req.sessionID})`
+            `Usuário deslogado por inatividade de 15 minutos (ID: ${req.sessionID})`
           );
         sessionTimeouts.delete(req.sessionID);
       });
-    }, 60 * 60 * 1000);
+    }, 120 * 60 * 1000); // 2 horas
 
     sessionTimeouts.set(req.sessionID, timeout);
 
