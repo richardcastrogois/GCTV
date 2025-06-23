@@ -1,4 +1,5 @@
 // backend/src/controllers/clientController.ts
+
 import { RequestHandler, Request, Response } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { ParsedQs } from "qs";
@@ -22,8 +23,17 @@ type ClientBody = {
 type RenewClientBody = { dueDate: string };
 type ObservationBody = { observations: string };
 type ReactivateClientBody = { dueDate: string };
-type PaymentBody = { paymentDate: string; amount: number };
-type UpdatePaymentBody = { index: number; paymentDate: string; amount: number };
+type PaymentBody = {
+  paymentDate: string;
+  paymentBruto: number;
+  paymentLiquido: number;
+};
+type UpdatePaymentBody = {
+  index: number;
+  paymentDate: string;
+  paymentBruto: number;
+  paymentLiquido: number;
+};
 type DeletePaymentBody = { index: number };
 
 type RawClient = {
@@ -708,7 +718,7 @@ export const updatePaymentStatus: RequestHandler<
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
-  const { paymentDate, amount } = req.body;
+  const { paymentDate, paymentBruto, paymentLiquido } = req.body;
 
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
@@ -722,10 +732,26 @@ export const updatePaymentStatus: RequestHandler<
       return;
     }
 
-    if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
+    if (
+      typeof paymentBruto !== "number" ||
+      isNaN(paymentBruto) ||
+      paymentBruto <= 0
+    ) {
       res.status(400).json({
         message:
-          "Valor do pagamento inválido, deve ser um número maior que zero.",
+          "Valor bruto do pagamento inválido, deve ser um número maior que zero.",
+      });
+      return;
+    }
+
+    if (
+      typeof paymentLiquido !== "number" ||
+      isNaN(paymentLiquido) ||
+      paymentLiquido <= 0
+    ) {
+      res.status(400).json({
+        message:
+          "Valor líquido do pagamento inválido, deve ser um número maior que zero.",
       });
       return;
     }
@@ -739,19 +765,37 @@ export const updatePaymentStatus: RequestHandler<
       return;
     }
 
-    const currentPayments = (
+    // Normalizar paymentHistory existente
+    let currentPayments = (
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
 
+    currentPayments = currentPayments.map((payment: any) => {
+      if (typeof payment === "object" && payment !== null) {
+        return {
+          paymentDate:
+            payment.paymentDate ||
+            (payment.date
+              ? new Date(payment.date).toISOString()
+              : new Date().toISOString()),
+          paymentBruto: payment.paymentBruto || payment.amount || 0,
+          paymentLiquido: payment.paymentLiquido || payment.amount || 0,
+        };
+      }
+      return {
+        paymentDate: new Date().toISOString(),
+        paymentBruto: 0,
+        paymentLiquido: 0,
+      };
+    });
+
     const newPayment = {
       paymentDate: parsedPaymentDate.toISOString(),
-      amount,
+      paymentBruto,
+      paymentLiquido,
     };
 
-    const updatedPayments = [
-      ...currentPayments,
-      newPayment as Prisma.JsonValue,
-    ];
+    const updatedPayments = [...currentPayments, newPayment];
 
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
@@ -786,7 +830,7 @@ export const editPayment: RequestHandler<
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
-  const { index, paymentDate, amount } = req.body;
+  const { index, paymentDate, paymentBruto, paymentLiquido } = req.body;
 
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
@@ -803,10 +847,25 @@ export const editPayment: RequestHandler<
       res.status(400).json({ message: "Data de pagamento inválida" });
       return;
     }
-    if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
+    if (
+      typeof paymentBruto !== "number" ||
+      isNaN(paymentBruto) ||
+      paymentBruto <= 0
+    ) {
       res.status(400).json({
         message:
-          "Valor do pagamento inválido, deve ser um número maior que zero.",
+          "Valor bruto do pagamento inválido, deve ser um número maior que zero.",
+      });
+      return;
+    }
+    if (
+      typeof paymentLiquido !== "number" ||
+      isNaN(paymentLiquido) ||
+      paymentLiquido <= 0
+    ) {
+      res.status(400).json({
+        message:
+          "Valor líquido do pagamento inválido, deve ser um número maior que zero.",
       });
       return;
     }
@@ -820,9 +879,29 @@ export const editPayment: RequestHandler<
       return;
     }
 
-    const currentPayments = (
+    let currentPayments = (
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
+
+    // Normalizar paymentHistory existente antes de editar
+    currentPayments = currentPayments.map((payment: any) => {
+      if (typeof payment === "object" && payment !== null) {
+        return {
+          paymentDate:
+            payment.paymentDate ||
+            (payment.date
+              ? new Date(payment.date).toISOString()
+              : new Date().toISOString()),
+          paymentBruto: payment.paymentBruto || payment.amount || 0,
+          paymentLiquido: payment.paymentLiquido || payment.amount || 0,
+        };
+      }
+      return {
+        paymentDate: new Date().toISOString(),
+        paymentBruto: 0,
+        paymentLiquido: 0,
+      };
+    });
 
     if (index >= currentPayments.length) {
       res
@@ -833,7 +912,8 @@ export const editPayment: RequestHandler<
 
     currentPayments[index] = {
       paymentDate: parsedPaymentDate.toISOString(),
-      amount,
+      paymentBruto,
+      paymentLiquido,
     } as Prisma.JsonValue;
 
     const updatedClient = await prisma.client.update({
@@ -894,6 +974,26 @@ export const deletePayment: RequestHandler<
     let currentPayments = (
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
+
+    // Normalizar paymentHistory existente antes de deletar
+    currentPayments = currentPayments.map((payment: any) => {
+      if (typeof payment === "object" && payment !== null) {
+        return {
+          paymentDate:
+            payment.paymentDate ||
+            (payment.date
+              ? new Date(payment.date).toISOString()
+              : new Date().toISOString()),
+          paymentBruto: payment.paymentBruto || payment.amount || 0,
+          paymentLiquido: payment.paymentLiquido || payment.amount || 0,
+        };
+      }
+      return {
+        paymentDate: new Date().toISOString(),
+        paymentBruto: 0,
+        paymentLiquido: 0,
+      };
+    });
 
     if (index >= currentPayments.length) {
       res

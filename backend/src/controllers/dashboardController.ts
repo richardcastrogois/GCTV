@@ -33,37 +33,35 @@ export const getDashboardStats: RequestHandler = async (
       return;
     }
 
-    // Construir a condição de filtro para clientes
+    // Construir a condição de filtro para clientes (somente isActive)
     const whereClause: any = { isActive: true };
-    if (filterMonth && filterYear) {
-      whereClause.dueDate = {
-        gte: new Date(
-          `${filterYear}-${filterMonth.toString().padStart(2, "0")}-01`
-        ),
-        lt: new Date(
-          filterMonth === 12
-            ? `${filterYear + 1}-01-01`
-            : `${filterYear}-${(filterMonth + 1)
-                .toString()
-                .padStart(2, "0")}-01`
-        ),
-      };
-    }
 
-    // Buscar clientes com o filtro aplicado
+    // Buscar todos os clientes ativos
     const clients = await prisma.client.findMany({
       where: whereClause,
       include: {
         paymentMethod: true,
+        user: true,
       },
     });
 
+    console.log(
+      "Clientes retornados:",
+      clients.map((c) => ({
+        id: c.id,
+        username: c.user.username,
+        paymentMethod: c.paymentMethod.name,
+        paymentHistory: c.paymentHistory,
+      }))
+    );
+
+    // Calcular gross_amount (soma de grossAmount para referência geral)
     const gross_amount = clients.reduce(
-      (sum, client) => sum + client.grossAmount,
+      (sum, client) => sum + (client.grossAmount || 0),
       0
     );
     const net_amount = clients.reduce(
-      (sum, client) => sum + client.netAmount,
+      (sum, client) => sum + (client.netAmount || 0),
       0
     );
     const active_clients = clients.filter((client) => client.isActive).length;
@@ -72,29 +70,93 @@ export const getDashboardStats: RequestHandler = async (
     const activationCost = active_clients * 8; // R$ 8,00 por ativação
     const totalNetAmount = net_amount - activationCost;
 
-    // Calcular gross_amount por paymentMethod
+    // Calcular grossByPaymentMethod somando paymentLiquido do paymentHistory
     const grossByPaymentMethod = clients.reduce((acc, client) => {
       const methodName = client.paymentMethod.name;
-      acc[methodName] = (acc[methodName] || 0) + client.grossAmount;
+      let paymentHistory: any[] = [];
+      if (typeof client.paymentHistory === "string") {
+        try {
+          paymentHistory = JSON.parse(client.paymentHistory);
+        } catch (e) {
+          paymentHistory = [];
+          console.error("Erro ao parsear paymentHistory:", e);
+        }
+      } else if (Array.isArray(client.paymentHistory)) {
+        paymentHistory = client.paymentHistory;
+      }
+      console.log("paymentHistory para", methodName, ":", paymentHistory);
+      const totalLiquido = paymentHistory.reduce(
+        (sum: number, payment: any) => {
+          const paymentDate = new Date(payment.paymentDate);
+          console.log(
+            "Payment Date:",
+            payment.paymentDate,
+            "Parsed:",
+            paymentDate,
+            "Month:",
+            paymentDate.getMonth() + 1,
+            "Year:",
+            paymentDate.getFullYear(),
+            "Filter Month:",
+            filterMonth,
+            "Filter Year:",
+            filterYear
+          );
+          if (
+            filterMonth &&
+            filterYear &&
+            !isNaN(paymentDate.getTime()) &&
+            paymentDate.getMonth() + 1 === filterMonth &&
+            paymentDate.getFullYear() === filterYear
+          ) {
+            return sum + (payment.paymentLiquido || 0);
+          }
+          return sum;
+        },
+        0
+      );
+      console.log("Total Líquido para", methodName, ":", totalLiquido);
+      acc[methodName] = (acc[methodName] || 0) + totalLiquido;
       return acc;
     }, {} as Record<string, number>);
 
-    // Calcular lucro líquido por dia
-    const dailyNetProfitRaw = await prisma.client.groupBy({
-      by: ["dueDate"],
-      where: whereClause,
-      _sum: {
-        netAmount: true,
-      },
-      orderBy: {
-        dueDate: "asc",
-      },
-    });
+    console.log("grossByPaymentMethod final:", grossByPaymentMethod);
+
+    // Calcular lucro líquido por dia somando paymentLiquido do paymentHistory
+    let dailyNetProfitQuery = `
+      SELECT 
+        DATE(payment_data->>'paymentDate') AS date,
+        SUM((payment_data->>'paymentLiquido')::FLOAT) AS netamount
+      FROM "Client"
+      CROSS JOIN jsonb_array_elements("paymentHistory") AS payment_data
+      WHERE "isActive" = true
+    `;
+    const params: any[] = [];
+    if (filterMonth && filterYear) {
+      dailyNetProfitQuery += ` AND EXTRACT(MONTH FROM (payment_data->>'paymentDate')::DATE) = $1 AND EXTRACT(YEAR FROM (payment_data->>'paymentDate')::DATE) = $2`;
+      params.push(filterMonth, filterYear);
+    }
+    dailyNetProfitQuery += `
+      GROUP BY DATE(payment_data->>'paymentDate')
+      ORDER BY DATE(payment_data->>'paymentDate') ASC
+    `;
+
+    console.log(
+      "Daily Net Profit Query:",
+      dailyNetProfitQuery,
+      "Params:",
+      params
+    ); // Depuração
+    const dailyNetProfitRaw: { date: string; netamount: number }[] =
+      await prisma.$queryRawUnsafe(dailyNetProfitQuery, ...params);
+    console.log("Daily Net Profit Raw:", dailyNetProfitRaw); // Depuração
 
     const dailyNetProfit = dailyNetProfitRaw.map((entry) => ({
-      date: entry.dueDate.toISOString().split("T")[0], // Formato YYYY-MM-DD
-      netAmount: entry._sum.netAmount || 0,
+      date: entry.date,
+      netAmount: entry.netamount || 0, // Corrigido para usar 'netamount' do resultado
     }));
+
+    console.log("Daily Net Profit:", dailyNetProfit); // Depuração
 
     res.json({
       gross_amount,
@@ -119,46 +181,47 @@ export const getCurrentMonthStats: RequestHandler = async (
     const currentMonth = currentDate.getMonth() + 1; // 1-12
     const currentYear = currentDate.getFullYear();
 
-    // Buscar clientes ativos no mês atual
+    // Buscar todos os clientes ativos
     const clients = await prisma.client.findMany({
       where: {
         isActive: true,
-        dueDate: {
-          gte: new Date(
-            `${currentYear}-${currentMonth.toString().padStart(2, "0")}-01`
-          ),
-          lt: new Date(
-            currentMonth === 12
-              ? `${currentYear + 1}-01-01`
-              : `${currentYear}-${(currentMonth + 1)
-                  .toString()
-                  .padStart(2, "0")}-01`
-          ),
-        },
       },
     });
 
-    // Calcular o total líquido (netAmount) antes do ajuste
-    const totalNetAmountBefore = clients.reduce(
-      (sum, client) => sum + (client.netAmount || 0),
-      0
-    );
+    // Calcular o total líquido a partir de paymentHistory
+    let totalPaymentLiquido = 0;
+    let totalPayments = 0;
 
-    // Contar o número de clientes ativos (cada um representa uma ativação)
-    const activeClients = clients.length;
+    clients.forEach((client) => {
+      const paymentHistory = Array.isArray(client.paymentHistory)
+        ? client.paymentHistory
+        : [];
+      paymentHistory.forEach((payment: any) => {
+        if (payment && typeof payment === "object") {
+          const paymentDate = new Date(payment.paymentDate);
+          if (
+            paymentDate.getUTCFullYear() === currentYear &&
+            paymentDate.getUTCMonth() + 1 === currentMonth &&
+            payment.paymentLiquido !== undefined &&
+            payment.paymentLiquido !== null
+          ) {
+            totalPaymentLiquido += Number(payment.paymentLiquido);
+            totalPayments += 1;
+          }
+        }
+      });
+    });
 
-    // Subtrair R$ 8,00 por cliente ativo
-    const activationCost8 = activeClients * 8; // R$ 8,00 por ativação
-    const totalNetAmount8 = totalNetAmountBefore - activationCost8;
+    // Subtrair R$ 8,00 por pagamento registrado
+    const totalNetAmount8 = totalPaymentLiquido - totalPayments * 8;
 
-    // Subtrair R$ 15,00 por cliente ativo
-    const activationCost15 = activeClients * 15; // R$ 15,00 por ativação
-    const totalNetAmount15 = totalNetAmountBefore - activationCost15;
+    // Subtrair R$ 15,00 por pagamento registrado
+    const totalNetAmount15 = totalPaymentLiquido - totalPayments * 15;
 
     res.json({
       totalNetAmount8: parseFloat(totalNetAmount8.toFixed(2)),
       totalNetAmount15: parseFloat(totalNetAmount15.toFixed(2)),
-      activeClients,
+      activeClients: clients.length,
     });
   } catch (error) {
     console.error("Error fetching current month stats:", error);

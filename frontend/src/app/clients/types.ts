@@ -25,7 +25,8 @@ export interface User {
 
 export interface PaymentEntry {
   paymentDate: string;
-  amount: number;
+  paymentBruto: number; // Novo campo para valor bruto digitado
+  paymentLiquido: number; // Novo campo para valor líquido digitado
 }
 
 export interface Client {

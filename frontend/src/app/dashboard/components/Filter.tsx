@@ -1,6 +1,6 @@
 //frontend/src/app/dashboard/components/Filter.tsx
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Select, { StylesConfig } from "react-select";
 
 // Interface para as opções do react-select
@@ -96,32 +96,45 @@ interface FilterProps {
 }
 
 export default function Filter({ onFilterChange }: FilterProps) {
-  const months: SelectOption[] = [
-    { value: 1, label: "Janeiro" },
-    { value: 2, label: "Fevereiro" },
-    { value: 3, label: "Março" },
-    { value: 4, label: "Abril" },
-    { value: 5, label: "Maio" },
-    { value: 6, label: "Junho" },
-    { value: 7, label: "Julho" },
-    { value: 8, label: "Agosto" },
-    { value: 9, label: "Setembro" },
-    { value: 10, label: "Outubro" },
-    { value: 11, label: "Novembro" },
-    { value: 12, label: "Dezembro" },
-  ];
-  const years: SelectOption[] = [
-    { value: 2023, label: "2023" },
-    { value: 2024, label: "2024" },
-    { value: 2025, label: "2025" },
-  ];
+  const months = useMemo(
+    () => [
+      { value: 1, label: "Janeiro" },
+      { value: 2, label: "Fevereiro" },
+      { value: 3, label: "Março" },
+      { value: 4, label: "Abril" },
+      { value: 5, label: "Maio" },
+      { value: 6, label: "Junho" },
+      { value: 7, label: "Julho" },
+      { value: 8, label: "Agosto" },
+      { value: 9, label: "Setembro" },
+      { value: 10, label: "Outubro" },
+      { value: 11, label: "Novembro" },
+      { value: 12, label: "Dezembro" },
+    ],
+    []
+  );
 
-  const [selectedMonth, setSelectedMonth] = useState<SelectOption | null>(
-    months.find((m) => m.value === new Date().getMonth() + 1) || null
+  const years = useMemo(
+    () => [
+      { value: 2023, label: "2023" },
+      { value: 2024, label: "2024" },
+      { value: 2025, label: "2025" },
+    ],
+    []
   );
-  const [selectedYear, setSelectedYear] = useState<SelectOption | null>(
-    years.find((y) => y.value === new Date().getFullYear()) || null
-  );
+
+  const [selectedMonth, setSelectedMonth] = useState<SelectOption | null>(null);
+  const [selectedYear, setSelectedYear] = useState<SelectOption | null>(null);
+
+  useEffect(() => {
+    // Inicializa os valores com base na data atual apenas no cliente
+    const currentMonth = months.find(
+      (m) => m.value === new Date().getMonth() + 1
+    );
+    const currentYear = years.find((y) => y.value === new Date().getFullYear());
+    setSelectedMonth(currentMonth || null);
+    setSelectedYear(currentYear || null);
+  }, [months, years]);
 
   const handleMonthChange = (option: SelectOption | null) => {
     setSelectedMonth(option);
@@ -140,7 +153,7 @@ export default function Filter({ onFilterChange }: FilterProps) {
   };
 
   return (
-    <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-center items-center">
+    <div className="flex flex-col sm:flex-row items-center">
       <div className="flex items-center">
         <label
           className="mr-2 text-lg"

@@ -16,7 +16,7 @@ import {
   deleteClient,
   updateClient,
   renewClient,
-} from "./api";
+} from "./api"; 
 import { Client, Plan, PaymentMethod, EditFormData } from "./types";
 import { useAuth } from "@/hooks/useAuth";
 import { FaTimes } from "react-icons/fa";

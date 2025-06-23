@@ -59,48 +59,10 @@ export default function Dashboard() {
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [useCurrentMonth, setUseCurrentMonth] = useState(true);
 
-  // [OTIMIZAÇÃO] Query para os dados filtrados (cartões e gráfico da direita)
   const { data: dashboardData, error: dashboardError } = useQuery({
     queryKey: ["dashboard", filterMonth, filterYear],
     queryFn: async (): Promise<DashboardStats> => {
-      const { data } = await axios.get(
-        process.env.NEXT_PUBLIC_API_URL +
-          `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      );
-      return data as DashboardStats;
-    },
-  });
-
-  // [OTIMIZAÇÃO] Query para o total do mês atual ou com base no filtro geral
-  const { data: currentMonthData, error: currentMonthError } = useQuery({
-    queryKey: [
-      "current-month",
-      useCurrentMonth ? "current" : `${filterMonth}-${filterYear}`,
-    ],
-    queryFn: async (): Promise<CurrentMonthStats> => {
-      if (useCurrentMonth) {
-        const { data } = await axios.get(
-          process.env.NEXT_PUBLIC_API_URL + "/api/current-month",
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
-        return data as CurrentMonthStats;
-      } else {
-        // Usa os dados já buscados em dashboardData para evitar chamada duplicada
-        if (dashboardData) {
-          return {
-            totalNetAmount8: dashboardData.totalNetAmount,
-            totalNetAmount15:
-              dashboardData.totalNetAmount - dashboardData.active_clients * 7,
-            activeClients: dashboardData.active_clients,
-          } as CurrentMonthStats;
-        }
+      try {
         const { data } = await axios.get(
           process.env.NEXT_PUBLIC_API_URL +
             `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
@@ -110,14 +72,65 @@ export default function Dashboard() {
             },
           }
         );
-        return {
-          totalNetAmount8: data.totalNetAmount,
-          totalNetAmount15: data.totalNetAmount - data.active_clients * 7,
-          activeClients: data.active_clients,
-        } as CurrentMonthStats;
+        return data as DashboardStats;
+      } catch (error) {
+        console.error("Erro ao carregar dashboard:", error);
+        throw error;
       }
     },
-    enabled: useCurrentMonth || !!dashboardData, // [OTIMIZAÇÃO] Só executa a query se necessário
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: currentMonthData, error: currentMonthError } = useQuery({
+    queryKey: [
+      "current-month",
+      useCurrentMonth ? "current" : `${filterMonth}-${filterYear}`,
+    ],
+    queryFn: async (): Promise<CurrentMonthStats> => {
+      try {
+        if (useCurrentMonth) {
+          const { data } = await axios.get(
+            process.env.NEXT_PUBLIC_API_URL + "/api/current-month",
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            }
+          );
+          return data as CurrentMonthStats;
+        } else {
+          if (dashboardData) {
+            return {
+              totalNetAmount8: dashboardData.totalNetAmount,
+              totalNetAmount15:
+                dashboardData.totalNetAmount - dashboardData.active_clients * 7,
+              activeClients: dashboardData.active_clients,
+            } as CurrentMonthStats;
+          }
+          const { data } = await axios.get(
+            process.env.NEXT_PUBLIC_API_URL +
+              `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            }
+          );
+          return {
+            totalNetAmount8: data.totalNetAmount,
+            totalNetAmount15: data.totalNetAmount - data.active_clients * 7,
+            activeClients: data.active_clients,
+          } as CurrentMonthStats;
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados do mês atual:", error);
+        throw error;
+      }
+    },
+    enabled: useCurrentMonth || !!dashboardData,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const showErrorToast = (error: unknown, context: string) => {
@@ -144,11 +157,11 @@ export default function Dashboard() {
     active_clients: 0,
     totalNetAmount: 0,
     grossByPaymentMethod: {
-      Nubank: 70,
-      PagSeguro: 65,
-      Caixa: 35,
-      PicPay: 50,
-      banco_do_brasil: 80,
+      Nubank: 0,
+      PagSeguro: 0,
+      Caixa: 0,
+      PicPay: 0,
+      banco_do_brasil: 0,
     },
     dailyNetProfit: [],
   };
@@ -162,6 +175,10 @@ export default function Dashboard() {
   const stats: DashboardStats = dashboardData ?? defaultStats;
   const currentMonthStats: CurrentMonthStats =
     currentMonthData ?? defaultCurrentMonthStats;
+
+  useEffect(() => {
+    console.log("Dados recebidos para o dashboard:", stats);
+  }, [stats]);
 
   const getCardClass = (method: string): string => {
     switch (method.toLowerCase()) {
@@ -180,14 +197,26 @@ export default function Dashboard() {
     }
   };
 
+  const getDaysInMonth = (month: number, year: number) => {
+    return new Date(year, month, 0).getDate();
+  };
+
+  const daysInMonth = getDaysInMonth(filterMonth, filterYear);
+  const fullMonthData = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const dailyDataMap = new Map(
+    stats.dailyNetProfit.map((entry) => [
+      new Date(entry.date).getUTCDate(),
+      entry.netAmount || 0,
+    ])
+  );
+
   const chartData = {
-    labels: stats.dailyNetProfit.map((entry) =>
-      new Date(entry.date).getDate().toString().padStart(2, "0")
-    ),
+    labels: fullMonthData.map((day) => day.toString()),
     datasets: [
       {
         label: "Lucro Líquido",
-        data: stats.dailyNetProfit.map((entry) => entry.netAmount),
+        data: fullMonthData.map((day) => dailyDataMap.get(day) || 0),
         borderColor: "var(--accent-blue)",
         backgroundColor: (context: {
           chart: { ctx: CanvasRenderingContext2D };
@@ -233,10 +262,10 @@ export default function Dashboard() {
           display: true,
           text: "Dia do Mês",
           color: "var(--text-primary)",
-          font: { size: 14, weight: "bold" as const },
+          font: { size: 10 },
         },
         grid: { display: false },
-        ticks: { color: "var(--text-primary)", font: { size: 12 } },
+        ticks: { color: "var(--text-primary)", font: { size: 10 } },
       },
       y: {
         title: {
@@ -252,6 +281,7 @@ export default function Dashboard() {
           callback: (tickValue: string | number) =>
             `R$ ${parseFloat(tickValue as string).toFixed(2)}`,
         },
+        beginAtZero: true,
       },
     },
   };
@@ -272,23 +302,25 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-container">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">
-          Dashboard
-        </h1>
-        {/* Adicionando um espaço vazio para manter o layout consistente com clients/page.tsx */}
-        <div className="flex-shrink-0 w-0 sm:w-auto"></div>
+      <div className="flex flex-col sm:flex-row items-center justify-start mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-left">Dashboard</h1>
+        <div className="flex-grow"></div>
+        <div
+          className="sm:mx-auto"
+          style={{ maxWidth: "350px", width: "100%" }}
+        >
+          <Filter onFilterChange={handleFilterChange} />
+        </div>
       </div>
-      <Filter onFilterChange={handleFilterChange} />
       <div className="flex flex-col lg:flex-row gap-6">
-        <div className="w-full lg:w-2/3 min-w-0">
+        <div className="w-full lg:w-2/3">
           <h2
             className="text-xl font-semibold mb-4 text-center sm:text-left"
             style={{ color: "var(--card-text-secondary)" }}
           >
-            Meu Saldo
+            Meu Saldo Bruto
           </h2>
-          <div className="card-container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 justify-items-center">
+          <div className="card-container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {Object.entries(stats.grossByPaymentMethod).map(
               ([method, amount]) => (
                 <div
@@ -320,9 +352,7 @@ export default function Dashboard() {
               )
             )}
           </div>
-        </div>
-        <div className="w-full lg:w-1/3 min-w-0 flex flex-col gap-4">
-          <div className="card w-full chart-card">
+          <div className="card w-full chart-card mb-6">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
               <h2
                 className="text-xl font-semibold text-center sm:text-left"
@@ -331,10 +361,12 @@ export default function Dashboard() {
                 Lucro Líquido Diário
               </h2>
             </div>
-            <div className="h-48">
+            <div className="h-40">
               <Line data={chartData} options={chartOptions} />
             </div>
           </div>
+        </div>
+        <div className="w-full lg:w-1/3 flex flex-col gap-4">
           <div className="card w-full current-month-card">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
               <h2
@@ -367,6 +399,9 @@ export default function Dashboard() {
                 {currentMonthStats.totalNetAmount15.toFixed(2)}
               </div>
             </div>
+          </div>
+          <div className="card w-full future-chart-card h-32 bg-gray-200 flex items-center justify-center text-gray-500">
+            Espaço reservado para futuro gráfico
           </div>
         </div>
       </div>

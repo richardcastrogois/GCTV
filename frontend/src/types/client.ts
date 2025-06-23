@@ -27,7 +27,8 @@ export interface User {
 
 export interface PaymentEntry {
   paymentDate: string; // Deve ser string ISO Date
-  amount: number;
+  paymentBruto: number; // Novo campo para valor bruto
+  paymentLiquido: number; // Novo campo para valor líquido
 }
 
 export interface Client {

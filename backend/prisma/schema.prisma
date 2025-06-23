@@ -74,7 +74,7 @@ model Client {
   updatedAt          DateTime      @updatedAt
   userId             Int           @unique
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  paymentHistory     Json?
+  paymentHistory     Json?         @default("[]")
   visualPaymentConfirmed Boolean @default(false)         
 
   @@index([isActive])
