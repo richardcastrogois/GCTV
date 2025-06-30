@@ -17,8 +17,10 @@ import { Client, PaymentEntry } from "@/types/client";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Skeleton } from "@mui/material";
-import axios from "axios";
+import api from "@/utils/api";
 import { toast } from "react-toastify";
+import { useAuth } from "@/hooks/useAuth";
+import { AxiosError } from "axios";
 
 const formatDateToUTC = (date: string | Date): string => {
   const d = new Date(date);
@@ -121,6 +123,7 @@ export default function ClientsTable({
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   const infoModalRef = useRef<HTMLDivElement>(null);
+  const { handleUnauthorized } = useAuth();
 
   const currentDate = useMemo(() => new Date(), []);
 
@@ -249,12 +252,16 @@ export default function ClientsTable({
         `Erro ao atualizar status visual para client ${clientId}:`,
         error
       );
+      if (error instanceof AxiosError && error.response?.status === 401) {
+        handleUnauthorized();
+      } else {
+        toast.error("Erro ao atualizar status visual");
+      }
       setIsPaidVisualStatus((prev) => {
         const newMap = new Map(prev);
-        newMap.set(clientId, !isPaid); // Reverte se falhar
+        newMap.set(clientId, !isPaid);
         return newMap;
       });
-      toast.error("Erro ao atualizar status visual");
     }
   };
 
@@ -264,12 +271,7 @@ export default function ClientsTable({
 
     try {
       console.log(`Carregando detalhes do cliente ${clientId}`);
-      const response = await axios.get(
-        process.env.NEXT_PUBLIC_API_URL + `/api/clients/${clientId}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      );
+      const response = await api.get(`/api/clients/${clientId}`);
       const normalizedClient = {
         ...response.data,
         paymentHistory: normalizePaymentHistory(
@@ -283,7 +285,11 @@ export default function ClientsTable({
       setIsModalOpen(true);
     } catch (error) {
       console.error("Erro ao carregar detalhes do cliente:", error);
-      toast.error("Erro ao carregar detalhes do cliente");
+      if (error instanceof AxiosError && error.response?.status === 401) {
+        handleUnauthorized();
+      } else {
+        toast.error("Erro ao carregar detalhes do cliente");
+      }
     }
   };
 
@@ -328,31 +334,21 @@ export default function ClientsTable({
     }
 
     try {
-      console.log("Token:", localStorage.getItem("token"));
       console.log("Payload:", {
         paymentDate: new Date(newPaymentDate).toISOString(),
         paymentBruto: newPaymentBruto,
         paymentLiquido: newPaymentLiquido,
       });
-      const putResponse = await axios.put(
-        process.env.NEXT_PUBLIC_API_URL +
-          `/api/clients/payment-status/${modalClient.id}`,
+      const putResponse = await api.put(
+        `/api/clients/payment-status/${modalClient.id}`,
         {
           paymentDate: new Date(newPaymentDate).toISOString(),
           paymentBruto: newPaymentBruto,
           paymentLiquido: newPaymentLiquido,
-        },
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
       );
       console.log("PUT bem-sucedido:", putResponse.data);
-      const getResponse = await axios.get(
-        process.env.NEXT_PUBLIC_API_URL + `/api/clients/${modalClient.id}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      );
+      const getResponse = await api.get(`/api/clients/${modalClient.id}`);
       const normalizedClient = {
         ...getResponse.data,
         paymentHistory: normalizePaymentHistory(
@@ -366,7 +362,11 @@ export default function ClientsTable({
       toast.success("Pagamento adicionado!");
     } catch (error) {
       console.error("Erro ao adicionar pagamento:", error);
-      toast.error("Erro ao adicionar pagamento");
+      if (error instanceof AxiosError && error.response?.status === 401) {
+        handleUnauthorized();
+      } else {
+        toast.error("Erro ao adicionar pagamento");
+      }
     }
   };
 
@@ -396,26 +396,17 @@ export default function ClientsTable({
     }
 
     try {
-      const putResponse = await axios.put(
-        process.env.NEXT_PUBLIC_API_URL +
-          `/api/clients/payments/edit/${modalClient.id}`,
+      const putResponse = await api.put(
+        `/api/clients/payments/edit/${modalClient.id}`,
         {
           index: editingPaymentIndex,
           paymentDate: new Date(editPaymentDate).toISOString(),
           paymentBruto: editPaymentBruto,
           paymentLiquido: editPaymentLiquido,
-        },
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
       );
       console.log("PUT bem-sucedido:", putResponse.data);
-      const getResponse = await axios.get(
-        process.env.NEXT_PUBLIC_API_URL + `/api/clients/${modalClient.id}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      );
+      const getResponse = await api.get(`/api/clients/${modalClient.id}`);
       const normalizedClient = {
         ...getResponse.data,
         paymentHistory: normalizePaymentHistory(
@@ -430,7 +421,11 @@ export default function ClientsTable({
       toast.success("Pagamento atualizado!");
     } catch (error) {
       console.error("Erro ao atualizar pagamento:", error);
-      toast.error("Erro ao atualizar pagamento");
+      if (error instanceof AxiosError && error.response?.status === 401) {
+        handleUnauthorized();
+      } else {
+        toast.error("Erro ao atualizar pagamento");
+      }
     }
   };
 
@@ -438,21 +433,14 @@ export default function ClientsTable({
     if (!modalClient) return;
 
     try {
-      const deleteResponse = await axios.delete(
-        process.env.NEXT_PUBLIC_API_URL +
-          `/api/clients/payments/delete/${modalClient.id}`,
+      const deleteResponse = await api.delete(
+        `/api/clients/payments/delete/${modalClient.id}`,
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           data: { index },
         }
       );
       console.log("DELETE bem-sucedido:", deleteResponse.data);
-      const getResponse = await axios.get(
-        process.env.NEXT_PUBLIC_API_URL + `/api/clients/${modalClient.id}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      );
+      const getResponse = await api.get(`/api/clients/${modalClient.id}`);
       const normalizedClient = {
         ...getResponse.data,
         paymentHistory: normalizePaymentHistory(
@@ -463,7 +451,11 @@ export default function ClientsTable({
       toast.success("Pagamento excluído!");
     } catch (error) {
       console.error("Erro ao excluir pagamento:", error);
-      toast.error("Erro ao excluir pagamento");
+      if (error instanceof AxiosError && error.response?.status === 401) {
+        handleUnauthorized();
+      } else {
+        toast.error("Erro ao excluir pagamento");
+      }
     }
   };
 
@@ -1262,7 +1254,8 @@ export default function ClientsTable({
         createPortal(
           <div className="modal-overlay" onClick={closeInfoModal}>
             <div
-              className="modal-content responsive-modal"
+              className="modal-content"
+              ref={infoModalRef}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="modal-header">
@@ -1272,57 +1265,40 @@ export default function ClientsTable({
                 </button>
               </div>
               <div className="modal-body">
-                <p className="text-[var(--text-primary)] mb-2">
-                  <strong>Nome:</strong> {selectedClient.fullName}
-                </p>
-                <p className="text-[var(--text-primary)] mb-2">
+                <p>
                   <strong>Usuário:</strong> {selectedClient.user.username}
                 </p>
-                <p className="text-[var(--text-primary)] mb-2">
+                <p>
+                  <strong>Nome:</strong> {selectedClient.fullName}
+                </p>
+                <p>
                   <strong>Email:</strong> {selectedClient.email}
                 </p>
-                <p className="text-[var(--text-primary)] mb-2">
+                <p>
                   <strong>Telefone:</strong> {selectedClient.phone}
                 </p>
-                <p className="text-[var(--text-primary)] mb-2">
-                  <strong>Plano:</strong>{" "}
-                  <span className={getPlanClass(selectedClient.plan.name)}>
-                    {selectedClient.plan.name}
-                  </span>
+                <p>
+                  <strong>Plano:</strong> {selectedClient.plan.name}
                 </p>
-                <p className="text-[var(--text-primary)] mb-2">
+                <p>
                   <strong>Método de Pagamento:</strong>{" "}
-                  <span
-                    className={getMethodClass(
-                      selectedClient.paymentMethod?.name || ""
-                    )}
-                  >
-                    {selectedClient.paymentMethod?.name}
-                  </span>
+                  {selectedClient.paymentMethod?.name}
                 </p>
-                <p className="text-[var(--text-primary)] mb-2">
+                <p>
                   <strong>Data de Vencimento:</strong>{" "}
-                  <span
-                    className={getDueDateClass(
-                      selectedClient.dueDate,
-                      currentDate
-                    )}
-                  >
-                    {formatDateToUTC(selectedClient.dueDate)}
-                  </span>
+                  {formatDateToUTC(selectedClient.dueDate)}
                 </p>
-                <p className="text-[var(--text-primary)] mb-2">
+                <p>
                   <strong>Valor Bruto:</strong> R${" "}
                   {selectedClient.grossAmount.toFixed(2)}
                 </p>
-                <p className="text-[var(--text-primary)] mb-2">
+                <p>
                   <strong>Valor Líquido:</strong> R${" "}
                   {selectedClient.netAmount.toFixed(2)}
                 </p>
-                <p className="text-[var(--text-primary)] mb-2">
+                <p>
                   <strong>Observações:</strong>{" "}
-                  {selectedClient.observations ||
-                    "Nenhuma observação registrada"}
+                  {selectedClient.observations || "Nenhuma"}
                 </p>
               </div>
               <div className="modal-footer">

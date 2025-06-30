@@ -1,23 +1,34 @@
 // frontend/src/app/page.tsx
 "use client";
 
-// Definir interface para a resposta de erro do Axios
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import api from "@/utils/api";
+import { toast } from "react-toastify";
+import { FaUser, FaLock } from "react-icons/fa";
+import { jwtDecode } from "jwt-decode";
+import { AxiosError } from "axios";
+import { useAuth } from "@/hooks/useAuth";
+
+// Extender Navigator para incluir a propriedade connection
+interface NavigatorNetwork extends Navigator {
+  connection?: {
+    downlink?: number;
+  };
+}
+
 interface ErrorResponse {
   error?: string;
 }
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import axios, { AxiosError } from "axios";
-import { toast } from "react-toastify";
-import { FaUser, FaLock } from "react-icons/fa";
-import { jwtDecode } from "jwt-decode";
-
-// Interface refinada para o payload do JWT
 interface JwtPayload {
   exp: number;
   iat?: number;
   username?: string;
+}
+
+interface TMDBResponse {
+  results: { backdrop_path: string; title: string }[];
 }
 
 const isTokenExpired = (token: string): boolean => {
@@ -26,71 +37,79 @@ const isTokenExpired = (token: string): boolean => {
     return decoded.exp < Date.now() / 1000;
   } catch (error) {
     console.error("Erro ao decodificar token:", error);
-    return true; // Assume como expirado se houver erro
+    return true;
   }
 };
 
-// Função auxiliar para obter token com tipagem explícita
 const getToken = (): string | null =>
   localStorage.getItem("token") as string | null;
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [movieTitle, setMovieTitle] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const { handleUnauthorized } = useAuth();
 
-  const setupInactivityTimer = useCallback(() => {
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-    }
-    inactivityTimerRef.current = setTimeout(() => {
-      localStorage.removeItem("token");
-      localStorage.removeItem("refreshToken");
-      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
-      toast.info(
-        "Sua sessão expirou por 15 minutos de inatividade. Faça login novamente."
+  const TMDB_API_KEY = "fb7b0bbf56df803d4612f1fc923f5b84";
+
+  const fetchRandomBackdrop = useCallback(async () => {
+    try {
+      const res = await api.get<TMDBResponse>(
+        `https://api.themoviedb.org/3/trending/movie/day?api_key=${TMDB_API_KEY}&language=pt-BR`
       );
-      router.push("/");
-    }, 120 * 60 * 1000); // 2 horas
-  }, [router]);
+      const results = res.data.results;
+      const random = Math.floor(Math.random() * results.length);
+      const backdropPath = results[random]?.backdrop_path;
+      const title = results[random]?.title;
 
-  const refreshToken = useCallback(async () => {
-    const refreshToken = localStorage.getItem("refreshToken");
-    if (refreshToken && typeof refreshToken === "string") {
-      try {
-        console.log("Enviando refreshToken para renovação:", refreshToken);
-        const { data } = await axios.post(
-          process.env.NEXT_PUBLIC_API_URL + "/api/auth/refresh",
-          { refreshToken },
-          { headers: { "Content-Type": "application/json" } }
-        );
-        if (data.accessToken && typeof data.accessToken === "string") {
-          localStorage.setItem("token", data.accessToken);
-          if (data.refreshToken && typeof data.refreshToken === "string") {
-            localStorage.setItem("refreshToken", data.refreshToken);
-          }
-          console.log(
-            "Token renovado com sucesso, novo token:",
-            data.accessToken
-          );
-          return true; // Indica sucesso
-        }
-      } catch (error) {
-        const axiosError = error as AxiosError<ErrorResponse>;
-        console.error(
-          "Erro ao renovar token:",
-          axiosError.response?.data?.error ||
-            axiosError.message ||
-            "Erro desconhecido"
+      if (!backdropPath) {
+        setIsLoading(false);
+        toast.error("Nenhuma imagem de fundo disponível");
+        return;
+      }
+
+      let quality = "w780";
+      const screenWidth =
+        typeof window !== "undefined" ? window.innerWidth : 1024;
+      const navigatorNetwork = navigator as NavigatorNetwork;
+      const downlink = navigatorNetwork.connection?.downlink ?? 5;
+
+      if (downlink >= 5 && screenWidth >= 1024) {
+        quality = "original";
+      } else if (downlink >= 1.5) {
+        quality = "w1280";
+      }
+
+      const imageUrl = `https://image.tmdb.org/t/p/${quality}${backdropPath}`;
+
+      const img = new Image();
+      img.onload = () => {
+        setBackgroundImage(imageUrl);
+        setMovieTitle(title || "");
+        setIsLoading(false);
+      };
+      img.onerror = () => {
+        console.error("Erro ao carregar a imagem:", imageUrl);
+        setIsLoading(false);
+        toast.error("Erro ao carregar imagem de fundo");
+      };
+      img.src = imageUrl;
+    } catch (err) {
+      const axiosError = err as AxiosError<ErrorResponse>;
+      console.error("Erro ao buscar imagem da TMDB:", err);
+      if (axiosError.response?.status === 401) {
+        handleUnauthorized();
+      } else {
+        toast.error(
+          axiosError.response?.data?.error || "Erro ao buscar imagem de fundo"
         );
       }
-    } else {
-      console.warn("Nenhum refreshToken válido encontrado no localStorage");
+      setIsLoading(false);
     }
-    return false; // Indica falha
-  }, []);
+  }, [handleUnauthorized]);
 
   useEffect(() => {
     const checkTokens = async () => {
@@ -105,31 +124,27 @@ export default function Login() {
         typeof storedRefreshToken !== "string"
       ) {
         console.log("Primeiro acesso ou tokens ausentes, aguardando login...");
+        fetchRandomBackdrop();
         return;
       }
 
       const safeToken = token.length > 0 ? token : "";
-      if (safeToken && isTokenExpired(safeToken)) {
-        const refreshed = await refreshToken();
-        if (refreshed) {
-          router.push("/dashboard");
-          setupInactivityTimer();
-        }
-      } else {
+      if (safeToken && !isTokenExpired(safeToken)) {
         router.push("/dashboard");
-        setupInactivityTimer();
+      } else {
+        fetchRandomBackdrop();
       }
     };
 
     checkTokens();
-  }, [router, setupInactivityTimer, refreshToken]);
+  }, [router, fetchRandomBackdrop]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       console.log("Tentando login com:", { username, password });
-      const { data } = await axios.post(
-        process.env.NEXT_PUBLIC_API_URL + "/api/auth/login",
+      const { data } = await api.post(
+        "/api/auth/login",
         { username, password },
         { headers: { "Content-Type": "application/json" } }
       );
@@ -141,18 +156,8 @@ export default function Login() {
         localStorage.setItem("token", data.accessToken);
         localStorage.setItem("refreshToken", data.refreshToken);
         console.log("refreshToken armazenado:", data.refreshToken);
-        setupInactivityTimer();
-        if (refreshIntervalRef.current)
-          clearInterval(refreshIntervalRef.current);
-        refreshIntervalRef.current = setInterval(refreshToken, 12 * 60 * 1000); // 12 minutos, antes dos 15 minutos de expiração
         toast.success("Login realizado com sucesso!");
         router.push("/dashboard");
-        return () => {
-          if (inactivityTimerRef.current)
-            clearTimeout(inactivityTimerRef.current);
-          if (refreshIntervalRef.current)
-            clearInterval(refreshIntervalRef.current);
-        };
       } else {
         throw new Error(
           "Resposta do servidor não contém accessToken ou refreshToken"
@@ -161,35 +166,53 @@ export default function Login() {
     } catch (error) {
       const axiosError = error as AxiosError<ErrorResponse>;
       console.error("Erro ao logar:", error);
-      toast.error(
-        `Erro ao logar: ${
-          axiosError.response?.data?.error ||
-          axiosError.message ||
-          "Erro desconhecido"
-        }`
-      );
+      if (axiosError.response?.status === 401) {
+        handleUnauthorized();
+      } else {
+        toast.error(
+          `Erro ao logar: ${
+            axiosError.response?.data?.error ||
+            axiosError.message ||
+            "Erro desconhecido"
+          }`
+        );
+      }
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-white text-xl sm:text-2xl font-bold flex items-center gap-2">
+          Carregando... <span className="animate-pulse">🎬</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-cover bg-center"
+      className="min-h-screen flex items-center justify-center bg-cover bg-center relative"
       style={{
-        backgroundImage:
-          "url('https://images.pexels.com/photos/39811/pexels-photo-39811.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=500')",
+        backgroundImage: backgroundImage ? `url(${backgroundImage})` : "none",
       }}
     >
+      {movieTitle && (
+        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 bg-gradient-to-br from-white/5 to-gray-100/5 px-8 py-5 rounded-3xl text-3xl sm:text-4xl md:text-5xl font-playfair font-extrabold text-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.2)] ring-1 ring-white/15 backdrop-blur-xl z-10 bg-opacity-20">
+          {movieTitle}
+        </div>
+      )}
       <form
         onSubmit={handleLogin}
-        className="bg-black/35 p-8 rounded-xl w-full max-w-md shadow-md"
+        className="bg-gradient-to-br from-white/3 to-gray-100/3 p-6 sm:p-8 rounded-3xl w-full max-w-sm sm:max-w-md shadow-[0_4px_20px_rgba(0,0,0,0.3)] ring-1 ring-white/15 backdrop-blur-sm z-20 text-slate-200 bg-opacity-2"
       >
-        <h2 className="text-3xl font-bold mb-6 text-center text-white">
+        <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-center text-white">
           Login
         </h2>
         <div className="mb-4 relative">
           <label
             htmlFor="username"
-            className="block text-base font-medium mb-1 text-white"
+            className="block text-sm sm:text-base font-medium mb-1 text-white"
           >
             Usuário
           </label>
@@ -203,7 +226,7 @@ export default function Login() {
               placeholder="User Name"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="pl-12 p-3 bg-gray-800/70 text-white text-lg border border-gray-600 rounded-full w-full focus:outline-none focus:ring-2 focus:ring-pink-500"
+              className="pl-12 p-3 bg-gray-800/70 text-white text-base sm:text-lg border border-gray-600 rounded-full w-full focus:outline-none focus:ring-2 focus:ring-pink-500"
               required
               autoComplete="username"
             />
@@ -212,7 +235,7 @@ export default function Login() {
         <div className="mb-6 relative">
           <label
             htmlFor="password"
-            className="block text-base font-medium mb-1 text-white"
+            className="block text-sm sm:text-base font-medium mb-1 text-white"
           >
             Senha
           </label>
@@ -226,7 +249,7 @@ export default function Login() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-12 p-3 bg-gray-800/70 text-white text-lg border border-gray-600 rounded-full w-full focus:outline-none focus:ring-2 focus:ring-pink-500"
+              className="pl-12 p-3 bg-gray-800/70 text-white text-base sm:text-lg border border-gray-600 rounded-full w-full focus:outline-none focus:ring-2 focus:ring-pink-500"
               required
               autoComplete="current-password"
             />
@@ -234,7 +257,7 @@ export default function Login() {
         </div>
         <button
           type="submit"
-          className="bg-pink-500 hover:bg-pink-600 text-white text-lg p-4 rounded-full w-full transition-colors uppercase font-semibold"
+          className="bg-pink-500 hover:bg-pink-600 text-white text-base sm:text-lg p-3 sm:p-4 rounded-full w-full transition-colors uppercase font-semibold"
         >
           Entrar
         </button>

@@ -1,14 +1,14 @@
-//frontend/src/app/clients/new/page.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import api from "@/utils/api";
 import { toast } from "react-toastify";
 import Navbar from "@/components/Navbar";
 import { FaArrowLeft } from "react-icons/fa";
 import Select, { StylesConfig } from "react-select";
+import { useAuth } from "@/hooks/useAuth";
+import { AxiosError } from "axios"; // Reintroduzido para suportar instanceof AxiosError
 
 type SelectOption = { value: string; label: string } | null;
 
@@ -109,17 +109,17 @@ interface PaymentMethod {
 
 export default function NewClient() {
   const router = useRouter();
+  const { handleUnauthorized } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [username, setUsername] = useState(""); // Novo estado para username
+  const [username, setUsername] = useState("");
   const [planId, setPlanId] = useState<number>(0);
   const [paymentMethodId, setPaymentMethodId] = useState<number>(0);
   const [dueDate, setDueDate] = useState("");
   const [grossAmount, setGrossAmount] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [observations, setObservations] = useState("");
-  const [token, setToken] = useState<string | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
@@ -147,47 +147,43 @@ export default function NewClient() {
   useEffect(() => {
     const storedToken =
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    setToken(storedToken);
 
     if (!storedToken) {
-      toast.error("Por favor, faça login para acessar esta página.");
-      router.push("/");
+      handleUnauthorized();
       return;
     }
 
     const fetchPlans = async () => {
       try {
-        const response = await axios.get(
-          process.env.NEXT_PUBLIC_API_URL + "/api/clients/plans",
-          {
-            headers: { Authorization: `Bearer ${storedToken}` },
-          }
-        );
+        const response = await api.get("/api/clients/plans");
         setPlans(response.data);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Erro ao buscar planos:", error);
-        toast.error("Erro ao carregar planos.");
+        if (error instanceof AxiosError && error.response?.status === 401) {
+          handleUnauthorized();
+        } else {
+          toast.error("Erro ao carregar planos.");
+        }
       }
     };
 
     const fetchPaymentMethods = async () => {
       try {
-        const response = await axios.get(
-          process.env.NEXT_PUBLIC_API_URL + "/api/clients/payment-methods",
-          {
-            headers: { Authorization: `Bearer ${storedToken}` },
-          }
-        );
+        const response = await api.get("/api/clients/payment-methods");
         setPaymentMethods(response.data);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Erro ao buscar métodos de pagamento:", error);
-        toast.error("Erro ao carregar métodos de pagamento.");
+        if (error instanceof AxiosError && error.response?.status === 401) {
+          handleUnauthorized();
+        } else {
+          toast.error("Erro ao carregar métodos de pagamento.");
+        }
       }
     };
 
     fetchPlans();
     fetchPaymentMethods();
-  }, [router]);
+  }, [handleUnauthorized]);
 
   const handlePlanChange = (selectedOption: SelectOption) => {
     const updatedValue = selectedOption
@@ -211,7 +207,7 @@ export default function NewClient() {
     if (
       !fullName ||
       !email ||
-      !username || // Validação para username
+      !username ||
       planId === 0 ||
       paymentMethodId === 0 ||
       !dueDate ||
@@ -244,7 +240,7 @@ export default function NewClient() {
       fullName,
       email,
       phone,
-      username, // Envia o username
+      username,
       planId,
       paymentMethodId,
       dueDate: dueDateISO,
@@ -254,19 +250,15 @@ export default function NewClient() {
     };
 
     try {
-      const response = await axios.post(
-        process.env.NEXT_PUBLIC_API_URL + "/api/clients",
-        clientData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await api.post("/api/clients", clientData);
       console.log("Resposta da API:", response.data);
       toast.success("Cliente cadastrado com sucesso!", {
         autoClose: 3000,
         position: "top-right",
       });
       router.push("/clients");
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
         const message = error.response?.data?.message || "Erro desconhecido";
         const errorDetails =
           error.response?.data?.error || "Sem detalhes adicionais";
@@ -279,8 +271,7 @@ export default function NewClient() {
         );
         console.error("Erro completo:", error.response?.data);
         if (error.response?.status === 401) {
-          localStorage.removeItem("token");
-          router.push("/");
+          handleUnauthorized();
         }
       } else {
         toast.error(`Erro ao cadastrar cliente: ${String(error)}`, {

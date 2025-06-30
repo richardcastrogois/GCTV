@@ -1,3 +1,5 @@
+//frontend/src/components/Loading.tsx
+
 "use client";
 
 import { ReactNode } from "react";

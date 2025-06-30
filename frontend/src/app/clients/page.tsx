@@ -16,11 +16,11 @@ import {
   deleteClient,
   updateClient,
   renewClient,
-} from "./api"; 
+} from "./api";
 import { Client, Plan, PaymentMethod, EditFormData } from "./types";
 import { useAuth } from "@/hooks/useAuth";
 import { FaTimes } from "react-icons/fa";
-import axios from "axios";
+import api from "@/utils/api"; // Alterado de axios para api
 import { useSearch } from "@/hooks/useSearch";
 import Loading from "@/components/Loading";
 import EditClientModal from "./components/EditClientModal";
@@ -375,14 +375,9 @@ export default function Clients() {
     verified: boolean
   ) => {
     try {
-      await axios.put(
-        process.env.NEXT_PUBLIC_API_URL +
-          `/api/clients/visual-payment-status/${clientId}`,
-        { status: verified },
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      );
+      await api.put(`/api/clients/visual-payment-status/${clientId}`, {
+        status: verified,
+      });
       toast.success("Status atualizado!");
       queryClient.invalidateQueries({ queryKey: ["clients"] });
     } catch (error) {

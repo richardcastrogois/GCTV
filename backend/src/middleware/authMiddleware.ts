@@ -3,13 +3,11 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction, RequestHandler } from "express";
 
-// Defina uma interface para o payload do JWT, se aplicável
 interface JwtPayload {
-  id: number; // Ajuste conforme o payload do seu token
-  [key: string]: any;
+  userId: number;
+  username: string;
 }
 
-// Estenda a interface Request para incluir a propriedade user
 interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
 }
@@ -19,7 +17,6 @@ export const authMiddleware: RequestHandler = (
   res: Response,
   next: NextFunction
 ): void => {
-  // Verifique o cabeçalho Authorization
   const authHeader = req.headers.authorization;
   console.log("Cabeçalho Authorization recebido:", authHeader);
 
@@ -37,7 +34,6 @@ export const authMiddleware: RequestHandler = (
   }
 
   try {
-    // Use uma variável de ambiente para a chave secreta
     const secret = process.env.JWT_SECRET || "seu-segredo-jwt";
     if (!process.env.JWT_SECRET) {
       console.warn(
@@ -47,14 +43,10 @@ export const authMiddleware: RequestHandler = (
 
     const decoded = jwt.verify(token, secret) as JwtPayload;
     console.log("Token decodificado com sucesso:", decoded);
-
-    // Adicione o payload decodificado ao req (opcional, mas útil)
     req.user = decoded;
-
     next();
   } catch (error) {
     console.error("Erro ao verificar token:", error);
     res.status(401).json({ error: "Token inválido ou expirado" });
-    return;
   }
 };

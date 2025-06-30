@@ -15,7 +15,8 @@ export const login: RequestHandler = async (
 ): Promise<void> => {
   const { username, password } = req.body;
   const user = authUsers.find(
-    (u: { username: string; password: string }) => u.username === username
+    (u: { username: string; password: string; id: number }) =>
+      u.username === username
   );
 
   if (!user || !bcrypt.compareSync(password, user.password)) {
@@ -33,12 +34,65 @@ export const login: RequestHandler = async (
     return;
   }
 
-  const accessToken = jwt.sign({ username }, secret, {
-    expiresIn: "15m", // Mantido como 15 minutos para renovação frequente
+  const accessToken = jwt.sign({ userId: user.id, username }, secret, {
+    expiresIn: "15m",
   } as SignOptions);
-  const refreshToken = jwt.sign({ username }, refreshSecret, {
-    expiresIn: "7d", // Mantido como 7 dias
+  const refreshToken = jwt.sign({ userId: user.id, username }, refreshSecret, {
+    expiresIn: "7d",
   } as SignOptions);
   console.log("Tokens gerados e enviados:", { accessToken, refreshToken });
-  res.json({ accessToken, refreshToken });
+  res.json({ accessToken, refreshToken, userId: user.id });
+};
+
+export const refreshToken: RequestHandler = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    res.status(400).json({ error: "Refresh token é obrigatório" });
+    return;
+  }
+
+  const secret = process.env.JWT_SECRET;
+  const refreshSecret = (process.env.JWT_SECRET || "") + "_refresh";
+  if (!secret) {
+    console.error("JWT_SECRET não definido no .env");
+    res
+      .status(500)
+      .json({ error: "Erro interno: Chave secreta não configurada" });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, refreshSecret) as {
+      userId: number;
+      username: string;
+    };
+    console.log("Refresh token decodificado:", decoded);
+
+    const user = authUsers.find(
+      (u: { username: string; id: number }) =>
+        u.username === decoded.username && u.id === decoded.userId
+    );
+
+    if (!user) {
+      res.status(401).json({ error: "Usuário não encontrado" });
+      return;
+    }
+
+    const newAccessToken = jwt.sign(
+      { userId: user.id, username: user.username },
+      secret,
+      {
+        expiresIn: "15m",
+      } as SignOptions
+    );
+    console.log("Novo accessToken gerado:", newAccessToken);
+    res.json({ accessToken: newAccessToken });
+  } catch (error) {
+    console.error("Erro ao verificar refresh token:", error);
+    res.status(403).json({ error: "Refresh token inválido ou expirado" });
+  }
 };

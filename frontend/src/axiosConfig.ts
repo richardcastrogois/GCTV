@@ -1,3 +1,5 @@
+//frontend/src/axiosConfig.ts
+
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 
@@ -10,21 +12,29 @@ axiosInstance.interceptors.request.use(
     const token = localStorage.getItem("token");
     if (token) {
       const decoded = jwtDecode<{ exp: number }>(token);
-      if (decoded.exp < Date.now() / 1000 + 300) {
-        // 5 minutos antes de expirar
+      const currentTime = Date.now() / 1000;
+      if (decoded.exp < currentTime + 120) {
+        // Renovar se faltar menos de 2 minutos
         const refreshToken = localStorage.getItem("refreshToken");
         if (refreshToken) {
           try {
-            const { data } = await axiosInstance.post("/api/refresh", {
-              refreshToken,
-            });
-            localStorage.setItem("token", data.accessToken);
-            config.headers.Authorization = `Bearer ${data.accessToken}`;
-          } catch {
+            const { data } = await axios.post(
+              `${process.env.NEXT_PUBLIC_API_URL}/api/auth/refresh-token`,
+              { refreshToken }
+            );
+            const newAccessToken = data.accessToken;
+            localStorage.setItem("token", newAccessToken);
+            config.headers.Authorization = `Bearer ${newAccessToken}`;
+            console.log("Token renovado com sucesso:", newAccessToken);
+          } catch (error) {
+            console.error("Erro ao renovar token:", error);
             localStorage.removeItem("token");
             localStorage.removeItem("refreshToken");
             window.location.href = "/";
           }
+        } else {
+          localStorage.removeItem("token");
+          window.location.href = "/";
         }
       } else {
         config.headers.Authorization = `Bearer ${token}`;
@@ -32,7 +42,7 @@ axiosInstance.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error) // Mantido para consistência, mas não usado explicitamente
+  (error) => Promise.reject(error)
 );
 
 axiosInstance.interceptors.response.use(

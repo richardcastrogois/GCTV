@@ -3,7 +3,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import axios, { AxiosError } from "axios";
+import api from "@/utils/api";
 import Filter from "./components/Filter";
 import { toast } from "react-toastify";
 import { useEffect, useState } from "react";
@@ -20,9 +20,9 @@ import {
   Filler,
   TooltipItem,
 } from "chart.js";
+import { AxiosError } from "axios";
 import Loading from "@/components/Loading";
 
-// Registrar os componentes do Chart.js
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -34,7 +34,6 @@ ChartJS.register(
   Filler
 );
 
-// [OTIMIZAÇÃO] Lazy loading do componente Line
 const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
   loading: () => <Loading>Carregando gráfico...</Loading>,
 });
@@ -59,13 +58,15 @@ export default function Dashboard() {
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [useCurrentMonth, setUseCurrentMonth] = useState(true);
 
-  const { data: dashboardData, error: dashboardError } = useQuery({
+  const { data: dashboardData, error: dashboardError } = useQuery<
+    DashboardStats,
+    unknown
+  >({
     queryKey: ["dashboard", filterMonth, filterYear],
     queryFn: async (): Promise<DashboardStats> => {
       try {
-        const { data } = await axios.get(
-          process.env.NEXT_PUBLIC_API_URL +
-            `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
+        const { data } = await api.get(
+          `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -82,7 +83,10 @@ export default function Dashboard() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: currentMonthData, error: currentMonthError } = useQuery({
+  const { data: currentMonthData, error: currentMonthError } = useQuery<
+    CurrentMonthStats,
+    unknown
+  >({
     queryKey: [
       "current-month",
       useCurrentMonth ? "current" : `${filterMonth}-${filterYear}`,
@@ -90,14 +94,11 @@ export default function Dashboard() {
     queryFn: async (): Promise<CurrentMonthStats> => {
       try {
         if (useCurrentMonth) {
-          const { data } = await axios.get(
-            process.env.NEXT_PUBLIC_API_URL + "/api/current-month",
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }
-          );
+          const { data } = await api.get("/api/current-month", {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
           return data as CurrentMonthStats;
         } else {
           if (dashboardData) {
@@ -108,9 +109,8 @@ export default function Dashboard() {
               activeClients: dashboardData.active_clients,
             } as CurrentMonthStats;
           }
-          const { data } = await axios.get(
-            process.env.NEXT_PUBLIC_API_URL +
-              `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
+          const { data } = await api.get(
+            `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
             {
               headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,

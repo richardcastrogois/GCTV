@@ -11,18 +11,7 @@ import { getExpiredClients } from "./controllers/clientController";
 import { authMiddleware } from "./middleware/authMiddleware";
 import https from "https";
 import fs from "fs";
-import session from "express-session";
 import { PrismaClient } from "@prisma/client";
-
-// Estendendo o tipo Session para incluir inactivityTimeout (opcional, mas mantido para consistência)
-declare module "express-session" {
-  interface Session {
-    inactivityTimeout?: NodeJS.Timeout;
-  }
-}
-
-// Mapa global para rastrear timeouts por ID de sessão
-const sessionTimeouts = new Map<string, NodeJS.Timeout>();
 
 dotenv.config();
 
@@ -50,16 +39,6 @@ const app: Express = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Middleware de sessão
-app.use(
-  session({
-    secret: process.env.JWT_SECRET || "fallback-secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: true }, // Requer HTTPS
-  })
-);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`[Global] Recebida requisição: ${req.method} ${req.originalUrl}`);
@@ -92,37 +71,6 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 console.log("JWT_SECRET carregado:", JWT_SECRET);
-
-// Middleware de inatividade ajustado
-app.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.session && req.sessionID) {
-    if (sessionTimeouts.has(req.sessionID)) {
-      clearTimeout(sessionTimeouts.get(req.sessionID)!);
-      sessionTimeouts.delete(req.sessionID);
-    }
-
-    const timeout = setTimeout(() => {
-      req.session.destroy((err) => {
-        if (err) console.error("Erro ao destruir sessão:", err);
-        else
-          console.log(
-            `Usuário deslogado por inatividade de 15 minutos (ID: ${req.sessionID})`
-          );
-        sessionTimeouts.delete(req.sessionID);
-      });
-    }, 120 * 60 * 1000); // 2 horas
-
-    sessionTimeouts.set(req.sessionID, timeout);
-
-    res.on("finish", () => {
-      if (sessionTimeouts.has(req.sessionID)) {
-        clearTimeout(sessionTimeouts.get(req.sessionID)!);
-        sessionTimeouts.delete(req.sessionID);
-      }
-    });
-  }
-  next();
-});
 
 const PORT = process.env.PORT || 3001;
 const httpsOptions = {

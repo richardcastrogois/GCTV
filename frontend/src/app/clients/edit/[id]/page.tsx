@@ -4,11 +4,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import axios, { AxiosError } from "axios";
+import api from "@/utils/api";
 import Navbar from "@/components/Navbar";
-import { Client } from "@/types/client"; // Removido User da importação
+import { Client } from "@/types/client";
 import Link from "next/link";
 import { toast } from "react-toastify";
+import { useAuth } from "@/hooks/useAuth";
+import { AxiosError } from "axios";
 
 export default function EditClient() {
   const [client, setClient] = useState<Client | null>(null);
@@ -28,7 +30,7 @@ export default function EditClient() {
   const { id } = useParams();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/clients";
-  const token = localStorage.getItem("token");
+  const { handleUnauthorized } = useAuth();
 
   useEffect(() => {
     const fetchClientAndOptions = async () => {
@@ -40,21 +42,16 @@ export default function EditClient() {
         return;
       }
 
-      if (!token) {
-        console.error("Token ausente, redirecionando para login...");
-        toast.error("Sessão expirada. Faça login novamente.");
-        router.push("/login");
+      const storedToken =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (!storedToken) {
+        handleUnauthorized();
         return;
       }
 
       try {
-        console.log("Token usado para requisições:", token);
         console.log("ID do cliente:", parsedId);
-
-        const { data: clientData } = await axios.get(
-          process.env.NEXT_PUBLIC_API_URL + `/api/clients/${parsedId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const { data: clientData } = await api.get(`/api/clients/${parsedId}`);
         setClient(clientData);
         setFullName(clientData.fullName);
         setEmail(clientData.email);
@@ -66,44 +63,38 @@ export default function EditClient() {
         setObservations(clientData.observations || "");
 
         const [plansResponse, paymentMethodsResponse] = await Promise.all([
-          axios.get(process.env.NEXT_PUBLIC_API_URL + "/api/clients/plans", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          axios.get(
-            process.env.NEXT_PUBLIC_API_URL + "/api/clients/payment-methods",
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          ),
+          api.get("/api/clients/plans"),
+          api.get("/api/clients/payment-methods"),
         ]);
         setPlans(plansResponse.data);
         setPaymentMethods(paymentMethodsResponse.data);
       } catch (error) {
-        const axiosError = error as AxiosError<{ message: string }>;
-        console.error("Erro ao carregar dados:", axiosError);
-        toast.error(
-          `Erro ao carregar dados: ${
-            axiosError.response?.data?.message || axiosError.message
-          }`
-        );
-        if (axiosError.response?.status === 401) {
-          toast.error("Sessão expirada. Faça login novamente.");
-          router.push("/login");
+        console.error("Erro ao carregar dados:", error);
+        if (error instanceof AxiosError && error.response?.status === 401) {
+          handleUnauthorized();
         } else {
+          toast.error(
+            `Erro ao carregar dados: ${
+              error instanceof AxiosError
+                ? error.response?.data?.message || error.message
+                : String(error)
+            }`
+          );
           router.push(returnTo);
         }
       }
     };
 
     fetchClientAndOptions();
-  }, [id, router, returnTo, token]);
+  }, [id, router, returnTo, handleUnauthorized]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!token) {
-      toast.error("Sessão expirada. Faça login novamente.");
-      router.push("/login");
+    const storedToken =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!storedToken) {
+      handleUnauthorized();
       return;
     }
 
@@ -136,34 +127,31 @@ export default function EditClient() {
     }
 
     try {
-      await axios.put(
-        process.env.NEXT_PUBLIC_API_URL + `/api/clients/${id}`,
-        {
-          fullName,
-          email,
-          username,
-          planId,
-          paymentMethodId,
-          dueDate: parsedDueDate.toISOString(),
-          grossAmount: grossAmountNum,
-          isActive: client?.isActive,
-          observations,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.put(`/api/clients/${id}`, {
+        fullName,
+        email,
+        username,
+        planId,
+        paymentMethodId,
+        dueDate: parsedDueDate.toISOString(),
+        grossAmount: grossAmountNum,
+        isActive: client?.isActive,
+        observations,
+      });
       toast.success("Cliente atualizado com sucesso!");
       router.push(returnTo);
     } catch (error) {
-      const axiosError = error as AxiosError<{ message: string }>;
-      console.error("Erro ao atualizar cliente:", axiosError);
-      toast.error(
-        `Erro ao atualizar cliente: ${
-          axiosError.response?.data?.message || axiosError.message
-        }`
-      );
-      if (axiosError.response?.status === 401) {
-        toast.error("Sessão expirada. Faça login novamente.");
-        router.push("/login");
+      console.error("Erro ao atualizar cliente:", error);
+      if (error instanceof AxiosError && error.response?.status === 401) {
+        handleUnauthorized();
+      } else {
+        toast.error(
+          `Erro ao atualizar cliente: ${
+            error instanceof AxiosError
+              ? error.response?.data?.message || error.message
+              : String(error)
+          }`
+        );
       }
     }
   };
@@ -240,7 +228,7 @@ export default function EditClient() {
               className="p-2 border w-full rounded"
               required
             >
-              <option value={0}>Selecione um método de pagamento</option>
+              <option value={0}>Selecione um métodoологи de pagamento</option>
               {paymentMethods.map((method) => (
                 <option key={method.id} value={method.id}>
                   {method.name}
