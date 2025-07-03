@@ -1,7 +1,7 @@
 // frontend/src/app/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/utils/api";
 import { toast } from "react-toastify";
@@ -10,6 +10,7 @@ import { jwtDecode } from "jwt-decode";
 import { AxiosError } from "axios";
 import { useAuth } from "@/hooks/useAuth";
 import Loading from "@/components/Loading";
+import LoadingSimple from "@/components/LoadingSimple";
 
 interface NavigatorNetwork extends Navigator {
   connection?: {
@@ -48,19 +49,33 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-  const [movieTitle, setMovieTitle] = useState<string>("Imagem Padrão");
-  const [isLoading, setIsLoading] = useState(true);
+  const [movieTitle, setMovieTitle] = useState<string>("");
+  const [isInitialLoading, setIsInitialLoading] = useState(true); // Para o carregamento inicial
+  const [isLoginLoading, setIsLoginLoading] = useState(false); // Para o login
   const router = useRouter();
   const { handleUnauthorized } = useAuth();
+  const hasLoaded = useRef(false);
 
   const TMDB_API_KEY = "fb7b0bbf56df803d4612f1fc923f5b84";
 
   useEffect(() => {
-    const loadImageAndData = async () => {
-      setIsLoading(true);
+    console.log("useEffect executado", {
+      TMDB_API_KEY,
+      handleUnauthorized,
+      router,
+    });
 
-      const img = new Image();
-      img.crossOrigin = "anonymous";
+    if (hasLoaded.current) {
+      console.log("Carregamento já realizado, saindo...");
+      setIsInitialLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadImageAndData = async () => {
+      console.log("Iniciando loadImageAndData");
+      setIsInitialLoading(true);
 
       try {
         const res = await api.get<TMDBResponse>(
@@ -68,61 +83,71 @@ export default function Login() {
         );
 
         const results = res.data.results;
-        // Filtra apenas filmes com backdrop_path
-        const moviesWithImages = results.filter((movie) => movie.backdrop_path);
+        const moviesWithImages = results.filter(
+          (movie: { backdrop_path: string; title: string }) =>
+            movie.backdrop_path
+        );
         if (moviesWithImages.length === 0) {
-          toast.error("Nenhum filme com imagem disponível");
-          setBackgroundImage("/teste001.jpg");
-          setMovieTitle("Imagem Padrão");
-        } else {
-          const random = Math.floor(Math.random() * moviesWithImages.length);
-          const { backdrop_path, title } = moviesWithImages[random];
+          throw new Error("Nenhum filme com imagem disponível");
+        }
 
-          let quality = "w780";
-          const screenWidth =
-            typeof window !== "undefined" ? window.innerWidth : 1024;
-          const navigatorNetwork = navigator as NavigatorNetwork;
-          const downlink = navigatorNetwork.connection?.downlink ?? 5;
+        const random = Math.floor(Math.random() * moviesWithImages.length);
+        const { backdrop_path, title } = moviesWithImages[random];
 
-          if (downlink >= 5 && screenWidth >= 1024) {
-            quality = "w1280";
-          } else if (downlink >= 1.5) {
-            quality = "w1280";
-          }
+        let quality = "w780";
+        const screenWidth =
+          typeof window !== "undefined" ? window.innerWidth : 1024;
+        const navigatorNetwork = navigator as NavigatorNetwork;
+        const downlink = navigatorNetwork.connection?.downlink ?? 5;
 
-          const imageUrl = `https://localhost:3001/proxy-image?url=${encodeURIComponent(
-            `https://image.tmdb.org/t/p/${quality}${backdrop_path}`
-          )}`;
+        if (downlink >= 5 && screenWidth >= 1024) {
+          quality = "w1280";
+        } else if (downlink >= 1.5) {
+          quality = "w1280";
+        }
 
-          await new Promise<void>((resolve) => {
-            img.src = imageUrl;
+        const imageUrl = `https://localhost:3001/proxy-image?url=${encodeURIComponent(
+          `https://image.tmdb.org/t/p/${quality}${backdrop_path}`
+        )}`;
+
+        if (isMounted) {
+          console.log("Carregando imagem:", imageUrl);
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          await new Promise<void>((resolve, reject) => {
             img.onload = () => {
+              console.log("Imagem carregada:", imageUrl);
               setBackgroundImage(imageUrl);
               setMovieTitle(title || "Imagem Aleatória");
               resolve();
             };
-            img.onerror = () => {
-              toast.error("Falha ao carregar imagem da TMDB");
-              setBackgroundImage("/teste001.jpg");
-              setMovieTitle("Imagem Padrão");
-              resolve();
-            };
+            img.onerror = () =>
+              reject(new Error("Falha ao carregar imagem da TMDB"));
+            img.src = imageUrl;
           });
+
+          console.log("Aguardando 2 segundos");
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       } catch (err) {
-        const axiosError = err as AxiosError<ErrorResponse>;
-        if (axiosError.response?.status === 401) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Erro desconhecido";
+        console.log("Erro ao carregar imagem:", errorMessage);
+        if (err instanceof AxiosError && err.response?.status === 401) {
           handleUnauthorized();
         } else {
-          toast.error("Erro ao buscar imagem da TMDB");
-          setBackgroundImage("/teste001.jpg");
-          setMovieTitle("Imagem Padrão");
+          toast.error(errorMessage || "Erro ao buscar imagem da TMDB");
+          if (isMounted) {
+            setBackgroundImage("/teste001.jpg");
+            setMovieTitle("Imagem Padrão");
+          }
         }
       } finally {
-        // Exibe o Loading por 3 segundos antes de carregar o conteúdo
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 2000); // 3000ms = 3 segundos
+        if (isMounted) {
+          console.log("Finalizando loadImageAndData");
+          setIsInitialLoading(false);
+          hasLoaded.current = true;
+        }
       }
     };
 
@@ -138,11 +163,16 @@ export default function Login() {
     };
 
     checkAuthThenLoad();
+
+    return () => {
+      isMounted = false;
+      console.log("Componente desmontado");
+    };
   }, [TMDB_API_KEY, handleUnauthorized, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsLoginLoading(true); // Ativa o LoadingSimple apenas para login
     try {
       const { data } = await api.post(
         "/api/auth/login",
@@ -172,14 +202,13 @@ export default function Login() {
         );
       }
     } finally {
-      // Exibe o Loading por 3 segundos após o login
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 2000); // 3000ms = 3 segundos
+      setIsLoginLoading(false); // Desativa o LoadingSimple
     }
   };
 
-  if (isLoading) return <Loading />;
+  if (isInitialLoading) return <Loading />; // Carregamento inicial com animação
+  if (isLoginLoading)
+    return <LoadingSimple>Processando login...</LoadingSimple>; // Carregamento do login
 
   return (
     <div
@@ -189,7 +218,7 @@ export default function Login() {
       }}
     >
       {movieTitle && (
-        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 bg-gradient-to-br from-white/5 to-gray-100/5 px-8 py-5 rounded-3xl text-3xl sm:text-4xl md:text-5xl font-playfair font-extrabold text-white shadow-[0_4px_20px_rgba(0,0,0,0.2)] ring-1 ring-white/15 backdrop-blur-xl z-10 bg-opacity-20">
+        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 bg-gradient-to-br px-8 py-5 rounded-3xl text-2xl sm:text-3xl md:text-4xl font-playfair font-extrabold shadow-[0_4px_20px_rgba(0,0,0,0.2)] ring-1 ring-white/5 backdrop-blur-xl z-10 bg-opacity-10">
           {movieTitle}
         </div>
       )}

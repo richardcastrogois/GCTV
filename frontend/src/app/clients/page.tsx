@@ -1,4 +1,4 @@
-//frontend/src/app/clients/page.tsx
+  //frontend/src/app/clients/page.tsx
 
 "use client";
 
@@ -22,11 +22,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { FaTimes } from "react-icons/fa";
 import api from "@/utils/api"; // Alterado de axios para api
 import { useSearch } from "@/hooks/useSearch";
-import Loading from "@/components/Loading";
+import LoadingSimple from "@/components/LoadingSimple"; // Substituído por LoadingSimple
 import EditClientModal from "./components/EditClientModal";
 
 const ClientsTable = dynamic(() => import("./components/ClientsTable"), {
-  loading: () => <Loading>Carregando tabela...</Loading>,
+  loading: () => <LoadingSimple>Carregando tabela...</LoadingSimple>, // Alterado para LoadingSimple
 });
 
 const formatDateToLocal = (date: string | Date): string => {
@@ -425,7 +425,8 @@ export default function Clients() {
             <p className="text-center mt-4">Nenhum cliente encontrado.</p>
           )}
         </div>
-        {isFetching && <div className="text-center mt-2">Atualizando...</div>}
+        {isFetching && <LoadingSimple>Atualizando...</LoadingSimple>}{" "}
+        {/* Alterado para LoadingSimple */}
         <div className="pagination">
           <select
             value={limit}

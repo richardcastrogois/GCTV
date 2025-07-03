@@ -4,7 +4,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import api from "@/utils/api";
-import Loading from "@/components/Loading";
+import LoadingSimple from "@/components/LoadingSimple"; // Substituído por LoadingSimple
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
 import { AxiosError } from "axios";
@@ -52,7 +52,8 @@ export default function DataPreloader({
     enabled: isReady,
   });
 
-  if (isLoading) return <Loading>Carregando dados iniciais...</Loading>;
+  if (isLoading)
+    return <LoadingSimple>Carregando dados iniciais...</LoadingSimple>; // Alterado para LoadingSimple
 
   if (error) {
     if (error instanceof AxiosError && error.response?.status === 401) {

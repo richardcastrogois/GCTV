@@ -1,5 +1,4 @@
 //frontend/src/app/expired/page.tsx
-
 "use client";
 
 import { useState } from "react";
@@ -12,12 +11,12 @@ import { fetchExpiredClients, reactivateClient } from "./api.ts";
 import { Client } from "../clients/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearch } from "@/hooks/useSearch";
-import Loading from "@/components/Loading";
+import LoadingSimple from "@/components/LoadingSimple"; // Novo import
 
 const ExpiredClientsTable = dynamic(
   () => import("./components/ExpiredClientsTable"),
   {
-    loading: () => <Loading>Carregando tabela...</Loading>,
+    loading: () => <LoadingSimple>Carregando tabela...</LoadingSimple>, // Substitui Loading
   }
 );
 
@@ -106,7 +105,7 @@ export default function Expired() {
         pauseOnFocusLoss: false,
       });
       queryClient.invalidateQueries({ queryKey: ["expiredClients"] });
-      queryClient.invalidateQueries({ queryKey: ["clients"] }); // Atualiza também a tabela de clientes ativos
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
     } catch (error) {
       if (error instanceof AxiosError) {
         toast.error(`Erro ao reativar cliente: ${error.message}`, {
@@ -167,7 +166,8 @@ export default function Expired() {
             </p>
           )}
         </div>
-        {isFetching && <div className="text-center mt-2">Atualizando...</div>}
+        {isFetching && <LoadingSimple>Atualizando...</LoadingSimple>}{" "}
+        {/* Substitui texto */}
         <div className="pagination">
           <select
             value={limit}

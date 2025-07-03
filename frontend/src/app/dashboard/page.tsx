@@ -2,11 +2,15 @@
 
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import {
+  useQuery,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import api from "@/utils/api";
 import Filter from "./components/Filter";
 import { toast } from "react-toastify";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import {
   Chart as ChartJS,
@@ -19,9 +23,10 @@ import {
   Legend,
   Filler,
   TooltipItem,
+  BarElement,
 } from "chart.js";
 import { AxiosError } from "axios";
-import Loading from "@/components/Loading";
+import LoadingSimple from "@/components/LoadingSimple";
 
 ChartJS.register(
   CategoryScale,
@@ -31,18 +36,20 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  BarElement
 );
 
 const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
-  loading: () => <Loading>Carregando gráfico...</Loading>,
+  loading: () => <LoadingSimple>Carregando gráfico...</LoadingSimple>,
 });
 
 interface DashboardStats {
   gross_amount: number;
   net_amount: number;
   active_clients: number;
-  totalNetAmount: number;
+  totalNetAmount8: number;
+  totalNetAmount15: number;
   grossByPaymentMethod: Record<string, number>;
   dailyNetProfit: { date: string; netAmount: number }[];
 }
@@ -53,6 +60,23 @@ interface CurrentMonthStats {
   activeClients: number;
 }
 
+interface Client {
+  id: number;
+  fullName: string;
+  email: string;
+  phone?: string;
+  plan: { id: number; name: string };
+  paymentMethod: { id: number; name: string };
+  dueDate: string;
+  grossAmount: number;
+  netAmount: number;
+  isActive: boolean;
+  observations?: string;
+  user: { id: number; username: string };
+}
+
+const queryClient = new QueryClient();
+
 export default function Dashboard() {
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
@@ -60,10 +84,11 @@ export default function Dashboard() {
 
   const { data: dashboardData, error: dashboardError } = useQuery<
     DashboardStats,
-    unknown
+    Error
   >({
     queryKey: ["dashboard", filterMonth, filterYear],
     queryFn: async (): Promise<DashboardStats> => {
+      const controller = new AbortController();
       try {
         const { data } = await api.get(
           `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
@@ -71,6 +96,7 @@ export default function Dashboard() {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
+            signal: controller.signal,
           }
         );
         return data as DashboardStats;
@@ -85,42 +111,37 @@ export default function Dashboard() {
 
   const { data: currentMonthData, error: currentMonthError } = useQuery<
     CurrentMonthStats,
-    unknown
+    Error
   >({
     queryKey: [
       "current-month",
       useCurrentMonth ? "current" : `${filterMonth}-${filterYear}`,
     ],
     queryFn: async (): Promise<CurrentMonthStats> => {
+      const controller = new AbortController();
       try {
         if (useCurrentMonth) {
           const { data } = await api.get("/api/current-month", {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
+            signal: controller.signal,
           });
           return data as CurrentMonthStats;
         } else {
-          if (dashboardData) {
-            return {
-              totalNetAmount8: dashboardData.totalNetAmount,
-              totalNetAmount15:
-                dashboardData.totalNetAmount - dashboardData.active_clients * 7,
-              activeClients: dashboardData.active_clients,
-            } as CurrentMonthStats;
-          }
           const { data } = await api.get(
             `/api/dashboard?month=${filterMonth}&year=${filterYear}`,
             {
               headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
               },
+              signal: controller.signal,
             }
           );
           return {
-            totalNetAmount8: data.totalNetAmount,
-            totalNetAmount15: data.totalNetAmount - data.active_clients * 7,
-            activeClients: data.active_clients,
+            totalNetAmount8: data.totalNetAmount8 || 0,
+            totalNetAmount15: data.totalNetAmount15 || 0,
+            activeClients: data.active_clients || 0,
           } as CurrentMonthStats;
         }
       } catch (error) {
@@ -128,18 +149,58 @@ export default function Dashboard() {
         throw error;
       }
     },
-    enabled: useCurrentMonth || !!dashboardData,
+    enabled: true,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: clientsData, error: clientsError } = useQuery<
+    { data: Client[]; total: number },
+    Error
+  >({
+    queryKey: ["clients"],
+    queryFn: async (): Promise<{ data: Client[]; total: number }> => {
+      const controller = new AbortController();
+      try {
+        const { data } = await api.get("/api/clients", {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          params: {
+            page: 1,
+            limit: 1000,
+          },
+          signal: controller.signal,
+        });
+        return data as { data: Client[]; total: number };
+      } catch (error) {
+        console.error("Erro ao carregar clientes:", error);
+        throw error;
+      }
+    },
     retry: false,
     refetchOnWindowFocus: false,
   });
 
   const showErrorToast = (error: unknown, context: string) => {
     if (error instanceof AxiosError) {
-      toast.error(
-        `Erro ao carregar ${context}: ${
-          error.response?.data?.message || error.message
-        }`
-      );
+      const axiosError = error as AxiosError;
+      const responseData = axiosError.response?.data;
+      const message =
+        responseData &&
+        typeof responseData === "object" &&
+        "message" in responseData &&
+        typeof (responseData as { message?: unknown }).message === "string"
+          ? (responseData as { message: string }).message
+          : (typeof error === "object" &&
+            error !== null &&
+            "message" in error &&
+            typeof (error as { message: unknown }).message === "string"
+            ? (error as { message: string }).message
+            : "Erro desconhecido");
+      toast.error(`Erro ao carregar ${context}: ${message}`);
+    } else if (error instanceof Error) {
+      toast.error(`Erro ao carregar ${context}: ${error.message}`);
     } else {
       toast.error(`Erro desconhecido ao carregar ${context}`);
     }
@@ -149,13 +210,15 @@ export default function Dashboard() {
     if (dashboardError) showErrorToast(dashboardError, "dashboard");
     if (currentMonthError)
       showErrorToast(currentMonthError, "dados do mês atual");
-  }, [dashboardError, currentMonthError]);
+    if (clientsError) showErrorToast(clientsError, "clientes");
+  }, [dashboardError, currentMonthError, clientsError]);
 
   const defaultStats: DashboardStats = {
     gross_amount: 0,
     net_amount: 0,
     active_clients: 0,
-    totalNetAmount: 0,
+    totalNetAmount8: 0,
+    totalNetAmount15: 0,
     grossByPaymentMethod: {
       Nubank: 0,
       PagSeguro: 0,
@@ -176,9 +239,22 @@ export default function Dashboard() {
   const currentMonthStats: CurrentMonthStats =
     currentMonthData ?? defaultCurrentMonthStats;
 
-  useEffect(() => {
-    console.log("Dados recebidos para o dashboard:", stats);
-  }, [stats]);
+  const clients = useMemo(() => clientsData?.data ?? [], [clientsData]);
+
+  const activeClientsCount = clients.filter((c) => c.isActive).length;
+  const clientsByPlan = clients.reduce((acc, client) => {
+    if (client.isActive) {
+      acc[client.plan.name] = (acc[client.plan.name] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+  const clientsByPaymentMethod = clients.reduce((acc, client) => {
+    if (client.isActive) {
+      acc[client.paymentMethod.name] =
+        (acc[client.paymentMethod.name] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
 
   const getCardClass = (method: string): string => {
     switch (method.toLowerCase()) {
@@ -289,122 +365,223 @@ export default function Dashboard() {
   const handleFilterChange = (month: number, year: number) => {
     setFilterMonth(month);
     setFilterYear(year);
+    if (!useCurrentMonth) {
+      queryClient.refetchQueries({
+        queryKey: ["current-month", `${month}-${year}`],
+      });
+    }
   };
 
   const getCurrentMonthTitle = () => {
-    if (useCurrentMonth) return "Como está meu mês:";
+    if (useCurrentMonth) return "Como está meu mês (livre):";
     const monthName = new Date(filterYear, filterMonth - 1).toLocaleString(
       "pt-BR",
       { month: "long" }
     );
-    return `Meu mês em ${monthName}/${filterYear}:`;
+    return `Meu mês (livre) em ${monthName}/${filterYear}:`;
   };
 
   return (
-    <div className="dashboard-container">
-      <div className="flex flex-col sm:flex-row items-center justify-start mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-left">Dashboard</h1>
-        <div className="flex-grow"></div>
-        <div
-          className="sm:mx-auto"
-          style={{ maxWidth: "350px", width: "100%" }}
-        >
-          <Filter onFilterChange={handleFilterChange} />
-        </div>
-      </div>
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="w-full lg:w-2/3">
-          <h2
-            className="text-xl font-semibold mb-4 text-center sm:text-left"
-            style={{ color: "var(--card-text-secondary)" }}
+    <QueryClientProvider client={queryClient}>
+      <div className="dashboard-container">
+        <div className="flex flex-col sm:flex-row items-center justify-start mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-left">
+            Dashboard
+          </h1>
+          <div className="flex-grow"></div>
+          <div
+            className="sm:mx-auto"
+            style={{ maxWidth: "350px", width: "100%" }}
           >
-            Meu Saldo Bruto
-          </h2>
-          <div className="card-container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {Object.entries(stats.grossByPaymentMethod).map(
-              ([method, amount]) => (
-                <div
-                  key={`${method}-${filterMonth}-${filterYear}`}
-                  className={`card bank-card ${getCardClass(
-                    method
-                  )} p-4 flex flex-col justify-between`}
-                >
-                  <div className="flex justify-between items-start">
-                    <img
-                      src="/icons/contactless.png"
-                      alt="Contactless"
-                      className="w-6 h-6"
-                    />
-                  </div>
-                  <div className="text-2xl font-bold card-amount">
-                    R$ {amount.toFixed(2)}
-                  </div>
-                  <div className="flex justify-between items-end">
-                    <div className="text-lg font-semibold card-method">
-                      {method}
-                    </div>
-                    <div className="flex gap-1">
-                      <span className="w-6 h-6 bg-orange-500 rounded-full"></span>
-                      <span className="w-6 h-6 bg-red-500 rounded-full"></span>
-                    </div>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-          <div className="card w-full chart-card mb-6">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
-              <h2
-                className="text-xl font-semibold text-center sm:text-left"
-                style={{ color: "var(--card-text-secondary)" }}
-              >
-                Lucro Líquido Diário
-              </h2>
-            </div>
-            <div className="h-40">
-              <Line data={chartData} options={chartOptions} />
-            </div>
+            <Filter onFilterChange={handleFilterChange} />
           </div>
         </div>
-        <div className="w-full lg:w-1/3 flex flex-col gap-4">
-          <div className="card w-full current-month-card">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
-              <h2
-                className="text-xl font-semibold text-center sm:text-left"
-                style={{ color: "var(--card-text)" }}
-              >
-                {getCurrentMonthTitle()}
-              </h2>
-              <button
-                onClick={() => setUseCurrentMonth(!useCurrentMonth)}
-                className={`toggle-button ${
-                  useCurrentMonth ? "active" : "inactive"
-                }`}
-              >
-                {useCurrentMonth ? "Usar Mês Atual" : "Usar Filtro Geral"}
-              </button>
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="w-full lg:w-2/3">
+            <h2
+              className="text-xl font-semibold mb-4 text-center sm:text-left"
+              style={{ color: "var(--card-text-secondary)" }}
+            >
+              Meu Saldo Bruto
+            </h2>
+            <div className="card-container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {Object.entries(stats.grossByPaymentMethod).map(
+                ([method, amount]) => (
+                  <div
+                    key={`${method}-${filterMonth}-${filterYear}`}
+                    className={`card bank-card ${getCardClass(
+                      method
+                    )} p-4 flex flex-col justify-between`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <img
+                        src="/icons/contactless.png"
+                        alt="Contactless"
+                        className="w-6 h-6"
+                      />
+                    </div>
+                    <div className="text-2xl font-bold card-amount">
+                      R$ {amount.toFixed(2)}
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <div className="text-lg font-semibold card-method">
+                        {method}
+                      </div>
+                      <div className="flex gap-1">
+                        <span className="w-6 h-6 bg-orange-500 rounded-full"></span>
+                        <span className="w-6 h-6 bg-red-500 rounded-full"></span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
             </div>
-            <div className="flex flex-col gap-2 text-center sm:text-left">
-              <div
-                className="text-2xl font-semibold"
-                style={{ color: "var(--card-text)" }}
-              >
-                -R$8/ativação: R$ {currentMonthStats.totalNetAmount8.toFixed(2)}
+            <div className="card w-full chart-card mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
+                <h2
+                  className="text-xl font-semibold text-center sm:text-left"
+                  style={{ color: "var(--card-text-secondary)" }}
+                >
+                  Lucro Líquido Diário
+                </h2>
               </div>
-              <div
-                className="text-2xl font-semibold"
-                style={{ color: "var(--card-text)" }}
-              >
-                -R$15/ativação: R${" "}
-                {currentMonthStats.totalNetAmount15.toFixed(2)}
+              <div className="h-40">
+                <Line data={chartData} options={chartOptions} />
               </div>
             </div>
           </div>
-          <div className="card w-full future-chart-card h-32 bg-gray-200 flex items-center justify-center text-gray-500">
-            Espaço reservado para futuro gráfico
+          <div className="w-full lg:w-1/3 flex flex-col gap-4">
+            <div className="card w-full current-month-card">
+              <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+                <h2
+                  className="text-xl font-semibold text-center sm:text-left"
+                  style={{ color: "var(--card-text)" }}
+                >
+                  {getCurrentMonthTitle()}
+                </h2>
+                <button
+                  onClick={() => {
+                    setUseCurrentMonth(!useCurrentMonth);
+                    queryClient.refetchQueries({
+                      queryKey: [
+                        "current-month",
+                        !useCurrentMonth
+                          ? "current"
+                          : `${filterMonth}-${filterYear}`,
+                      ],
+                    });
+                  }}
+                  className={`toggle-button ${
+                    useCurrentMonth ? "active" : "inactive"
+                  }`}
+                >
+                  {useCurrentMonth ? "Usar Mês Atual" : "Usar Filtro Geral"}
+                </button>
+              </div>
+              <div className="flex flex-col gap-2 text-center sm:text-left">
+                <div
+                  className="text-2xl font-semibold"
+                  style={{ color: "var(--card-text)" }}
+                >
+                  -R$8/ativação: R${" "}
+                  {currentMonthStats.totalNetAmount8 !== undefined
+                    ? currentMonthStats.totalNetAmount8.toFixed(2)
+                    : "0.00"}
+                </div>
+                <div
+                  className="text-2xl font-semibold"
+                  style={{ color: "var(--card-text)" }}
+                >
+                  -R$15/ativação: R${" "}
+                  {currentMonthStats.totalNetAmount15 !== undefined
+                    ? currentMonthStats.totalNetAmount15.toFixed(2)
+                    : "0.00"}
+                </div>
+              </div>
+            </div>
+            <div
+              className="card w-full future-chart-card"
+              style={{ minHeight: "300px", overflowY: "auto" }}
+            >
+              <h2
+                className="text-3xl font-bold m-6  text-center sm:text-left"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Análise dos Clientes (Meu Mês)
+              </h2>
+              <div className="flex flex-col gap-3">
+                <p className="mb-4">
+                  <strong
+                    className="text-xl font-bold"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    Clientes Ativos:
+                  </strong>{" "}
+                  {activeClientsCount}
+                </p>
+                <p className="m-4">
+                  <strong
+                    className="text-2xl font-bold"
+                    style={{ color: "var(--text-primary-secondary)" }}
+                  >
+                    Por Plano:
+                  </strong>
+                </p>
+                {Object.entries(clientsByPlan).map(([plan, count]) => (
+                  <p
+                    key={plan}
+                    style={{
+                      color:
+                        plan.toLowerCase() === "p2p"
+                          ? "#F1916D"
+                          : plan.toLowerCase() === "platinum"
+                          ? "#a64dff"
+                          : plan.toLowerCase() === "comum"
+                          ? "#4d8cff"
+                          : "#F3DADF",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    - {plan}: {count}
+                  </p>
+                ))}
+                <p className="m-4">
+                  <strong
+                    className="text-xl font-bold"
+                    style={{ color: "var(--text-primary-secondary)" }}
+                  >
+                    Por Método de Pagamento:
+                  </strong>
+                </p>
+                {Object.entries(clientsByPaymentMethod).map(
+                  ([method, count]) => (
+                    <p
+                      key={method}
+                      style={{
+                        color:
+                          method.toLowerCase() === "nubank"
+                            ? "#a64dff"
+                            : method.toLowerCase() === "banco do brasil"
+                            ? "#ffd700"
+                            : method.toLowerCase() === "caixa"
+                            ? "#4d8cff"
+                            : method.toLowerCase() === "picpay"
+                            ? "#00da77"
+                            : method.toLowerCase() === "pagseguro"
+                            ? "#ffa000"
+                            : "#F3DADF",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      - {method}: {count}
+                    </p>
+                  )
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </QueryClientProvider>
   );
 }

@@ -1,4 +1,4 @@
-//backend/src/controllers/dashboardController.ts
+// backend/src/controllers/dashboardController.ts
 
 import { Request, Response, RequestHandler } from "express";
 import { PrismaClient } from "@prisma/client";
@@ -33,27 +33,13 @@ export const getDashboardStats: RequestHandler = async (
       return;
     }
 
-    // Construir a condição de filtro para clientes (somente isActive)
-    const whereClause: any = { isActive: true };
-
-    // Buscar todos os clientes ativos
+    // Buscar todos os clientes (ativos e expirados)
     const clients = await prisma.client.findMany({
-      where: whereClause,
       include: {
         paymentMethod: true,
         user: true,
       },
     });
-
-    console.log(
-      "Clientes retornados:",
-      clients.map((c) => ({
-        id: c.id,
-        username: c.user.username,
-        paymentMethod: c.paymentMethod.name,
-        paymentHistory: c.paymentHistory,
-      }))
-    );
 
     // Calcular gross_amount (soma de grossAmount para referência geral)
     const gross_amount = clients.reduce(
@@ -66,9 +52,31 @@ export const getDashboardStats: RequestHandler = async (
     );
     const active_clients = clients.filter((client) => client.isActive).length;
 
-    // Calcular o total líquido ajustado (subtraindo R$ 8,00 por ativação)
-    const activationCost = active_clients * 8; // R$ 8,00 por ativação
-    const totalNetAmount = net_amount - activationCost;
+    // Calcular totalNetAmount somando paymentLiquido do paymentHistory filtrado
+    let totalPaymentLiquido = 0;
+    let totalPayments = 0;
+    clients.forEach((client) => {
+      const paymentHistory = Array.isArray(client.paymentHistory)
+        ? client.paymentHistory
+        : [];
+      paymentHistory.forEach((payment: any) => {
+        const paymentDate = new Date(payment.paymentDate);
+        if (
+          !isNaN(paymentDate.getTime()) &&
+          (!filterMonth || paymentDate.getMonth() + 1 === filterMonth) &&
+          (!filterYear || paymentDate.getFullYear() === filterYear) &&
+          payment.paymentLiquido !== undefined &&
+          payment.paymentLiquido !== null
+        ) {
+          totalPaymentLiquido += Number(payment.paymentLiquido);
+          totalPayments += 1;
+        }
+      });
+    });
+    const activationCost8 = totalPayments * 8;
+    const activationCost15 = totalPayments * 15;
+    const totalNetAmount8 = totalPaymentLiquido - activationCost8;
+    const totalNetAmount15 = totalPaymentLiquido - activationCost15;
 
     // Calcular grossByPaymentMethod somando paymentLiquido do paymentHistory
     const grossByPaymentMethod = clients.reduce((acc, client) => {
@@ -84,24 +92,9 @@ export const getDashboardStats: RequestHandler = async (
       } else if (Array.isArray(client.paymentHistory)) {
         paymentHistory = client.paymentHistory;
       }
-      console.log("paymentHistory para", methodName, ":", paymentHistory);
       const totalLiquido = paymentHistory.reduce(
         (sum: number, payment: any) => {
           const paymentDate = new Date(payment.paymentDate);
-          console.log(
-            "Payment Date:",
-            payment.paymentDate,
-            "Parsed:",
-            paymentDate,
-            "Month:",
-            paymentDate.getMonth() + 1,
-            "Year:",
-            paymentDate.getFullYear(),
-            "Filter Month:",
-            filterMonth,
-            "Filter Year:",
-            filterYear
-          );
           if (
             filterMonth &&
             filterYear &&
@@ -115,12 +108,9 @@ export const getDashboardStats: RequestHandler = async (
         },
         0
       );
-      console.log("Total Líquido para", methodName, ":", totalLiquido);
       acc[methodName] = (acc[methodName] || 0) + totalLiquido;
       return acc;
     }, {} as Record<string, number>);
-
-    console.log("grossByPaymentMethod final:", grossByPaymentMethod);
 
     // Calcular lucro líquido por dia somando paymentLiquido do paymentHistory
     let dailyNetProfitQuery = `
@@ -129,11 +119,10 @@ export const getDashboardStats: RequestHandler = async (
         SUM((payment_data->>'paymentLiquido')::FLOAT) AS netamount
       FROM "Client"
       CROSS JOIN jsonb_array_elements("paymentHistory") AS payment_data
-      WHERE "isActive" = true
     `;
     const params: any[] = [];
     if (filterMonth && filterYear) {
-      dailyNetProfitQuery += ` AND EXTRACT(MONTH FROM (payment_data->>'paymentDate')::DATE) = $1 AND EXTRACT(YEAR FROM (payment_data->>'paymentDate')::DATE) = $2`;
+      dailyNetProfitQuery += ` WHERE EXTRACT(MONTH FROM (payment_data->>'paymentDate')::DATE) = $1 AND EXTRACT(YEAR FROM (payment_data->>'paymentDate')::DATE) = $2`;
       params.push(filterMonth, filterYear);
     }
     dailyNetProfitQuery += `
@@ -141,28 +130,20 @@ export const getDashboardStats: RequestHandler = async (
       ORDER BY DATE(payment_data->>'paymentDate') ASC
     `;
 
-    console.log(
-      "Daily Net Profit Query:",
-      dailyNetProfitQuery,
-      "Params:",
-      params
-    ); // Depuração
     const dailyNetProfitRaw: { date: string; netamount: number }[] =
       await prisma.$queryRawUnsafe(dailyNetProfitQuery, ...params);
-    console.log("Daily Net Profit Raw:", dailyNetProfitRaw); // Depuração
 
     const dailyNetProfit = dailyNetProfitRaw.map((entry) => ({
       date: entry.date,
-      netAmount: entry.netamount || 0, // Corrigido para usar 'netamount' do resultado
+      netAmount: entry.netamount || 0,
     }));
-
-    console.log("Daily Net Profit:", dailyNetProfit); // Depuração
 
     res.json({
       gross_amount,
       net_amount,
       active_clients,
-      totalNetAmount: parseFloat(totalNetAmount.toFixed(2)),
+      totalNetAmount8: parseFloat(totalNetAmount8.toFixed(2)),
+      totalNetAmount15: parseFloat(totalNetAmount15.toFixed(2)),
       grossByPaymentMethod,
       dailyNetProfit,
     });
@@ -178,17 +159,16 @@ export const getCurrentMonthStats: RequestHandler = async (
 ): Promise<void> => {
   try {
     const currentDate = new Date();
-    const currentMonth = currentDate.getMonth() + 1; // 1-12
+    const currentMonth = currentDate.getMonth() + 1;
     const currentYear = currentDate.getFullYear();
 
-    // Buscar todos os clientes ativos
     const clients = await prisma.client.findMany({
-      where: {
-        isActive: true,
+      include: {
+        paymentMethod: true,
+        user: true,
       },
     });
 
-    // Calcular o total líquido a partir de paymentHistory
     let totalPaymentLiquido = 0;
     let totalPayments = 0;
 
@@ -212,10 +192,7 @@ export const getCurrentMonthStats: RequestHandler = async (
       });
     });
 
-    // Subtrair R$ 8,00 por pagamento registrado
     const totalNetAmount8 = totalPaymentLiquido - totalPayments * 8;
-
-    // Subtrair R$ 15,00 por pagamento registrado
     const totalNetAmount15 = totalPaymentLiquido - totalPayments * 15;
 
     res.json({
