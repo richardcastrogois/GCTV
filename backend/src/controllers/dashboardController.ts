@@ -12,28 +12,20 @@ export const getDashboardStats: RequestHandler = async (
   try {
     const { month, year } = req.query;
 
-    // Validar parâmetros de filtro
-    const filterMonth = month ? parseInt(month as string) : undefined;
-    const filterYear = year ? parseInt(year as string) : undefined;
+    const filterMonth = month ? parseInt(month as string) : new Date().getMonth() + 1;
+    const filterYear = year ? parseInt(year as string) : new Date().getFullYear();
 
-    if (
-      filterMonth &&
-      (isNaN(filterMonth) || filterMonth < 1 || filterMonth > 12)
-    ) {
+    if (isNaN(filterMonth) || filterMonth < 1 || filterMonth > 12) {
       res.status(400).json({ message: "Mês inválido (deve ser entre 1 e 12)" });
       return;
     }
-    if (
-      filterYear &&
-      (isNaN(filterYear) || filterYear < 2000 || filterYear > 2100)
-    ) {
+    if (isNaN(filterYear) || filterYear < 2000 || filterYear > 2100) {
       res
         .status(400)
         .json({ message: "Ano inválido (deve ser entre 2000 e 2100)" });
       return;
     }
 
-    // Buscar todos os clientes (ativos e expirados)
     const clients = await prisma.client.findMany({
       include: {
         paymentMethod: true,
@@ -41,7 +33,6 @@ export const getDashboardStats: RequestHandler = async (
       },
     });
 
-    // Calcular gross_amount (soma de grossAmount para referência geral)
     const gross_amount = clients.reduce(
       (sum, client) => sum + (client.grossAmount || 0),
       0
@@ -52,7 +43,6 @@ export const getDashboardStats: RequestHandler = async (
     );
     const active_clients = clients.filter((client) => client.isActive).length;
 
-    // Calcular totalNetAmount somando paymentLiquido do paymentHistory filtrado
     let totalPaymentLiquido = 0;
     let totalPayments = 0;
     clients.forEach((client) => {
@@ -60,16 +50,18 @@ export const getDashboardStats: RequestHandler = async (
         ? client.paymentHistory
         : [];
       paymentHistory.forEach((payment: any) => {
-        const paymentDate = new Date(payment.paymentDate);
-        if (
-          !isNaN(paymentDate.getTime()) &&
-          (!filterMonth || paymentDate.getMonth() + 1 === filterMonth) &&
-          (!filterYear || paymentDate.getFullYear() === filterYear) &&
-          payment.paymentLiquido !== undefined &&
-          payment.paymentLiquido !== null
-        ) {
-          totalPaymentLiquido += Number(payment.paymentLiquido);
-          totalPayments += 1;
+        if (payment && typeof payment === "object" && payment.paymentDate) {
+          const paymentDate = new Date(payment.paymentDate);
+          if (
+            !isNaN(paymentDate.getTime()) &&
+            paymentDate.getUTCMonth() + 1 === filterMonth &&
+            paymentDate.getUTCFullYear() === filterYear &&
+            payment.paymentLiquido !== undefined &&
+            payment.paymentLiquido !== null
+          ) {
+            totalPaymentLiquido += Number(payment.paymentLiquido);
+            totalPayments += 1;
+          }
         }
       });
     });
@@ -78,7 +70,12 @@ export const getDashboardStats: RequestHandler = async (
     const totalNetAmount8 = totalPaymentLiquido - activationCost8;
     const totalNetAmount15 = totalPaymentLiquido - activationCost15;
 
-    // Calcular grossByPaymentMethod somando paymentLiquido do paymentHistory
+    const paymentMethods = await prisma.paymentMethod.findMany();
+    const initialGrossByPaymentMethod = paymentMethods.reduce((acc, method) => {
+      acc[method.name] = 0;
+      return acc;
+    }, {} as Record<string, number>);
+
     const grossByPaymentMethod = clients.reduce((acc, client) => {
       const methodName = client.paymentMethod.name;
       let paymentHistory: any[] = [];
@@ -94,25 +91,27 @@ export const getDashboardStats: RequestHandler = async (
       }
       const totalLiquido = paymentHistory.reduce(
         (sum: number, payment: any) => {
-          const paymentDate = new Date(payment.paymentDate);
-          if (
-            filterMonth &&
-            filterYear &&
-            !isNaN(paymentDate.getTime()) &&
-            paymentDate.getMonth() + 1 === filterMonth &&
-            paymentDate.getFullYear() === filterYear
-          ) {
-            return sum + (payment.paymentLiquido || 0);
+          if (payment && typeof payment === "object" && payment.paymentDate) {
+            const paymentDate = new Date(payment.paymentDate);
+            if (
+              !isNaN(paymentDate.getTime()) &&
+              paymentDate.getUTCMonth() + 1 === filterMonth &&
+              paymentDate.getUTCFullYear() === filterYear
+            ) {
+              return sum + (payment.paymentLiquido || 0);
+            }
           }
           return sum;
         },
         0
       );
-      acc[methodName] = (acc[methodName] || 0) + totalLiquido;
+      if (acc.hasOwnProperty(methodName)) {
+        acc[methodName] += totalLiquido;
+      }
       return acc;
-    }, {} as Record<string, number>);
+    }, initialGrossByPaymentMethod);
 
-    // Calcular lucro líquido por dia somando paymentLiquido do paymentHistory
+
     let dailyNetProfitQuery = `
       SELECT 
         DATE(payment_data->>'paymentDate') AS date,
@@ -159,8 +158,8 @@ export const getCurrentMonthStats: RequestHandler = async (
 ): Promise<void> => {
   try {
     const currentDate = new Date();
-    const currentMonth = currentDate.getMonth() + 1;
-    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getUTCMonth() + 1;
+    const currentYear = currentDate.getUTCFullYear();
 
     const clients = await prisma.client.findMany({
       include: {
@@ -177,9 +176,10 @@ export const getCurrentMonthStats: RequestHandler = async (
         ? client.paymentHistory
         : [];
       paymentHistory.forEach((payment: any) => {
-        if (payment && typeof payment === "object") {
+        if (payment && typeof payment === "object" && payment.paymentDate) {
           const paymentDate = new Date(payment.paymentDate);
           if (
+            !isNaN(paymentDate.getTime()) &&
             paymentDate.getUTCFullYear() === currentYear &&
             paymentDate.getUTCMonth() + 1 === currentMonth &&
             payment.paymentLiquido !== undefined &&

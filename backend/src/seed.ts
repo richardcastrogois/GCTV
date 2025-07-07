@@ -19,8 +19,9 @@ function randomDate(start: Date, end: Date): Date {
 async function seed() {
   try {
     // Inserir métodos de pagamento com upsert
+    // <-- MUDANÇA 1: ID manual removido para deixar o DB gerenciar.
     const paymentMethods = [
-      { id: 999, name: "Outros", isActive: true },
+      { name: "Outros", isActive: true },
       { name: "Nubank", isActive: true },
       { name: "Banco do Brasil", isActive: true },
       { name: "Caixa", isActive: true },
@@ -33,7 +34,6 @@ async function seed() {
         where: { name: method.name },
         update: { isActive: method.isActive },
         create: {
-          id: method.id,
           name: method.name,
           isActive: method.isActive,
           createdAt: new Date(),
@@ -44,8 +44,9 @@ async function seed() {
     console.log("Métodos de pagamento inseridos/atualizados com sucesso!");
 
     // Inserir planos com upsert
+    // <-- MUDANÇA 2: Nome alterado para "Hibrid" e ID manual removido.
     const plans = [
-      { id: 999, name: "Outros", isActive: true },
+      { name: "Hibrid", isActive: true },
       { name: "Comum", isActive: true },
       { name: "Platinum", isActive: true },
       { name: "P2P", isActive: true },
@@ -56,7 +57,6 @@ async function seed() {
         where: { name: plan.name },
         update: { isActive: plan.isActive },
         create: {
-          id: plan.id,
           name: plan.name,
           isActive: plan.isActive,
           createdAt: new Date(),
@@ -91,8 +91,9 @@ async function seed() {
       where: { name: "Platinum" },
     });
     const p2p = await prisma.plan.findFirst({ where: { name: "P2P" } });
-    const outrosPlan = await prisma.plan.findFirst({
-      where: { name: "Outros" },
+    // <-- MUDANÇA 3: Buscando pelo novo nome "Hibrid" e variável renomeada
+    const hibridPlan = await prisma.plan.findFirst({
+      where: { name: "Hibrid" },
     });
 
     if (
@@ -105,41 +106,42 @@ async function seed() {
       comum &&
       platinum &&
       p2p &&
-      outrosPlan
+      hibridPlan // <-- MUDANÇA 3: Usando a nova variável
     ) {
       const discounts = [
+        // <-- MUDANÇA 3: Usando hibridPlan.id em todos os lugares onde outrosPlan.id era usado
         { planId: comum.id, paymentMethodId: pagSeguro.id, discount: 0.5666 },
         { planId: platinum.id, paymentMethodId: pagSeguro.id, discount: 0.49 },
         { planId: p2p.id, paymentMethodId: pagSeguro.id, discount: 0.49 },
-        { planId: outrosPlan.id, paymentMethodId: pagSeguro.id, discount: 0 },
+        { planId: hibridPlan.id, paymentMethodId: pagSeguro.id, discount: 0 },
         { planId: comum.id, paymentMethodId: outrosPayment.id, discount: 0 },
         { planId: platinum.id, paymentMethodId: outrosPayment.id, discount: 0 },
         { planId: p2p.id, paymentMethodId: outrosPayment.id, discount: 0 },
         {
-          planId: outrosPlan.id,
+          planId: hibridPlan.id,
           paymentMethodId: outrosPayment.id,
           discount: 0,
         },
         { planId: comum.id, paymentMethodId: nubank.id, discount: 0 },
         { planId: platinum.id, paymentMethodId: nubank.id, discount: 0 },
         { planId: p2p.id, paymentMethodId: nubank.id, discount: 0 },
-        { planId: outrosPlan.id, paymentMethodId: nubank.id, discount: 0 },
+        { planId: hibridPlan.id, paymentMethodId: nubank.id, discount: 0 },
         { planId: comum.id, paymentMethodId: bancoDoBrasil.id, discount: 0 },
         { planId: platinum.id, paymentMethodId: bancoDoBrasil.id, discount: 0 },
         { planId: p2p.id, paymentMethodId: bancoDoBrasil.id, discount: 0 },
         {
-          planId: outrosPlan.id,
+          planId: hibridPlan.id,
           paymentMethodId: bancoDoBrasil.id,
           discount: 0,
         },
         { planId: comum.id, paymentMethodId: caixa.id, discount: 0 },
         { planId: platinum.id, paymentMethodId: caixa.id, discount: 0 },
         { planId: p2p.id, paymentMethodId: caixa.id, discount: 0 },
-        { planId: outrosPlan.id, paymentMethodId: caixa.id, discount: 0 },
+        { planId: hibridPlan.id, paymentMethodId: caixa.id, discount: 0 },
         { planId: comum.id, paymentMethodId: picpay.id, discount: 0 },
         { planId: platinum.id, paymentMethodId: picpay.id, discount: 0 },
         { planId: p2p.id, paymentMethodId: picpay.id, discount: 0 },
-        { planId: outrosPlan.id, paymentMethodId: picpay.id, discount: 0 },
+        { planId: hibridPlan.id, paymentMethodId: picpay.id, discount: 0 },
       ];
 
       for (const discount of discounts) {

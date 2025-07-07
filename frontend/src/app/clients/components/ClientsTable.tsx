@@ -117,23 +117,24 @@ export default function ClientsTable({
   const [selectedClient, setSelectedClient] = useState<ExtendedClient | null>(
     null
   );
+
+  // <-- CORREÇÃO: Inicializa o estado diretamente com base nos clientes iniciais.
   const [isPaidVisualStatus, setIsPaidVisualStatus] = useState<
     Map<number, boolean>
-  >(new Map());
+  >(() => {
+    const initialStatus = new Map<number, boolean>();
+    clients.forEach((client) => {
+      initialStatus.set(client.id, client.visualPaymentConfirmed ?? false);
+    });
+    return initialStatus;
+  });
+
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   const infoModalRef = useRef<HTMLDivElement>(null);
   const { handleUnauthorized } = useAuth();
 
   const currentDate = useMemo(() => new Date(), []);
-
-  useEffect(() => {
-    const initialStatus = new Map<number, boolean>();
-    clients.forEach((client) => {
-      initialStatus.set(client.id, client.visualPaymentConfirmed ?? false);
-    });
-    setIsPaidVisualStatus(initialStatus);
-  }, [clients]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -257,6 +258,7 @@ export default function ClientsTable({
       } else {
         toast.error("Erro ao atualizar status visual");
       }
+      // Reverte em caso de erro
       setIsPaidVisualStatus((prev) => {
         const newMap = new Map(prev);
         newMap.set(clientId, !isPaid);

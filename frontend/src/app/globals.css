@@ -6,7 +6,6 @@
 
 /* Definir variáveis de cor com a nova paleta */
 :root {
-  --background-primary: linear-gradient(135deg, #03122F, #19305C, #413B61, #AE7DAC);
   --text-primary: #F3DADF;
   --text-primary-secondary: #03122F;
   --text-secondary: #AE7DAC;
@@ -14,7 +13,7 @@
   --card-bg-end: #2d3748;
   --accent-blue: #F1916D;
   --accent-gray: #AE7DAC;
-  --dashboard-bg: rgba(243, 218, 223, 0.2);
+  --dashboard-bg: rgba(243, 218, 223, 0.08);
   --current-month-bg: linear-gradient(135deg, rgba(241, 145, 109, 0.6), rgba(174, 125, 172, 0.6));
   --button-active-bg: #00da77;
   --button-active-text: #03122F;
@@ -40,7 +39,10 @@
     min-height: 100vh;
     width: 100vw;
     font-family: "Inter", sans-serif;
-    background: var(--background-primary);
+    background: linear-gradient(135deg, #2d3748, #4a5568, #2c5282);
+    background-size: 400% 400%;
+    animation: moveGradient 8s ease infinite;
+
     color: var(--text-primary);
     overflow-x: hidden;
     overflow-y: auto;
@@ -69,19 +71,13 @@
   }
 
   .dashboard-container {
-    flex: 1;
-    background: var(--dashboard-bg);
-    backdrop-filter: blur(20px);
-    border-radius: 1rem;
+    margin-top: 3rem;
     padding: 1rem;
-    margin: 1rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     max-width: 100%;
     overflow-x: hidden;
     overflow-y: hidden;
     display: flex;
     flex-direction: column;
-    transition: opacity 0.3s ease-in-out;
   }
 
   @media (max-width: 640px) {
@@ -205,19 +201,15 @@
     }
   }
 
-  .chart-card {
+  .chart-card,
+  .future-chart-card,
+  .current-month-card {
     background: var(--dashboard-bg);
     backdrop-filter: blur(5px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(255, 255, 250, 0.1);
+    border: 1px solid rgba(255, 255, 250, 0.01);
   }
 
-  .current-month-card {
-    background: var(--current-month-bg);
-    backdrop-filter: blur(3px);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
 
   .toggle-button {
     @apply px-3 py-1 rounded-full text-sm transition-all duration-300;
@@ -1282,5 +1274,17 @@
 @layer utilities {
   .animate-fadeIn {
     animation: fadeIn 0.3s ease-in-out;
+  }
+}
+
+@keyframes moveGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
   }
 }

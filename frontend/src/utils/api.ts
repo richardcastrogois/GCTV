@@ -14,7 +14,7 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem("token");
-    console.log("Token enviado na requisição (interceptor):", token);
+    // Removido o console.log do token para limpar o console em produção
     if (token) {
       const decoded = jwtDecode<{ exp: number }>(token);
       const currentTime = Date.now() / 1000;
@@ -30,16 +30,19 @@ api.interceptors.request.use(
             const newAccessToken = data.accessToken;
             localStorage.setItem("token", newAccessToken);
             config.headers.Authorization = `Bearer ${newAccessToken}`;
-            console.log("Token renovado com sucesso:", newAccessToken);
           } catch (error) {
             console.error("Erro ao renovar token:", error);
             localStorage.removeItem("token");
             localStorage.removeItem("refreshToken");
-            window.location.href = "/";
+            if (typeof window !== "undefined") {
+              window.location.href = "/";
+            }
           }
         } else {
           localStorage.removeItem("token");
-          window.location.href = "/";
+          if (typeof window !== "undefined") {
+            window.location.href = "/";
+          }
         }
       } else {
         config.headers.Authorization = `Bearer ${token}`;
@@ -53,12 +56,26 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error: AxiosError) => {
-    console.error("Erro na resposta do servidor:", error.response);
-    if (error.response?.status === 401) {
+    // --- INÍCIO DA CORREÇÃO ---
+    // Verificamos se o erro é 401 E se a requisição original NÃO FOI para a rota de login.
+    if (
+      error.response?.status === 401 &&
+      error.config?.url !== "/api/auth/login"
+    ) {
+      // Esta lógica agora só será executada se o usuário já estiver logado
+      // e o token expirar em outra página, que não a de login.
+      console.log("Interceptor: Token inválido ou expirado. Deslogando...");
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
-      window.location.href = "/";
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
+      }
     }
+    // --- FIM DA CORREÇÃO ---
+
+    // Para todos os outros erros (incluindo o 401 do login),
+    // nós simplesmente rejeitamos o erro para que a função que fez a chamada (handleLogin)
+    // possa capturá-lo em seu próprio bloco 'catch'.
     return Promise.reject(error);
   }
 );

@@ -192,12 +192,12 @@ export default function Dashboard() {
         "message" in responseData &&
         typeof (responseData as { message?: unknown }).message === "string"
           ? (responseData as { message: string }).message
-          : (typeof error === "object" &&
+          : typeof error === "object" &&
             error !== null &&
             "message" in error &&
             typeof (error as { message: unknown }).message === "string"
-            ? (error as { message: string }).message
-            : "Erro desconhecido");
+          ? (error as { message: string }).message
+          : "Erro desconhecido";
       toast.error(`Erro ao carregar ${context}: ${message}`);
     } else if (error instanceof Error) {
       toast.error(`Erro ao carregar ${context}: ${error.message}`);
@@ -287,29 +287,39 @@ export default function Dashboard() {
     ])
   );
 
+  const neonColor = "#00f5d4";
+  const neonColorTransparent = "rgba(0, 245, 212, 0.5)";
+  const neonColorFaded = "rgba(0, 245, 212, 0)";
+
   const chartData = {
     labels: fullMonthData.map((day) => day.toString()),
     datasets: [
       {
         label: "Lucro Líquido",
         data: fullMonthData.map((day) => dailyDataMap.get(day) || 0),
-        borderColor: "var(--accent-blue)",
+        fill: true,
+        borderColor: neonColor,
+        borderWidth: 4,
+        tension: 0.4,
         backgroundColor: (context: {
           chart: { ctx: CanvasRenderingContext2D };
         }) => {
           const ctx = context.chart.ctx;
           const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-          gradient.addColorStop(0, "rgba(241, 145, 109, 0.5)");
-          gradient.addColorStop(1, "rgba(241, 145, 109, 0.1)");
+          gradient.addColorStop(0, neonColorTransparent);
+          gradient.addColorStop(1, neonColorFaded);
           return gradient;
         },
-        fill: true,
-        tension: 0.4,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        pointBackgroundColor: "var(--accent-blue)",
-        pointBorderColor: "#fff",
-        pointBorderWidth: 2,
+
+        // --- AJUSTE DOS PONTOS PARA MELHOR USABILIDADE ---
+        pointRadius: 3, // Raio do ponto em estado normal (visível, mas pequeno)
+        pointBorderColor: neonColor, // Cor da borda do ponto
+        pointBorderWidth: 2, // Espessura da borda para criar o efeito "vazado"
+        pointBackgroundColor: "#1e293b", // Cor do fundo do card para o preenchimento do ponto
+        pointHoverRadius: 7, // Raio do ponto ao passar o mouse
+        pointHoverBackgroundColor: neonColor, // Cor de preenchimento no hover
+        pointHoverBorderColor: "#fff", // Cor da borda no hover
+        // --- FIM DO AJUSTE DOS PONTOS ---
       },
     ],
   };
@@ -318,8 +328,14 @@ export default function Dashboard() {
     responsive: true,
     maintainAspectRatio: false,
     animation: { duration: 1000, easing: "easeOutCubic" as const },
+    interaction: {
+      mode: "index" as const,
+      intersect: false,
+    },
     plugins: {
-      legend: { display: false },
+      legend: {
+        display: false,
+      },
       tooltip: {
         backgroundColor: "rgba(3, 18, 47, 0.8)",
         titleFont: { size: 14, weight: "bold" as const },
@@ -334,30 +350,38 @@ export default function Dashboard() {
     },
     scales: {
       x: {
-        title: {
+        ticks: {
           display: true,
-          text: "Dia do Mês",
-          color: "var(--text-primary)",
+          color: "rgba(255, 255, 255, 0.5)",
           font: { size: 10 },
+          maxRotation: 0,
+          minRotation: 0,
         },
-        grid: { display: false },
-        ticks: { color: "var(--text-primary)", font: { size: 10 } },
+        grid: {
+          display: false,
+        },
+        border: {
+          display: false,
+        },
       },
       y: {
-        title: {
-          display: true,
-          text: "Valor Líquido (R$)",
-          color: "var(--text-primary)",
-          font: { size: 14, weight: "bold" as const },
-        },
-        grid: { color: "var(--accent-gray)", lineWidth: 1 },
         ticks: {
-          color: "var(--text-primary)",
-          font: { size: 12 },
-          callback: (tickValue: string | number) =>
-            `R$ ${parseFloat(tickValue as string).toFixed(2)}`,
+          display: true,
+          color: "rgba(255, 255, 255, 0.7)",
+          font: { size: 10 },
+          padding: 10,
+          callback: (value: string | number) =>
+            `R$ ${Number(value).toFixed(0)}`,
         },
-        beginAtZero: true,
+        grid: {
+          display: true,
+          color: "rgba(255, 255, 255, 0.1)",
+          borderDash: [5, 5],
+          drawBorder: false,
+        },
+        border: {
+          display: false,
+        },
       },
     },
   };
@@ -384,27 +408,26 @@ export default function Dashboard() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="dashboard-container">
-        <div className="flex flex-col sm:flex-row items-center justify-start mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-left">
-            Dashboard
-          </h1>
-          <div className="flex-grow"></div>
-          <div
-            className="sm:mx-auto"
-            style={{ maxWidth: "350px", width: "100%" }}
-          >
-            <Filter onFilterChange={handleFilterChange} />
-          </div>
-        </div>
         <div className="flex flex-col lg:flex-row gap-6">
-          <div className="w-full lg:w-2/3">
+          <div className="w-full lg:w-2/3 flex flex-col gap-6">
+            <div className="w-full flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-left flex-shrink-0">
+                  Dashboard
+                </h1>
+              </div>
+              <div style={{ maxWidth: "350px", width: "100%" }}>
+                <Filter onFilterChange={handleFilterChange} />
+              </div>
+            </div>
+
             <h2
-              className="text-xl font-semibold mb-4 text-center sm:text-left"
+              className="text-xl font-semibold text-center sm:text-left"
               style={{ color: "var(--card-text-secondary)" }}
             >
               Meu Saldo Bruto
             </h2>
-            <div className="card-container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="card-container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(stats.grossByPaymentMethod).map(
                 ([method, amount]) => (
                   <div
@@ -436,7 +459,7 @@ export default function Dashboard() {
                 )
               )}
             </div>
-            <div className="card w-full chart-card mb-6">
+            <div className="card w-full chart-card">
               <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
                 <h2
                   className="text-xl font-semibold text-center sm:text-left"
@@ -450,12 +473,13 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
           <div className="w-full lg:w-1/3 flex flex-col gap-4">
             <div className="card w-full current-month-card">
               <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
                 <h2
                   className="text-xl font-semibold text-center sm:text-left"
-                  style={{ color: "var(--card-text)" }}
+                  style={{ color: "var(--text-primary-secondary)" }}
                 >
                   {getCurrentMonthTitle()}
                 </h2>
@@ -504,22 +528,27 @@ export default function Dashboard() {
               style={{ minHeight: "300px", overflowY: "auto" }}
             >
               <h2
-                className="text-3xl font-bold m-6  text-center sm:text-left"
+                className="text-3xl font-bold m-4 text-center sm:text-left"
                 style={{ color: "var(--text-secondary)" }}
               >
                 Análise dos Clientes (Meu Mês)
               </h2>
               <div className="flex flex-col gap-3">
-                <p className="mb-4">
+                <p className="mb-3">
                   <strong
-                    className="text-xl font-bold"
+                    className="text-2xl font-bold"
                     style={{ color: "var(--text-primary)" }}
                   >
                     Clientes Ativos:
                   </strong>{" "}
-                  {activeClientsCount}
+                  <span
+                    className="text-2xl font-bold"
+                    style={{ color: "var(--accent-blue)" }}
+                  >
+                    {activeClientsCount}
+                  </span>
                 </p>
-                <p className="m-4">
+                <p className="m-3">
                   <strong
                     className="text-2xl font-bold"
                     style={{ color: "var(--text-primary-secondary)" }}
@@ -540,12 +569,13 @@ export default function Dashboard() {
                           ? "#4d8cff"
                           : "#F3DADF",
                       fontWeight: "bold",
+                      fontSize: "1.25rem",
                     }}
                   >
                     - {plan}: {count}
                   </p>
                 ))}
-                <p className="m-4">
+                <p className="m-3">
                   <strong
                     className="text-xl font-bold"
                     style={{ color: "var(--text-primary-secondary)" }}
@@ -571,6 +601,7 @@ export default function Dashboard() {
                             ? "#ffa000"
                             : "#F3DADF",
                         fontWeight: "bold",
+                        fontSize: "1.25rem",
                       }}
                     >
                       - {method}: {count}

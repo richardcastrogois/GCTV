@@ -191,7 +191,7 @@ export default function Login() {
     } catch (error) {
       const axiosError = error as AxiosError<ErrorResponse>;
       if (axiosError.response?.status === 401) {
-        handleUnauthorized();
+        toast.error("Usuário ou senha inválida.");
       } else {
         toast.error(
           `Erro ao logar: ${

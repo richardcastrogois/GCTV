@@ -181,7 +181,8 @@ export default function Filter({ onFilterChange }: FilterProps) {
           options={years}
           value={selectedYear}
           onChange={handleYearChange}
-          className="w-28"
+          // AQUI ESTÁ A CORREÇÃO: Aumentei a largura para caber o conteúdo
+          className="w-32"
           classNamePrefix="custom-select"
           styles={customStyles}
         />

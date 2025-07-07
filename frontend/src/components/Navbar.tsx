@@ -51,11 +51,10 @@ export default function Navbar() {
 
   return (
     <nav
-      className="text-white p-3 shadow-lg fixed top-0 left-0 right-0 z-50 border-b border-opacity-30 border-white"
+      className="text-white p-3 fixed top-0 left-0 right-0 z-50 border-opacity-30 border-white"
       style={{
-        background: "linear-gradient(135deg, #03122F, #19305C, #413B61)",
-        borderBottomLeftRadius: "20px",
-        borderBottomRightRadius: "20px",
+        borderBottomLeftRadius: "10px",
+        borderBottomRightRadius: "10px",
         borderTopLeftRadius: "0",
         borderTopRightRadius: "0",
       }}
@@ -68,13 +67,18 @@ export default function Navbar() {
               href={item.href}
               prefetch={true}
               onClick={() => handleIconClick(item.href)}
-              className="flex items-center group"
+              // AQUI ESTÁ A MUDANÇA PRINCIPAL:
+              // Criamos um container de tamanho fixo (w-16 h-16) para cada ícone.
+              // Agora, o ícone pode mudar de tamanho internamente sem afetar o layout externo.
+              className="group flex h-16 w-16 items-center justify-center rounded-full"
             >
               <span
-                className={`transition-all duration-300 ${
+                // O span agora só controla a aparência do ícone, sem impactar o layout.
+                // Usei `scale` no hover para um efeito de crescimento mais suave e sem quebrar o layout.
+                className={`transition-all duration-300 ease-in-out ${
                   activeIcon === item.href
-                    ? "text-4xl"
-                    : "text-3xl group-hover:text-3.5xl"
+                    ? "text-5xl" // Ícone ativo fica grande
+                    : "text-3xl group-hover:scale-125" // Ícone inativo cresce com zoom no hover
                 }`}
                 style={{
                   color: activeIcon === item.href ? "#F1916D" : "#AE7DAC",

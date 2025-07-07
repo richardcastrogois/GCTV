@@ -1,4 +1,4 @@
-//backend/src/controllers/authController.ts
+// backend/src/controllers/authController.ts
 
 import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
@@ -40,7 +40,7 @@ export const login: RequestHandler = async (
   const refreshToken = jwt.sign({ userId: user.id, username }, refreshSecret, {
     expiresIn: "7d",
   } as SignOptions);
-  console.log("Tokens gerados e enviados:", { accessToken, refreshToken });
+
   res.json({ accessToken, refreshToken, userId: user.id });
 };
 
@@ -70,7 +70,6 @@ export const refreshToken: RequestHandler = async (
       userId: number;
       username: string;
     };
-    console.log("Refresh token decodificado:", decoded);
 
     const user = authUsers.find(
       (u: { username: string; id: number }) =>
@@ -89,10 +88,8 @@ export const refreshToken: RequestHandler = async (
         expiresIn: "15m",
       } as SignOptions
     );
-    console.log("Novo accessToken gerado:", newAccessToken);
     res.json({ accessToken: newAccessToken });
   } catch (error) {
-    console.error("Erro ao verificar refresh token:", error);
     res.status(403).json({ error: "Refresh token inválido ou expirado" });
   }
 };
