@@ -29,28 +29,29 @@ const prisma = new PrismaClient({
   log: ["query", "error", "info", "warn"],
 });
 
-// Comentado temporariamente para teste, pois pode causar atrasos
-// prisma.$use(async (params, next) => {
-//   const result = await next(params);
-//   await prisma.$disconnect();
-//   return result;
-// });
-
 const app: Express = express();
 
-app.use(cors());
+// --- INÍCIO DOS AJUSTES PARA DEPLOY ---
+
+// 1. Configuração explícita de CORS para permitir requisições de qualquer origem
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`[Global] Recebida requisição: ${req.method} ${req.originalUrl}`);
-  next();
-});
+// Removido o log de cada requisição para não poluir os logs de produção
+// app.use((req: Request, res: Response, next: NextFunction) => {
+//   console.log(`[Global] Recebida requisição: ${req.method} ${req.originalUrl}`);
+//   next();
+// });
 
-app.get("/test", (req: Request, res: Response) => {
-  console.log("[Test] Rota /test acessada diretamente no server.ts");
-  res.json({ message: "Rota /test funcionando!" });
-});
+// --- FIM DOS AJUSTES PARA DEPLOY ---
 
 // Cache com expiração de 1 semana (604800 segundos)
 interface CachedImage {
@@ -146,13 +147,6 @@ function saveCacheToDisk() {
   const validCache = Array.from(imageCache.entries()).filter(
     ([_, item]) => Date.now() - item.timestamp < CACHE_EXPIRY
   );
-  // fs.writeFileSync(
-  //   CACHE_FILE,
-  //   JSON.stringify(validCache, (key, value) =>
-  //     value instanceof Buffer ? value.toString("base64") : value
-  //   ),
-  //   "utf-8"
-  // );
   console.log(
     "Salvamento em disco desativado para teste. Cache em memória com",
     validCache.length,
@@ -187,9 +181,8 @@ app.get("/proxy-image", async (req: Request, res: Response) => {
     }
 
     if (imageCache.has(url)) {
-      const cachedImage = imageCache.get(url)!; // Asserção de tipo, pois sabemos que existe
+      const cachedImage = imageCache.get(url)!;
       if (Date.now() - cachedImage.timestamp < CACHE_EXPIRY) {
-        console.log("Imagem servida do cache:", url);
         res.set("Access-Control-Allow-Origin", "*");
         res.set("Content-Type", cachedImage.contentType);
         return res.send(cachedImage.data);
@@ -207,7 +200,6 @@ app.get("/proxy-image", async (req: Request, res: Response) => {
     };
     imageCache.set(url, newItem);
     saveCacheToDisk();
-    console.log("Imagem proxyada com sucesso e cacheada:", url);
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Content-Type", contentType);
     res.send(response.data);
@@ -219,9 +211,6 @@ app.get("/proxy-image", async (req: Request, res: Response) => {
 
 function setupRoutes(app: Express) {
   console.log("Registrando rotas...");
-  if (!app._router) {
-    app.use((req: Request, res: Response, next: NextFunction) => next());
-  }
   app.use("/api/clients", clientRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/dashboard", dashboardRoutes);
@@ -240,21 +229,30 @@ if (!JWT_SECRET) {
 console.log("JWT_SECRET carregado:", JWT_SECRET);
 
 const PORT = process.env.PORT || 3001;
-const httpsOptions = {
-  key: fs.readFileSync("cert.key"),
-  cert: fs.readFileSync("cert.pem"),
-};
-const server = https.createServer(httpsOptions, app);
-server.listen(PORT, () => {
-  console.log(`Server running on https://localhost:${PORT}`);
-});
 
-// Fechar Prisma e o servidor ao encerrar
-process.on("SIGTERM", async () => {
-  await prisma.$disconnect();
-  saveCacheToDisk();
-  server.close(() => {
-    console.log("Servidor encerrado.");
-    process.exit(0);
-  });
-});
+// --- INÍCIO DO SEGUNDO AJUSTE PARA DEPLOY ---
+
+// Esta parte só vai rodar se não estivermos no ambiente de produção da Vercel
+if (process.env.NODE_ENV !== "production") {
+  try {
+    const httpsOptions = {
+      key: fs.readFileSync("cert.key"),
+      cert: fs.readFileSync("cert.pem"),
+    };
+    const server = https.createServer(httpsOptions, app);
+    server.listen(PORT, () => {
+      console.log(`Servidor HTTPS local rodando em https://localhost:${PORT}`);
+    });
+  } catch (e) {
+    console.warn(
+      "Certificados SSL não encontrados, iniciando servidor HTTP para desenvolvimento local."
+    );
+    app.listen(PORT, () => {
+      console.log(`Servidor HTTP local rodando em http://localhost:${PORT}`);
+    });
+  }
+}
+
+// Exporta o 'app' para que a Vercel possa usá-lo como uma Serverless Function.
+// Esta é a linha mais importante para o deploy funcionar.
+export default app;
