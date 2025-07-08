@@ -1,5 +1,3 @@
-// backend/src/server.ts
-
 import express, { Express, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -39,17 +37,12 @@ app.use(
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   })
 );
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Removido o log de cada requisição para não poluir os logs de produção
-// app.use((req: Request, res: Response, next: NextFunction) => {
-//   console.log(`[Global] Recebida requisição: ${req.method} ${req.originalUrl}`);
-//   next();
-// });
 
 // --- FIM DOS AJUSTES PARA DEPLOY ---
 
@@ -184,6 +177,8 @@ app.get("/proxy-image", async (req: Request, res: Response) => {
       const cachedImage = imageCache.get(url)!;
       if (Date.now() - cachedImage.timestamp < CACHE_EXPIRY) {
         res.set("Access-Control-Allow-Origin", "*");
+        res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+        res.set("Access-Control-Allow-Headers", "Content-Type");
         res.set("Content-Type", cachedImage.contentType);
         return res.send(cachedImage.data);
       } else {
@@ -201,6 +196,8 @@ app.get("/proxy-image", async (req: Request, res: Response) => {
     imageCache.set(url, newItem);
     saveCacheToDisk();
     res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
     res.set("Content-Type", contentType);
     res.send(response.data);
   } catch (error) {
@@ -254,5 +251,4 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 // Exporta o 'app' para que a Vercel possa usá-lo como uma Serverless Function.
-// Esta é a linha mais importante para o deploy funcionar.
 export default app;
