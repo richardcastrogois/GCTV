@@ -29,9 +29,15 @@ const prisma = new PrismaClient({
 
 const app: Express = express();
 
-// --- INÍCIO DOS AJUSTES PARA DEPLOY ---
+// Middleware para lidar com requisições OPTIONS (preflight)
+app.options("*", (req: Request, res: Response) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.sendStatus(200);
+});
 
-// 1. Configuração explícita de CORS para permitir requisições de qualquer origem
+// Configuração explícita de CORS para permitir requisições de qualquer origem
 app.use(
   cors({
     origin: "*",
@@ -43,8 +49,6 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// --- FIM DOS AJUSTES PARA DEPLOY ---
 
 // Cache com expiração de 1 semana (604800 segundos)
 interface CachedImage {
@@ -226,8 +230,6 @@ if (!JWT_SECRET) {
 console.log("JWT_SECRET carregado:", JWT_SECRET);
 
 const PORT = process.env.PORT || 3001;
-
-// --- INÍCIO DO SEGUNDO AJUSTE PARA DEPLOY ---
 
 // Esta parte só vai rodar se não estivermos no ambiente de produção da Vercel
 if (process.env.NODE_ENV !== "production") {
