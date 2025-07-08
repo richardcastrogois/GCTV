@@ -7,6 +7,11 @@ import axios, {
 } from "axios";
 import { jwtDecode } from "jwt-decode";
 
+console.log(
+  "API Base URL que o frontend está usando:",
+  process.env.NEXT_PUBLIC_API_URL
+);
+
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
 });
