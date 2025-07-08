@@ -38,7 +38,7 @@ app.options("*", (req: Request, res: Response) => {
 // Configuração explícita de CORS para permitir requisições de qualquer origem
 app.use(
   cors({
-    origin: "*",
+    origin: "https://platinum-tv.vercel.app", // IMPORTANTE: Use a URL do seu frontend
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
