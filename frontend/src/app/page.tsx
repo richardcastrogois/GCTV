@@ -106,7 +106,8 @@ export default function Login() {
           quality = "w1280";
         }
 
-        const imageUrl = `https://localhost:3001/proxy-image?url=${encodeURIComponent(
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        const imageUrl = `${apiUrl}/proxy-image?url=${encodeURIComponent(
           `https://image.tmdb.org/t/p/${quality}${backdrop_path}`
         )}`;
 
