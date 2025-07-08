@@ -15,13 +15,11 @@ import path from "path";
 
 dotenv.config();
 
-// Configurar Prisma Client com pool ajustado
+// Configurar Prisma Client (sem fallback local)
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url:
-        process.env.DATABASE_URL ||
-        "postgresql://localhost:5432/yourdb?schema=public",
+      url: process.env.DATABASE_URL, // Obrigatório, configurado na Vercel
     },
   },
   log: ["query", "error", "info", "warn"],
@@ -58,26 +56,20 @@ interface CachedImage {
 }
 
 const CACHE_DIR = path.join(__dirname, "cache");
-const CACHE_FILE = path.join(CACHE_DIR, "image_cache.json");
 const CACHE_EXPIRY = 604800000; // 1 semana em milissegundos
 const CLEANUP_INTERVAL = 3600000; // 1 hora em milissegundos
 
 const imageCache = new Map<string, CachedImage>();
 
-// Criar diretório de cache se não existir
-if (!fs.existsSync(CACHE_DIR)) {
-  fs.mkdirSync(CACHE_DIR);
-}
-
-// Carregar cache do disco ao iniciar
+// Carregar cache do disco ao iniciar (opcional, desativado em produção)
 function loadCacheFromDisk() {
-  if (fs.existsSync(CACHE_FILE)) {
+  if (process.env.NODE_ENV !== "production" && fs.existsSync(CACHE_DIR)) {
     try {
-      const rawData = fs.readFileSync(CACHE_FILE, "utf-8");
+      const rawData = fs.readFileSync(
+        path.join(CACHE_DIR, "image_cache.json"),
+        "utf-8"
+      );
       const cachedData: [string, any][] = JSON.parse(rawData) || [];
-      if (!Array.isArray(cachedData)) {
-        throw new Error("Dados do cache não são um array válido");
-      }
       const filteredData: [string, CachedImage][] = cachedData
         .map((item): [string, CachedImage] | null => {
           if (
@@ -116,42 +108,24 @@ function loadCacheFromDisk() {
         }
       });
       console.log(
-        "Cache carregado do disco com",
+        "Cache carregado localmente com",
         imageCache.size,
         "itens válidos."
       );
     } catch (error) {
-      console.error(
-        "Erro ao carregar cache do disco, ignorando arquivo corrompido:",
-        error
-      );
-      try {
-        fs.unlinkSync(CACHE_FILE); // Remove o arquivo corrompido
-        console.log("Arquivo corrompido removido.");
-      } catch (unlinkError) {
-        console.error("Erro ao remover arquivo corrompido:", unlinkError);
-      }
+      console.error("Erro ao carregar cache local, ignorando:", error);
     }
-  } else {
-    console.log("Nenhum cache encontrado no disco.");
   }
 }
 
 loadCacheFromDisk();
 
-// Salvar cache no disco periodicamente (desativado temporariamente para evitar reinicializações)
+// Remover saveCacheToDisk (não mais usado)
 function saveCacheToDisk() {
-  const validCache = Array.from(imageCache.entries()).filter(
-    ([_, item]) => Date.now() - item.timestamp < CACHE_EXPIRY
-  );
-  console.log(
-    "Salvamento em disco desativado para teste. Cache em memória com",
-    validCache.length,
-    "itens."
-  );
+  // Função vazia ou removida, pois não salva em disco em produção
 }
 
-// Limpeza automática a cada hora
+// Limpeza automática a cada hora (sem salvamento em disco)
 setInterval(() => {
   const beforeSize = imageCache.size;
   for (const [url, item] of imageCache) {
@@ -160,7 +134,6 @@ setInterval(() => {
     }
   }
   if (imageCache.size !== beforeSize) {
-    saveCacheToDisk();
     console.log(
       "Cache limpo, removidos",
       beforeSize - imageCache.size,
@@ -198,7 +171,6 @@ app.get("/proxy-image", async (req: Request, res: Response) => {
       timestamp: Date.now(),
     };
     imageCache.set(url, newItem);
-    saveCacheToDisk();
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
     res.set("Access-Control-Allow-Headers", "Content-Type");
