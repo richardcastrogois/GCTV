@@ -80,4 +80,4 @@ model Client {
   @@index([isActive])
   @@index([dueDate])
 }
-// Forçar novo build 2025-07-08
+// Forçar novo build 2025-0708
