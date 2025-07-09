@@ -86,13 +86,12 @@ app.get("/proxy-image", async (req: Request, res: Response) => {
 
 // CORREÇÃO DE ROTEAMENTO PARA VERCEL
 function setupRoutes(app: Express) {
-  console.log("Registrando rotas COM o prefixo /api para teste local...");
-  // ADICIONAMOS DE VOLTA O /api AQUI
-  app.use("/clients", clientRoutes);
-  app.use("/auth", authRoutes);
-  app.use("/dashboard", dashboardRoutes);
-  app.use("/current-month", currentMonthRoutes);
-  app.get("/expired-clients", authMiddleware, getExpiredClients);
+  console.log("Registrando rotas COM o prefixo /api...");
+  app.use("/api/clients", clientRoutes);
+  app.use("/api/auth", authRoutes);
+  app.use("/api/dashboard", dashboardRoutes);
+  app.use("/api/current-month", currentMonthRoutes);
+  app.get("/api/expired-clients", authMiddleware, getExpiredClients);
   console.log("Rotas registradas com sucesso.");
 }
 
