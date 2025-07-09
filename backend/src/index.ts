@@ -54,7 +54,7 @@ const imageCache = new Map<string, CachedImage>();
 // Endpoint de proxy para imagens do TMDB com cache
 // Esta rota está correta. O erro na Vercel é de roteamento, não do código dela.
 // A chamada no frontend para /api/proxy-image está certa.
-app.get("/proxy-image", async (req: Request, res: Response) => {
+app.get("/api/proxy-image", async (req: Request, res: Response) => {
   try {
     const url = req.query.url as string;
     if (!url) {
