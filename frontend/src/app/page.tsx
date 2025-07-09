@@ -107,7 +107,7 @@ export default function Login() {
         }
 
         const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-        const imageUrl = `${apiUrl}/proxy-image?url=${encodeURIComponent(
+        const imageUrl = `${apiUrl}/api/proxy-image?url=${encodeURIComponent(
           `https://image.tmdb.org/t/p/${quality}${backdrop_path}`
         )}`;
 
