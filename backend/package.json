@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "postinstall": "npx prisma generate",
-    "vercel-build": "npx prisma generate && tsc && mkdir public",
+    "vercel-build": "npx prisma generate && tsc",
     "prisma:seed": "ts-node src/seed.ts",
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "npx prisma generate && tsc",
