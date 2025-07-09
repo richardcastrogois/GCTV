@@ -25,25 +25,37 @@ const prisma = new PrismaClient({
   log: ["query", "error", "info", "warn"],
 });
 
+// =================================================================
+// INÍCIO DA CORREÇÃO FINAL DE CORS
+// =================================================================
+
+const corsOptions = {
+  origin: "https://platinum-tv.vercel.app",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-CSRF-Token",
+    "X-Requested-With",
+    "Accept",
+    "Accept-Version",
+    "Content-Length",
+    "Content-MD5",
+    "Date",
+    "X-Api-Version",
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200, // Garante que a resposta para o preflight seja 200 OK
+};
+
 const app: Express = express();
 
-// Middleware para lidar com requisições OPTIONS (preflight)
-app.options("*", (req: Request, res: Response) => {
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.sendStatus(200);
-});
+// Habilita o CORS para todas as requisições, tratando o preflight automaticamente
+app.use(cors(corsOptions));
 
-// Configuração explícita de CORS para permitir requisições de qualquer origem
-app.use(
-  cors({
-    origin: "https://platinum-tv.vercel.app", // IMPORTANTE: Use a URL do seu frontend
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+// =================================================================
+// FIM DA CORREÇÃO FINAL DE CORS
+// =================================================================
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
