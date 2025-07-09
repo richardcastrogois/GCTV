@@ -1,11 +1,10 @@
 // backend/src/controllers/clientController.ts
 
 import { RequestHandler, Request, Response } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { ParsedQs } from "qs";
 import bcrypt from "bcryptjs";
-
-const prisma = new PrismaClient();
+import prisma from "../lib/prisma"; // USANDO A NOSSA CONEXÃO ÚNICA E ESTÁVEL
 
 type ParamsWithId = { id: string };
 type ClientBody = {
@@ -135,8 +134,6 @@ export const getClients: RequestHandler = async (
   } catch (error) {
     console.error("Erro ao buscar clientes:", error);
     res.status(500).json({ message: "Erro ao buscar clientes" });
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -227,8 +224,6 @@ export const getExpiredClients: RequestHandler = async (
   } catch (error) {
     console.error("Erro ao buscar clientes expirados:", error);
     res.status(500).json({ message: "Erro ao buscar clientes expirados" });
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -258,8 +253,6 @@ export const getClientById: RequestHandler<ParamsWithId> = async (
   } catch (error) {
     console.error("Erro ao buscar cliente:", error);
     res.status(500).json({ message: "Erro ao buscar cliente" });
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -275,8 +268,6 @@ export const getPlans: RequestHandler = async (
   } catch (error) {
     console.error("Erro ao buscar planos:", error);
     res.status(500).json({ message: "Erro ao buscar planos" });
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -292,8 +283,6 @@ export const getPaymentMethods: RequestHandler = async (
   } catch (error) {
     console.error("Erro ao buscar métodos de pagamento:", error);
     res.status(500).json({ message: "Erro ao buscar métodos de pagamento" });
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -408,8 +397,6 @@ export const createClient: RequestHandler<
     if (!res.headersSent) {
       res.status(500).json({ message: "Erro interno ao criar cliente" });
     }
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -556,8 +543,6 @@ export const updateClient: RequestHandler<
         .status(500)
         .json({ message: "Erro ao atualizar cliente", error: String(error) });
     }
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -586,8 +571,6 @@ export const deleteClient: RequestHandler<ParamsWithId> = async (
       }
     }
     res.status(500).json({ message: "Erro ao deletar cliente" });
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -639,8 +622,6 @@ export const renewClient: RequestHandler<
       }
     }
     res.status(500).json({ message: "Erro ao renovar cliente" });
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -703,8 +684,6 @@ export const reactivateClient: RequestHandler<
       }
     }
     res.status(500).json({ message: "Erro ao reativar cliente" });
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -765,7 +744,6 @@ export const updatePaymentStatus: RequestHandler<
       return;
     }
 
-    // Normalizar paymentHistory existente
     let currentPayments = (
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
@@ -815,8 +793,6 @@ export const updatePaymentStatus: RequestHandler<
       }
     }
     res.status(500).json({ message: "Erro ao atualizar status de pagamento" });
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -883,7 +859,6 @@ export const editPayment: RequestHandler<
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
 
-    // Normalizar paymentHistory existente antes de editar
     currentPayments = currentPayments.map((payment: any) => {
       if (typeof payment === "object" && payment !== null) {
         return {
@@ -935,8 +910,6 @@ export const editPayment: RequestHandler<
     } else {
       res.status(500).json({ message: "Erro ao editar pagamento" });
     }
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -975,7 +948,6 @@ export const deletePayment: RequestHandler<
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
 
-    // Normalizar paymentHistory existente antes de deletar
     currentPayments = currentPayments.map((payment: any) => {
       if (typeof payment === "object" && payment !== null) {
         return {
@@ -1023,8 +995,6 @@ export const deletePayment: RequestHandler<
     } else {
       res.status(500).json({ message: "Erro ao excluir pagamento" });
     }
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -1069,8 +1039,6 @@ export const updateClientObservations: RequestHandler<
       }
     }
     res.status(500).json({ message: "Erro ao atualizar observações" });
-  } finally {
-    await prisma.$disconnect();
   }
 };
 
@@ -1085,7 +1053,6 @@ export const updateVisualPaymentStatus: RequestHandler<
   const { id } = req.params;
   const { status } = req.body;
 
-  // Log da requisição recebida
   console.log("Recebida requisição para updateVisualPaymentStatus", {
     id: req.params.id,
     status: req.body.status,
@@ -1117,7 +1084,6 @@ export const updateVisualPaymentStatus: RequestHandler<
       include: { plan: true, paymentMethod: true, user: true },
     });
 
-    // Log do cliente atualizado com sucesso
     console.log("Cliente atualizado com sucesso:", updatedClient);
 
     res.json(updatedClient);
@@ -1135,7 +1101,5 @@ export const updateVisualPaymentStatus: RequestHandler<
     res.status(500).json({
       message: "Erro interno ao atualizar status visual de pagamento",
     });
-  } finally {
-    await prisma.$disconnect();
   }
 };

@@ -1,7 +1,7 @@
 // backend/src/controllers/dashboardController.ts
 
 import { Request, Response, RequestHandler } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
 

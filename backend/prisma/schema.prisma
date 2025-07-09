@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
+  provider      = "prisma-client-js"
+  output        = "../node_modules/.prisma/client"
   binaryTargets = ["native", "rhel-openssl-1.0.x"]
 }
 
@@ -18,11 +18,11 @@ model User {
 }
 
 model PaymentMethod {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        Int                         @id @default(autoincrement())
+  name      String                      @unique
+  isActive  Boolean                     @default(true)
+  createdAt DateTime                    @default(now())
+  updatedAt DateTime                    @updatedAt
   clients   Client[]
   discounts PlanPaymentMethodDiscount[]
 
@@ -30,11 +30,11 @@ model PaymentMethod {
 }
 
 model Plan {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        Int                         @id @default(autoincrement())
+  name      String                      @unique
+  isActive  Boolean                     @default(true)
+  createdAt DateTime                    @default(now())
+  updatedAt DateTime                    @updatedAt
   clients   Client[]
   discounts PlanPaymentMethodDiscount[]
 
@@ -42,14 +42,14 @@ model Plan {
 }
 
 model PlanPaymentMethodDiscount {
-  id             Int           @id @default(autoincrement())
-  planId         Int
+  id              Int           @id @default(autoincrement())
+  planId          Int
   paymentMethodId Int
-  discount       Float         @default(0)
-  plan           Plan          @relation(fields: [planId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  paymentMethod  PaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  discount        Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  paymentMethod   PaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
+  plan            Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   @@unique([planId, paymentMethodId])
   @@index([planId])
@@ -57,27 +57,26 @@ model PlanPaymentMethodDiscount {
 }
 
 model Client {
-  id                 Int           @id @default(autoincrement())
-  fullName           String
-  email              String
-  phone              String?
-  planId             Int           @default(999)
-  plan               Plan          @relation(fields: [planId], references: [id], onDelete: SetDefault, onUpdate: Cascade)
-  paymentMethodId    Int           @default(999)
-  paymentMethod      PaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: SetDefault, onUpdate: Cascade)
-  dueDate            DateTime
-  grossAmount        Float
-  netAmount          Float
-  isActive           Boolean       @default(true)
-  observations       String?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  userId             Int           @unique
-  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  paymentHistory     Json?         @default("[]")
-  visualPaymentConfirmed Boolean @default(false)         
+  id                     Int           @id @default(autoincrement())
+  fullName               String
+  email                  String
+  phone                  String?
+  dueDate                DateTime
+  grossAmount            Float
+  netAmount              Float
+  isActive               Boolean       @default(true)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  paymentMethodId        Int           @default(999)
+  planId                 Int           @default(999)
+  observations           String?
+  userId                 Int           @unique
+  paymentHistory         Json?         @default("[]")
+  visualPaymentConfirmed Boolean       @default(false)
+  paymentMethod          PaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: SetDefault)
+  plan                   Plan          @relation(fields: [planId], references: [id], onDelete: SetDefault)
+  user                   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([isActive])
   @@index([dueDate])
 }
-// Forçar novo build 2025-0708

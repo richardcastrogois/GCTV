@@ -12,20 +12,15 @@ import fs from "fs";
 import { PrismaClient } from "@prisma/client";
 import axios from "axios";
 import path from "path";
+import prisma from "./lib/prisma";
 
 dotenv.config();
 
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-  log: ["query", "error", "info", "warn"],
-});
-
 const corsOptions = {
-  origin: "https://platinum-tv.vercel.app",
+  origin: [
+    "https://platinum-tv.vercel.app", // Para produção na Vercel
+    "http://localhost:3000", // Para desenvolvimento local
+  ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
@@ -48,19 +43,18 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ... (todo o seu código de cache de imagem permanece igual) ...
+// Sua lógica de cache de imagem está aqui, mantida como original
 interface CachedImage {
   data: Buffer;
   contentType: string;
   timestamp: number;
 }
 const imageCache = new Map<string, CachedImage>();
-// etc...
 
 // Endpoint de proxy para imagens do TMDB com cache
-app.get("/proxy-image", async (req: Request, res: Response) => {
-  // O código desta rota está correto e não precisa de alterações.
-  // A chamada do frontend é que precisa ser ajustada.
+// Esta rota está correta. O erro na Vercel é de roteamento, não do código dela.
+// A chamada no frontend para /api/proxy-image está certa.
+app.get("/api/proxy-image", async (req: Request, res: Response) => {
   try {
     const url = req.query.url as string;
     if (!url) {
@@ -68,6 +62,7 @@ app.get("/proxy-image", async (req: Request, res: Response) => {
     }
     if (imageCache.has(url)) {
       const cachedImage = imageCache.get(url)!;
+      // Adicionando headers de CORS aqui também por segurança
       res.set("Access-Control-Allow-Origin", "*");
       res.set("Content-Type", cachedImage.contentType);
       return res.send(cachedImage.data);
@@ -89,24 +84,17 @@ app.get("/proxy-image", async (req: Request, res: Response) => {
   }
 });
 
-// =================================================================
-// INÍCIO DA CORREÇÃO DE ROTEAMENTO
-// =================================================================
-
+// CORREÇÃO DE ROTEAMENTO PARA VERCEL
 function setupRoutes(app: Express) {
-  console.log("Registrando rotas sem o prefixo /api...");
-  // REMOVEMOS O /api DE TODAS AS ROTAS AQUI
-  app.use("/clients", clientRoutes);
-  app.use("/auth", authRoutes);
-  app.use("/dashboard", dashboardRoutes);
-  app.use("/current-month", currentMonthRoutes);
-  app.get("/expired-clients", authMiddleware, getExpiredClients);
+  console.log("Registrando rotas COM o prefixo /api para teste local...");
+  // ADICIONAMOS DE VOLTA O /api AQUI
+  app.use("/api/clients", clientRoutes);
+  app.use("/api/auth", authRoutes);
+  app.use("/api/dashboard", dashboardRoutes);
+  app.use("/api/current-month", currentMonthRoutes);
+  app.get("/api/expired-clients", authMiddleware, getExpiredClients);
   console.log("Rotas registradas com sucesso.");
 }
-
-// =================================================================
-// FIM DA CORREÇÃO DE ROTEAMENTO
-// =================================================================
 
 setupRoutes(app);
 
@@ -116,7 +104,28 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-// ... (resto do seu código, if (process.env.NODE_ENV !== "production") etc...)
+const PORT = process.env.PORT || 3001;
 
-// Exporta o 'app' para que a Vercel possa usá-lo como uma Serverless Function.
+// Lógica para iniciar o servidor (localmente ou na Vercel)
+if (process.env.NODE_ENV !== "production") {
+  try {
+    // CORREÇÃO DO CAMINHO DOS CERTIFICADOS SSL PARA O AMBIENTE LOCAL
+    const httpsOptions = {
+      key: fs.readFileSync(path.join(__dirname, "..", "cert.key")),
+      cert: fs.readFileSync(path.join(__dirname, "..", "cert.pem")),
+    };
+    const server = https.createServer(httpsOptions, app);
+    server.listen(PORT, () => {
+      console.log(`Servidor HTTPS local rodando em https://localhost:${PORT}`);
+    });
+  } catch (e) {
+    console.warn(
+      "Certificados SSL não encontrados, iniciando servidor HTTP para desenvolvimento local."
+    );
+    app.listen(PORT, () => {
+      console.log(`Servidor HTTP local rodando em http://localhost:${PORT}`);
+    });
+  }
+}
+
 export default app;
