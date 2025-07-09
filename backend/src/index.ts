@@ -54,7 +54,7 @@ const imageCache = new Map<string, CachedImage>();
 // Endpoint de proxy para imagens do TMDB com cache
 // Esta rota está correta. O erro na Vercel é de roteamento, não do código dela.
 // A chamada no frontend para /api/proxy-image está certa.
-app.get("/api/proxy-image", async (req: Request, res: Response) => {
+app.get("/proxy-image", async (req: Request, res: Response) => {
   try {
     const url = req.query.url as string;
     if (!url) {
@@ -88,11 +88,11 @@ app.get("/api/proxy-image", async (req: Request, res: Response) => {
 function setupRoutes(app: Express) {
   console.log("Registrando rotas COM o prefixo /api para teste local...");
   // ADICIONAMOS DE VOLTA O /api AQUI
-  app.use("/api/clients", clientRoutes);
-  app.use("/api/auth", authRoutes);
-  app.use("/api/dashboard", dashboardRoutes);
-  app.use("/api/current-month", currentMonthRoutes);
-  app.get("/api/expired-clients", authMiddleware, getExpiredClients);
+  app.use("/clients", clientRoutes);
+  app.use("/auth", authRoutes);
+  app.use("/dashboard", dashboardRoutes);
+  app.use("/current-month", currentMonthRoutes);
+  app.get("/expired-clients", authMiddleware, getExpiredClients);
   console.log("Rotas registradas com sucesso.");
 }
 
