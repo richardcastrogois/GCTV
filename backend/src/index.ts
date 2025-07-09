@@ -45,13 +45,12 @@ const corsOptions = {
     "X-Api-Version",
   ],
   credentials: true,
-  optionsSuccessStatus: 200, // Garante que a resposta para o preflight seja 200 OK
+  optionsSuccessStatus: 200, 
 };
 
 const app: Express = express();
 
-// Habilita o CORS para todas as requisições, tratando o preflight automaticamente
-app.use(cors(corsOptions));
+app.use(cors(corsOptions)); // Apenas esta linha para o CORS
 
 // =================================================================
 // FIM DA CORREÇÃO FINAL DE CORS
