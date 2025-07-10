@@ -1,13 +1,15 @@
-//backend/src/middleware/authMiddleware.ts
+// backend/src/middleware/authMiddleware.ts
 
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction, RequestHandler } from "express";
 
+// Tipagem para o payload do token JWT
 interface JwtPayload {
   userId: number;
   username: string;
 }
 
+// Estende a interface Request do Express para incluir a propriedade 'user'
 interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
 }
@@ -18,35 +20,36 @@ export const authMiddleware: RequestHandler = (
   next: NextFunction
 ): void => {
   const authHeader = req.headers.authorization;
-  console.log("Cabeçalho Authorization recebido:", authHeader);
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    console.log("Token não fornecido ou formato inválido.");
+    // Responde com 401 (Unauthorized) se o token não for fornecido ou estiver no formato errado.
     res.status(401).json({ error: "Token não fornecido ou formato inválido" });
     return;
   }
 
   const token = authHeader.split(" ")[1];
   if (!token) {
-    console.log("Token ausente após split.");
     res.status(401).json({ error: "Token não fornecido" });
     return;
   }
 
   try {
-    const secret = process.env.JWT_SECRET || "seu-segredo-jwt";
-    if (!process.env.JWT_SECRET) {
-      console.warn(
-        "JWT_SECRET não está definido no .env. Usando valor padrão."
-      );
+    const secret = process.env.JWT_SECRET;
+    // OTIMIZAÇÃO DE SEGURANÇA: Se o segredo JWT não estiver configurado,
+    // o servidor não deve continuar. Lançar um erro é mais seguro do que
+    // usar uma chave padrão ou continuar com uma falha silenciosa.
+    if (!secret) {
+      console.error("FATAL ERROR: JWT_SECRET is not configured.");
+      throw new Error("A configuração do servidor está incompleta.");
     }
 
     const decoded = jwt.verify(token, secret) as JwtPayload;
-    console.log("Token decodificado com sucesso:", decoded);
-    req.user = decoded;
-    next();
+    req.user = decoded; // Anexa os dados do usuário à requisição
+    next(); // Passa para a próxima função (o controller da rota)
   } catch (error) {
+    // Se jwt.verify falhar (token expirado, malformado, etc.), ele lança um erro.
+    // Respondemos com 403 (Forbidden) que é mais apropriado para token inválido.
     console.error("Erro ao verificar token:", error);
-    res.status(401).json({ error: "Token inválido ou expirado" });
+    res.status(403).json({ error: "Token inválido ou expirado" });
   }
 };

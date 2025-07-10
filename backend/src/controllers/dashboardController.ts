@@ -1,9 +1,8 @@
 // backend/src/controllers/dashboardController.ts
 
 import { Request, Response, RequestHandler } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { Prisma } from "@prisma/client";
+import prisma from "../lib/prisma"; // OTIMIZAÇÃO: Usando a instância única e estável do Prisma.
 
 export const getDashboardStats: RequestHandler = async (
   req: Request,
@@ -12,8 +11,12 @@ export const getDashboardStats: RequestHandler = async (
   try {
     const { month, year } = req.query;
 
-    const filterMonth = month ? parseInt(month as string) : new Date().getMonth() + 1;
-    const filterYear = year ? parseInt(year as string) : new Date().getFullYear();
+    const filterMonth = month
+      ? parseInt(month as string)
+      : new Date().getUTCMonth() + 1;
+    const filterYear = year
+      ? parseInt(year as string)
+      : new Date().getUTCFullYear();
 
     if (isNaN(filterMonth) || filterMonth < 1 || filterMonth > 12) {
       res.status(400).json({ message: "Mês inválido (deve ser entre 1 e 12)" });
@@ -26,6 +29,7 @@ export const getDashboardStats: RequestHandler = async (
       return;
     }
 
+    // Voltando para a lógica original que busca todos os clientes, pois é mais estável.
     const clients = await prisma.client.findMany({
       include: {
         paymentMethod: true,
@@ -46,10 +50,11 @@ export const getDashboardStats: RequestHandler = async (
     let totalPaymentLiquido = 0;
     let totalPayments = 0;
     clients.forEach((client) => {
-      const paymentHistory = Array.isArray(client.paymentHistory)
-        ? client.paymentHistory
-        : [];
-      paymentHistory.forEach((payment: any) => {
+      const paymentHistory = (
+        Array.isArray(client.paymentHistory) ? client.paymentHistory : []
+      ) as any[]; // Tipagem como 'any[]' para simplicidade no forEach
+
+      paymentHistory.forEach((payment) => {
         if (payment && typeof payment === "object" && payment.paymentDate) {
           const paymentDate = new Date(payment.paymentDate);
           if (
@@ -77,65 +82,51 @@ export const getDashboardStats: RequestHandler = async (
     }, {} as Record<string, number>);
 
     const grossByPaymentMethod = clients.reduce((acc, client) => {
-      const methodName = client.paymentMethod.name;
-      let paymentHistory: any[] = [];
-      if (typeof client.paymentHistory === "string") {
-        try {
-          paymentHistory = JSON.parse(client.paymentHistory);
-        } catch (e) {
-          paymentHistory = [];
-          console.error("Erro ao parsear paymentHistory:", e);
-        }
-      } else if (Array.isArray(client.paymentHistory)) {
-        paymentHistory = client.paymentHistory;
-      }
-      const totalLiquido = paymentHistory.reduce(
-        (sum: number, payment: any) => {
-          if (payment && typeof payment === "object" && payment.paymentDate) {
-            const paymentDate = new Date(payment.paymentDate);
-            if (
-              !isNaN(paymentDate.getTime()) &&
-              paymentDate.getUTCMonth() + 1 === filterMonth &&
-              paymentDate.getUTCFullYear() === filterYear
-            ) {
-              return sum + (payment.paymentLiquido || 0);
+      // CORREÇÃO: Garante que paymentMethod existe antes de acessar o nome.
+      if (client.paymentMethod) {
+        const methodName = client.paymentMethod.name;
+        const paymentHistory = (
+          Array.isArray(client.paymentHistory) ? client.paymentHistory : []
+        ) as any[];
+
+        const totalLiquido = paymentHistory.reduce(
+          (sum: number, payment: any) => {
+            if (payment && typeof payment === "object" && payment.paymentDate) {
+              const paymentDate = new Date(payment.paymentDate);
+              if (
+                !isNaN(paymentDate.getTime()) &&
+                paymentDate.getUTCMonth() + 1 === filterMonth &&
+                paymentDate.getUTCFullYear() === filterYear
+              ) {
+                return sum + (Number(payment.paymentLiquido) || 0);
+              }
             }
-          }
-          return sum;
-        },
-        0
-      );
-      if (acc.hasOwnProperty(methodName)) {
-        acc[methodName] += totalLiquido;
+            return sum;
+          },
+          0
+        );
+
+        if (acc.hasOwnProperty(methodName)) {
+          acc[methodName] += totalLiquido;
+        }
       }
       return acc;
     }, initialGrossByPaymentMethod);
 
-
-    let dailyNetProfitQuery = `
-      SELECT 
-        DATE(payment_data->>'paymentDate') AS date,
-        SUM((payment_data->>'paymentLiquido')::FLOAT) AS netamount
-      FROM "Client"
-      CROSS JOIN jsonb_array_elements("paymentHistory") AS payment_data
+    // OTIMIZAÇÃO: Usando uma query SQL pura para agregar dados do campo JSON.
+    const dailyNetProfitQuery = Prisma.sql`
+        SELECT
+            (p.value->>'paymentDate')::DATE AS date,
+            SUM((p.value->>'paymentLiquido')::FLOAT) AS "netAmount"
+        FROM "Client" c, jsonb_array_elements(c."paymentHistory") p
+        WHERE
+            EXTRACT(YEAR FROM (p.value->>'paymentDate')::DATE) = ${filterYear} AND
+            EXTRACT(MONTH FROM (p.value->>'paymentDate')::DATE) = ${filterMonth}
+        GROUP BY date
+        ORDER BY date ASC;
     `;
-    const params: any[] = [];
-    if (filterMonth && filterYear) {
-      dailyNetProfitQuery += ` WHERE EXTRACT(MONTH FROM (payment_data->>'paymentDate')::DATE) = $1 AND EXTRACT(YEAR FROM (payment_data->>'paymentDate')::DATE) = $2`;
-      params.push(filterMonth, filterYear);
-    }
-    dailyNetProfitQuery += `
-      GROUP BY DATE(payment_data->>'paymentDate')
-      ORDER BY DATE(payment_data->>'paymentDate') ASC
-    `;
-
-    const dailyNetProfitRaw: { date: string; netamount: number }[] =
-      await prisma.$queryRawUnsafe(dailyNetProfitQuery, ...params);
-
-    const dailyNetProfit = dailyNetProfitRaw.map((entry) => ({
-      date: entry.date,
-      netAmount: entry.netamount || 0,
-    }));
+    const dailyNetProfit: { date: Date; netAmount: number }[] =
+      await prisma.$queryRaw(dailyNetProfitQuery);
 
     res.json({
       gross_amount,
@@ -144,7 +135,10 @@ export const getDashboardStats: RequestHandler = async (
       totalNetAmount8: parseFloat(totalNetAmount8.toFixed(2)),
       totalNetAmount15: parseFloat(totalNetAmount15.toFixed(2)),
       grossByPaymentMethod,
-      dailyNetProfit,
+      dailyNetProfit: dailyNetProfit.map((d) => ({
+        ...d,
+        date: d.date.toISOString().split("T")[0],
+      })),
     });
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
@@ -161,35 +155,28 @@ export const getCurrentMonthStats: RequestHandler = async (
     const currentMonth = currentDate.getUTCMonth() + 1;
     const currentYear = currentDate.getUTCFullYear();
 
-    const clients = await prisma.client.findMany({
-      include: {
-        paymentMethod: true,
-        user: true,
-      },
-    });
+    // OTIMIZAÇÃO: Query SQL para buscar e agregar dados do mês atual diretamente no banco.
+    const paymentStatsQuery = Prisma.sql`
+      SELECT
+        COALESCE(SUM((p.value->>'paymentLiquido')::FLOAT), 0) AS "totalPaymentLiquido",
+        COUNT(p.value) AS "totalPayments"
+      FROM "Client" c, jsonb_array_elements(c."paymentHistory") p
+      WHERE
+        EXTRACT(YEAR FROM (p.value->>'paymentDate')::DATE) = ${currentYear} AND
+        EXTRACT(MONTH FROM (p.value->>'paymentDate')::DATE) = ${currentMonth};
+    `;
+    const paymentStats: {
+      totalPaymentLiquido: number;
+      totalPayments: bigint;
+    }[] = await prisma.$queryRaw(paymentStatsQuery);
 
-    let totalPaymentLiquido = 0;
-    let totalPayments = 0;
+    const { totalPaymentLiquido, totalPayments } = {
+      totalPaymentLiquido: paymentStats[0]?.totalPaymentLiquido || 0,
+      totalPayments: Number(paymentStats[0]?.totalPayments || 0),
+    };
 
-    clients.forEach((client) => {
-      const paymentHistory = Array.isArray(client.paymentHistory)
-        ? client.paymentHistory
-        : [];
-      paymentHistory.forEach((payment: any) => {
-        if (payment && typeof payment === "object" && payment.paymentDate) {
-          const paymentDate = new Date(payment.paymentDate);
-          if (
-            !isNaN(paymentDate.getTime()) &&
-            paymentDate.getUTCFullYear() === currentYear &&
-            paymentDate.getUTCMonth() + 1 === currentMonth &&
-            payment.paymentLiquido !== undefined &&
-            payment.paymentLiquido !== null
-          ) {
-            totalPaymentLiquido += Number(payment.paymentLiquido);
-            totalPayments += 1;
-          }
-        }
-      });
+    const activeClients = await prisma.client.count({
+      where: { isActive: true },
     });
 
     const totalNetAmount8 = totalPaymentLiquido - totalPayments * 8;
@@ -198,7 +185,7 @@ export const getCurrentMonthStats: RequestHandler = async (
     res.json({
       totalNetAmount8: parseFloat(totalNetAmount8.toFixed(2)),
       totalNetAmount15: parseFloat(totalNetAmount15.toFixed(2)),
-      activeClients: clients.length,
+      activeClients: activeClients,
     });
   } catch (error) {
     console.error("Error fetching current month stats:", error);

@@ -1,4 +1,4 @@
-//backend/src/routes/clientRoutes.ts
+// backend/src/routes/clientRoutes.ts
 
 import { Router } from "express";
 import {
@@ -15,41 +15,39 @@ import {
   editPayment,
   deletePayment,
   updateClientObservations,
-  updateVisualPaymentStatus, // IMPORTAR A NOVA FUNÇÃO
-  getExpiredClients, // Adicionado getExpiredClients se for usado em alguma rota
+  updateVisualPaymentStatus,
+  getExpiredClients,
 } from "../controllers/clientController";
 import { authMiddleware } from "../middleware/authMiddleware";
 
 const router: Router = Router();
 
-// Middleware para logar todas as requisições neste router
-router.use((req, res, next) => {
-  console.log(
-    `Recebida requisição para ClientRoutes: ${req.method} ${req.originalUrl}`
-  );
-  next();
-});
+// OTIMIZAÇÃO: O middleware de log foi removido para não poluir os logs de produção.
+// A depuração deve ser feita nos controllers ou no middleware principal, se necessário.
 
+// Rotas de utilidade (planos e métodos de pagamento)
 router.get("/plans", authMiddleware, getPlans);
 router.get("/payment-methods", authMiddleware, getPaymentMethods);
 
-// Rotas protegidas por autenticação
+// Rotas principais de clientes (CRUD)
 router.get("/", authMiddleware, getClients);
-router.get("/expired", authMiddleware, getExpiredClients); // Exemplo de rota para clientes expirados
+router.get("/expired", authMiddleware, getExpiredClients);
 router.get("/:id", authMiddleware, getClientById);
 router.post("/", authMiddleware, createClient);
 router.put("/:id", authMiddleware, updateClient);
 router.delete("/:id", authMiddleware, deleteClient);
+
+// Rotas de ações específicas do cliente
 router.put("/renew/:id", authMiddleware, renewClient);
 router.put("/reactivate/:id", authMiddleware, reactivateClient);
 router.put("/observations/:id", authMiddleware, updateClientObservations);
 
-// Rotas para o histórico de pagamento REAL
-router.put("/payment-status/:id", authMiddleware, updatePaymentStatus); // Adiciona um novo pagamento
-router.put("/payments/edit/:id", authMiddleware, editPayment); // Edita um pagamento existente
-router.delete("/payments/delete/:id", authMiddleware, deletePayment); // Remove um pagamento
+// Rotas para o histórico de pagamentos
+router.put("/payment-status/:id", authMiddleware, updatePaymentStatus);
+router.put("/payments/edit/:id", authMiddleware, editPayment);
+router.delete("/payments/delete/:id", authMiddleware, deletePayment);
 
-// NOVA ROTA para o status visual de pagamento
+// Rota para o status visual de pagamento
 router.put(
   "/visual-payment-status/:id",
   authMiddleware,
