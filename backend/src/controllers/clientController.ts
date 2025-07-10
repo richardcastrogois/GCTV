@@ -4,8 +4,9 @@ import { RequestHandler, Request, Response } from "express";
 import { Prisma } from "@prisma/client";
 import { ParsedQs } from "qs";
 import bcrypt from "bcryptjs";
-import prisma from "../lib/prisma"; // USANDO A NOSSA CONEXÃO ÚNICA E ESTÁVEL
+import prisma from "../lib/prisma"; // OTIMIZAÇÃO: Usando a instância única e estável do Prisma.
 
+// Tipos de dados (sem alterações)
 type ParamsWithId = { id: string };
 type ClientBody = {
   fullName: string;
@@ -34,14 +35,34 @@ type UpdatePaymentBody = {
   paymentLiquido: number;
 };
 type DeletePaymentBody = { index: number };
-
-type RawClient = {
-  id: number;
-};
-
 type VisualPaymentStatusBody = {
   status: boolean;
 };
+
+// OTIMIZAÇÃO: Função auxiliar para construir a cláusula de busca de forma segura e eficiente
+function buildSearchWhereClause(searchTerm: string, isActive: boolean): Prisma.ClientWhereInput {
+  const searchClauses: Prisma.ClientWhereInput[] = [
+    { fullName: { contains: searchTerm, mode: 'insensitive' } },
+    { email: { contains: searchTerm, mode: 'insensitive' } },
+    { phone: { contains: searchTerm, mode: 'insensitive' } },
+    { observations: { contains: searchTerm, mode: 'insensitive' } },
+    { plan: { name: { contains: searchTerm, mode: 'insensitive' } } },
+    { paymentMethod: { name: { contains: searchTerm, mode: 'insensitive' } } },
+    { user: { username: { contains: searchTerm, mode: 'insensitive' } } },
+  ];
+
+  const numericSearchTerm = parseFloat(searchTerm.replace(',', '.'));
+  if (!isNaN(numericSearchTerm)) {
+    searchClauses.push({ grossAmount: { equals: numericSearchTerm } });
+    searchClauses.push({ netAmount: { equals: numericSearchTerm } });
+  }
+
+  return {
+    isActive,
+    OR: searchClauses,
+  };
+}
+
 
 export const getClients: RequestHandler = async (
   req: Request,
@@ -51,84 +72,22 @@ export const getClients: RequestHandler = async (
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
-    const searchTerm = (req.query.search as string)?.toLowerCase() || "";
+    const searchTerm = (req.query.search as string) || "";
 
-    let whereClause: Prisma.ClientWhereInput = { isActive: true };
-    let clientIdsFromResult: number[] = [];
+    const whereClause: Prisma.ClientWhereInput = searchTerm
+      ? buildSearchWhereClause(searchTerm, true)
+      : { isActive: true };
 
-    if (searchTerm) {
-      const searchPattern = `%${searchTerm}%`;
-      const isNumeric = /^\d+([.,]\d+)?$/.test(searchTerm.replace(/[,]/g, "."));
-      let tempNumericClientIds: number[] = [];
-
-      if (isNumeric) {
-        const numericQuery = `
-          SELECT c.id
-          FROM "Client" c
-          WHERE c."isActive" = true
-            AND (
-              LOWER(CAST(c."grossAmount" AS TEXT)) LIKE '${searchPattern}'
-              OR LOWER(CAST(c."netAmount" AS TEXT)) LIKE '${searchPattern}'
-            )
-        `;
-        const foundNumericClients = await prisma.$queryRawUnsafe<RawClient[]>(
-          numericQuery
-        );
-        tempNumericClientIds = foundNumericClients.map(
-          (client: RawClient) => client.id
-        );
-      }
-
-      if (isNumeric && tempNumericClientIds.length > 0) {
-        clientIdsFromResult = tempNumericClientIds;
-      } else {
-        const otherFieldsQuery = `
-            SELECT c.id
-            FROM "Client" c
-            LEFT JOIN "Plan" p ON c."planId" = p.id
-            LEFT JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id
-            LEFT JOIN "User" u ON c."userId" = u.id
-            WHERE c."isActive" = true
-              AND (
-                LOWER(c."fullName") LIKE '${searchPattern}'
-                OR LOWER(c."email") LIKE '${searchPattern}'
-                OR LOWER(c."phone") LIKE '${searchPattern}'
-                OR LOWER(p."name") LIKE '${searchPattern}'
-                OR LOWER(pm."name") LIKE '${searchPattern}'
-                OR LOWER(c."observations") LIKE '${searchPattern}'
-                OR LOWER(TO_CHAR(c."dueDate", 'DD/MM/YYYY')) LIKE '${searchPattern}'
-                OR LOWER(u."username") LIKE '${searchPattern}'
-                ${
-                  isNumeric
-                    ? `OR LOWER(CAST(c."grossAmount" AS TEXT)) LIKE '${searchPattern}' OR LOWER(CAST(c."netAmount" AS TEXT)) LIKE '${searchPattern}'`
-                    : ""
-                }
-              )
-          `;
-        const otherFieldsClients = await prisma.$queryRawUnsafe<RawClient[]>(
-          otherFieldsQuery
-        );
-        clientIdsFromResult = otherFieldsClients.map(
-          (client: RawClient) => client.id
-        );
-      }
-
-      if (clientIdsFromResult.length > 0) {
-        whereClause = { isActive: true, id: { in: clientIdsFromResult } };
-      } else {
-        whereClause = { isActive: true, id: { in: [] } };
-      }
-    }
-
-    const clients = await prisma.client.findMany({
-      where: whereClause,
-      include: { plan: true, paymentMethod: true, user: true },
-      skip,
-      take: limit,
-      orderBy: { createdAt: "desc" },
-    });
-
-    const total = await prisma.client.count({ where: whereClause });
+    const [clients, total] = await prisma.$transaction([
+      prisma.client.findMany({
+        where: whereClause,
+        include: { plan: true, paymentMethod: true, user: true },
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.client.count({ where: whereClause }),
+    ]);
 
     res.json({ data: clients, total, page, limit });
   } catch (error) {
@@ -145,80 +104,22 @@ export const getExpiredClients: RequestHandler = async (
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
-    const searchTerm = (req.query.search as string)?.toLowerCase() || "";
+    const searchTerm = (req.query.search as string) || "";
 
-    let whereClause: Prisma.ClientWhereInput = { isActive: false };
-    let clientIdsFromResult: number[] = [];
+    const whereClause: Prisma.ClientWhereInput = searchTerm
+      ? buildSearchWhereClause(searchTerm, false)
+      : { isActive: false };
 
-    if (searchTerm) {
-      const searchPattern = `%${searchTerm}%`;
-      const isNumeric = /^\d+([.,]\d+)?$/.test(searchTerm.replace(/[,]/g, "."));
-      let tempNumericClientIds: number[] = [];
-
-      if (isNumeric) {
-        const numericQuery = `
-          SELECT c.id FROM "Client" c
-          WHERE c."isActive" = false AND (
-            LOWER(CAST(c."grossAmount" AS TEXT)) LIKE '${searchPattern}' OR
-            LOWER(CAST(c."netAmount" AS TEXT)) LIKE '${searchPattern}'
-          )
-        `;
-        const foundNumericClients = await prisma.$queryRawUnsafe<RawClient[]>(
-          numericQuery
-        );
-        tempNumericClientIds = foundNumericClients.map(
-          (client: RawClient) => client.id
-        );
-      }
-
-      if (isNumeric && tempNumericClientIds.length > 0) {
-        clientIdsFromResult = tempNumericClientIds;
-      } else {
-        const otherFieldsQuery = `
-            SELECT c.id FROM "Client" c
-            LEFT JOIN "Plan" p ON c."planId" = p.id
-            LEFT JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id
-            LEFT JOIN "User" u ON c."userId" = u.id
-            WHERE c."isActive" = false AND (
-              LOWER(c."fullName") LIKE '${searchPattern}' OR
-              LOWER(c."email") LIKE '${searchPattern}' OR
-              LOWER(c."phone") LIKE '${searchPattern}' OR
-              LOWER(p."name") LIKE '${searchPattern}' OR
-              LOWER(pm."name") LIKE '${searchPattern}' OR
-              LOWER(c."observations") LIKE '${searchPattern}' OR
-              LOWER(TO_CHAR(c."dueDate", 'DD/MM/YYYY')) LIKE '${searchPattern}' OR
-              LOWER(u."username") LIKE '${searchPattern}'
-              ${
-                isNumeric
-                  ? `OR LOWER(CAST(c."grossAmount" AS TEXT)) LIKE '${searchPattern}' OR LOWER(CAST(c."netAmount" AS TEXT)) LIKE '${searchPattern}'`
-                  : ""
-              }
-            )
-          `;
-        const otherFieldsClients = await prisma.$queryRawUnsafe<RawClient[]>(
-          otherFieldsQuery
-        );
-        clientIdsFromResult = otherFieldsClients.map(
-          (client: RawClient) => client.id
-        );
-      }
-
-      if (clientIdsFromResult.length > 0) {
-        whereClause = { isActive: false, id: { in: clientIdsFromResult } };
-      } else {
-        whereClause = { isActive: false, id: { in: [] } };
-      }
-    }
-
-    const clients = await prisma.client.findMany({
-      where: whereClause,
-      include: { plan: true, paymentMethod: true, user: true },
-      skip,
-      take: limit,
-      orderBy: { updatedAt: "desc" },
-    });
-
-    const total = await prisma.client.count({ where: whereClause });
+    const [clients, total] = await prisma.$transaction([
+      prisma.client.findMany({
+        where: whereClause,
+        include: { plan: true, paymentMethod: true, user: true },
+        skip,
+        take: limit,
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.client.count({ where: whereClause }),
+    ]);
 
     res.json({ data: clients, total, page, limit });
   } catch (error) {
@@ -359,10 +260,7 @@ export const createClient: RequestHandler<
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002" &&
-        error.meta &&
-        Array.isArray((error.meta as any).target) &&
-        (error.meta as any).target.includes("username")
+        error.code === "P2002"
       ) {
         res
           .status(400)
@@ -476,7 +374,6 @@ export const updateClient: RequestHandler<
       return;
     }
 
-    let userIdToUpdate = clientToUpdate.userId;
     if (
       username &&
       clientToUpdate.user &&
@@ -513,7 +410,6 @@ export const updateClient: RequestHandler<
         netAmount,
         isActive,
         observations: observations || null,
-        userId: userIdToUpdate,
       },
       include: { plan: true, paymentMethod: true, user: true },
     });
@@ -522,12 +418,7 @@ export const updateClient: RequestHandler<
   } catch (error) {
     console.error("Erro detalhado ao atualizar cliente:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (
-        error.code === "P2002" &&
-        error.meta &&
-        Array.isArray((error.meta as any).target) &&
-        (error.meta as any).target.includes("username")
-      ) {
+      if (error.code === "P2002") {
         res.status(400).json({ message: "Username já cadastrado." });
         return;
       }
@@ -744,28 +635,9 @@ export const updatePaymentStatus: RequestHandler<
       return;
     }
 
-    let currentPayments = (
+    const currentPayments = (
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
-
-    currentPayments = currentPayments.map((payment: any) => {
-      if (typeof payment === "object" && payment !== null) {
-        return {
-          paymentDate:
-            payment.paymentDate ||
-            (payment.date
-              ? new Date(payment.date).toISOString()
-              : new Date().toISOString()),
-          paymentBruto: payment.paymentBruto || payment.amount || 0,
-          paymentLiquido: payment.paymentLiquido || payment.amount || 0,
-        };
-      }
-      return {
-        paymentDate: new Date().toISOString(),
-        paymentBruto: 0,
-        paymentLiquido: 0,
-      };
-    });
 
     const newPayment = {
       paymentDate: parsedPaymentDate.toISOString(),
@@ -859,25 +731,6 @@ export const editPayment: RequestHandler<
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
 
-    currentPayments = currentPayments.map((payment: any) => {
-      if (typeof payment === "object" && payment !== null) {
-        return {
-          paymentDate:
-            payment.paymentDate ||
-            (payment.date
-              ? new Date(payment.date).toISOString()
-              : new Date().toISOString()),
-          paymentBruto: payment.paymentBruto || payment.amount || 0,
-          paymentLiquido: payment.paymentLiquido || payment.amount || 0,
-        };
-      }
-      return {
-        paymentDate: new Date().toISOString(),
-        paymentBruto: 0,
-        paymentLiquido: 0,
-      };
-    });
-
     if (index >= currentPayments.length) {
       res
         .status(400)
@@ -947,25 +800,6 @@ export const deletePayment: RequestHandler<
     let currentPayments = (
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
-
-    currentPayments = currentPayments.map((payment: any) => {
-      if (typeof payment === "object" && payment !== null) {
-        return {
-          paymentDate:
-            payment.paymentDate ||
-            (payment.date
-              ? new Date(payment.date).toISOString()
-              : new Date().toISOString()),
-          paymentBruto: payment.paymentBruto || payment.amount || 0,
-          paymentLiquido: payment.paymentLiquido || payment.amount || 0,
-        };
-      }
-      return {
-        paymentDate: new Date().toISOString(),
-        paymentBruto: 0,
-        paymentLiquido: 0,
-      };
-    });
 
     if (index >= currentPayments.length) {
       res
@@ -1053,11 +887,6 @@ export const updateVisualPaymentStatus: RequestHandler<
   const { id } = req.params;
   const { status } = req.body;
 
-  console.log("Recebida requisição para updateVisualPaymentStatus", {
-    id: req.params.id,
-    status: req.body.status,
-  });
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
@@ -1084,8 +913,6 @@ export const updateVisualPaymentStatus: RequestHandler<
       include: { plan: true, paymentMethod: true, user: true },
     });
 
-    console.log("Cliente atualizado com sucesso:", updatedClient);
-
     res.json(updatedClient);
   } catch (error) {
     console.error("Erro ao atualizar status visual de pagamento:", error);
@@ -1102,4 +929,4 @@ export const updateVisualPaymentStatus: RequestHandler<
       message: "Erro interno ao atualizar status visual de pagamento",
     });
   }
-};
+}
