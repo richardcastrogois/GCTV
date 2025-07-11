@@ -17,6 +17,7 @@ import {
   updateClientObservations,
   updateVisualPaymentStatus,
   getExpiredClients,
+  deactivateExpiredClients,
 } from "../controllers/clientController";
 import { authMiddleware } from "../middleware/authMiddleware";
 
@@ -53,5 +54,7 @@ router.put(
   authMiddleware,
   updateVisualPaymentStatus
 );
+
+router.post("/clients/deactivate-expired", deactivateExpiredClients);
 
 export default router;

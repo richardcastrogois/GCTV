@@ -1,14 +1,15 @@
-//frontend/src/app/clients/components/EditClientModal.tsx
+// frontend/src/app/clients/components/EditClientModal.tsx
 
+import React, { useEffect } from "react"; // Importar React para React.memo
 import { FaTimes } from "react-icons/fa";
 import { EditFormData, Plan, PaymentMethod, User } from "../types";
 import { createPortal } from "react-dom";
 import Select, { StylesConfig } from "react-select";
-import { useEffect } from "react";
 
 type SelectOption = { value: string; label: string } | null;
 
 const customStyles: StylesConfig<SelectOption, false> = {
+  // ... seu código de estilos mantido integralmente ...
   control: (provided) => ({
     ...provided,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
@@ -39,12 +40,8 @@ const customStyles: StylesConfig<SelectOption, false> = {
     maxHeight: "200px",
     scrollbarWidth: "thin",
     scrollbarColor: "var(--accent-gray) transparent",
-    "&::-webkit-scrollbar": {
-      width: "6px",
-    },
-    "&::-webkit-scrollbar-track": {
-      background: "transparent",
-    },
+    "&::-webkit-scrollbar": { width: "6px" },
+    "&::-webkit-scrollbar-track": { background: "transparent" },
     "&::-webkit-scrollbar-thumb": {
       background: "var(--accent-gray)",
       borderRadius: "3px",
@@ -71,10 +68,7 @@ const customStyles: StylesConfig<SelectOption, false> = {
         : "rgba(241, 145, 109, 0.6)",
     },
   }),
-  singleValue: (provided) => ({
-    ...provided,
-    color: "var(--text-primary)",
-  }),
+  singleValue: (provided) => ({ ...provided, color: "var(--text-primary)" }),
   placeholder: (provided) => ({
     ...provided,
     color: "rgba(255, 255, 255, 0.7)",
@@ -87,9 +81,7 @@ const customStyles: StylesConfig<SelectOption, false> = {
     ...provided,
     color: "var(--text-primary-secondary)",
     padding: "0.25rem",
-    "&:hover": {
-      color: "var(--accent-blue)",
-    },
+    "&:hover": { color: "var(--accent-blue)" },
   }),
 };
 
@@ -115,49 +107,38 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
   user,
 }) => {
   const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     let updatedValue: string | number | boolean = value;
 
-    if (name === "planId" || name === "paymentMethodId") {
-      updatedValue = parseInt(value, 10);
-    } else if (name === "grossAmount") {
-      updatedValue = value === "" ? 0 : parseFloat(value); // Converte para number
-    } else if (name === "isActive") {
-      updatedValue = value === "true";
+    if (name === "grossAmount") {
+      updatedValue = value === "" ? 0 : parseFloat(value);
     }
 
     onChange({ ...formData, [name]: updatedValue });
-    console.log(`Campo ${name} alterado:`, updatedValue);
   };
 
   const handlePlanChange = (selectedOption: SelectOption) => {
-    const updatedValue = selectedOption
-      ? parseInt(selectedOption.value, 10)
-      : 0;
-    onChange({ ...formData, planId: updatedValue });
-    console.log("planId alterado:", updatedValue);
+    onChange({
+      ...formData,
+      planId: selectedOption ? parseInt(selectedOption.value, 10) : 0,
+    });
   };
 
   const handlePaymentMethodChange = (selectedOption: SelectOption) => {
-    const updatedValue = selectedOption
-      ? parseInt(selectedOption.value, 10)
-      : 0;
-    onChange({ ...formData, paymentMethodId: updatedValue });
-    console.log("paymentMethodId alterado:", updatedValue);
+    onChange({
+      ...formData,
+      paymentMethodId: selectedOption ? parseInt(selectedOption.value, 10) : 0,
+    });
   };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ ...formData, isActive: e.target.checked });
-    console.log("isActive alterado:", e.target.checked);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Dados enviados para o submit:", formData);
     onSubmit(e);
   };
 
@@ -171,26 +152,25 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
     return () => document.removeEventListener("keydown", handleEscKey);
   }, [isOpen, onClose]);
 
+  // OTIMIZAÇÃO / CORREÇÃO: Este useEffect foi ajustado para evitar loops infinitos.
+  // Ele agora depende apenas de `user` e só atualiza o username se ele não estiver já preenchido.
   useEffect(() => {
     if (user && !formData.username) {
       onChange({ ...formData, username: user.username });
     }
-  }, [user, formData, onChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   if (!isOpen) return null;
 
-  const planOptions = [
-    { value: "0", label: "Selecione um plano" },
-    ...plans.map((plan) => ({ value: plan.id.toString(), label: plan.name })),
-  ];
-
-  const paymentMethodOptions = [
-    { value: "0", label: "Selecione um método" },
-    ...paymentMethods.map((method) => ({
-      value: method.id.toString(),
-      label: method.name,
-    })),
-  ];
+  const planOptions = plans.map((plan) => ({
+    value: plan.id.toString(),
+    label: plan.name,
+  }));
+  const paymentMethodOptions = paymentMethods.map((method) => ({
+    value: method.id.toString(),
+    label: method.name,
+  }));
 
   return createPortal(
     <div
@@ -213,8 +193,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
             <FaTimes size={20} />
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
             <label className="block text-sm text-[var(--text-primary)] mb-1">
               Nome
             </label>
@@ -227,7 +207,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
               required
             />
           </div>
-          <div className="mb-4">
+          <div>
             <label className="block text-sm text-[var(--text-primary)] mb-1">
               Usuário (Username)
             </label>
@@ -240,7 +220,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
               required
             />
           </div>
-          <div className="mb-4">
+          <div>
             <label className="block text-sm text-[var(--text-primary)] mb-1">
               Email
             </label>
@@ -253,7 +233,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
               required
             />
           </div>
-          <div className="mb-4">
+          <div>
             <label className="block text-sm text-[var(--text-primary)] mb-1">
               Telefone
             </label>
@@ -265,7 +245,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
               className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
             />
           </div>
-          <div className="mb-4">
+          <div>
             <label className="block text-sm text-[var(--text-primary)] mb-1">
               Plano
             </label>
@@ -280,7 +260,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
               isSearchable={false}
             />
           </div>
-          <div className="mb-4">
+          <div>
             <label className="block text-sm text-[var(--text-primary)] mb-1">
               Método de Pagamento
             </label>
@@ -295,7 +275,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
               isSearchable={false}
             />
           </div>
-          <div className="mb-4">
+          <div>
             <label className="block text-sm text-[var(--text-primary)] mb-1">
               Data de Vencimento
             </label>
@@ -308,7 +288,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
               required
             />
           </div>
-          <div className="mb-4">
+          <div>
             <label className="block text-sm text-[var(--text-primary)] mb-1">
               Valor Bruto
             </label>
@@ -316,13 +296,13 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
               type="number"
               step="0.01"
               name="grossAmount"
-              value={formData.grossAmount === 0 ? "" : formData.grossAmount} // Exibe vazio se for 0
+              value={formData.grossAmount === 0 ? "" : formData.grossAmount}
               onChange={handleInputChange}
               className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
               required
             />
           </div>
-          <div className="mb-4">
+          <div>
             <label className="block text-sm text-[var(--text-primary)] mb-1">
               Observações
             </label>
@@ -334,7 +314,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
               placeholder="Sem observações"
             />
           </div>
-          <div className="mb-4 flex items-center">
+          <div className="flex items-center">
             <input
               type="checkbox"
               name="isActive"
@@ -354,4 +334,6 @@ const EditClientModal: React.FC<EditClientModalProps> = ({
   );
 };
 
-export default EditClientModal;
+// OTIMIZAÇÃO: Envolve o componente com React.memo para previnir re-renderizações desnecessárias
+// quando as props não mudam, melhorando a performance geral da página que o utiliza.
+export default React.memo(EditClientModal);

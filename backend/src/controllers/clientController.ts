@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { ParsedQs } from "qs";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma";
+import { subDays } from "date-fns";
 
 // Tipos de dados (sem alterações)
 type ParamsWithId = { id: string };
@@ -855,5 +856,37 @@ export const updateVisualPaymentStatus: RequestHandler<
       .json({
         message: "Erro interno ao atualizar status visual de pagamento",
       });
+  }
+};
+
+// NOVA FUNÇÃO para inativar clientes expirados
+export const deactivateExpiredClients: RequestHandler = async (req, res) => {
+  // 1. Segurança: Protege a rota para que só o Cron Job da Vercel possa executá-la
+  const authHeader = req.headers['authorization'];
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ message: 'Acesso não autorizado' });
+  }
+
+  try {
+    const thirtyDaysAgo = subDays(new Date(), 30);
+
+    // 2. Eficiência: Usa 'updateMany' para atualizar todos os clientes de uma só vez
+    const result = await prisma.client.updateMany({
+      where: {
+        isActive: true, // Apenas clientes que ainda estão ativos
+        dueDate: {
+          lt: thirtyDaysAgo, // 'lt' significa 'less than' (menor que)
+        },
+      },
+      data: {
+        isActive: false,
+      },
+    });
+
+    console.log(`${result.count} clientes foram inativados por expiração.`);
+    res.status(200).json({ message: `${result.count} clientes inativados com sucesso.` });
+  } catch (error) {
+    console.error("Erro ao inativar clientes expirados:", error);
+    res.status(500).json({ message: "Erro interno no servidor." });
   }
 };

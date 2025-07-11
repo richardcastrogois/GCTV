@@ -11,5 +11,11 @@
       "src": "/api/(.*)",
       "dest": "src/index.ts"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/clients/deactivate-expired",
+      "schedule": "0 5 * * *"
+    }
   ]
 }

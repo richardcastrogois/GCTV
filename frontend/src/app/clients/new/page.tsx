@@ -1,3 +1,5 @@
+// frontend/src/app/clients/new/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,7 +10,7 @@ import Navbar from "@/components/Navbar";
 import { FaArrowLeft } from "react-icons/fa";
 import Select, { StylesConfig } from "react-select";
 import { useAuth } from "@/hooks/useAuth";
-import { AxiosError } from "axios"; // Reintroduzido para suportar instanceof AxiosError
+import { AxiosError } from "axios";
 
 type SelectOption = { value: string; label: string } | null;
 
@@ -43,12 +45,8 @@ const customStyles: StylesConfig<SelectOption, false> = {
     maxHeight: "200px",
     scrollbarWidth: "thin",
     scrollbarColor: "var(--accent-gray) transparent",
-    "&::-webkit-scrollbar": {
-      width: "6px",
-    },
-    "&::-webkit-scrollbar-track": {
-      background: "transparent",
-    },
+    "&::-webkit-scrollbar": { width: "6px" },
+    "&::-webkit-scrollbar-track": { background: "transparent" },
     "&::-webkit-scrollbar-thumb": {
       background: "var(--accent-gray)",
       borderRadius: "3px",
@@ -75,10 +73,7 @@ const customStyles: StylesConfig<SelectOption, false> = {
         : "rgba(241, 145, 109, 0.8)",
     },
   }),
-  singleValue: (provided) => ({
-    ...provided,
-    color: "var(--text-primary)",
-  }),
+  singleValue: (provided) => ({ ...provided, color: "var(--text-primary)" }),
   placeholder: (provided) => ({
     ...provided,
     color: "rgba(255, 255, 255, 0.9)",
@@ -91,9 +86,7 @@ const customStyles: StylesConfig<SelectOption, false> = {
     ...provided,
     color: "var(--text-primary)",
     padding: "0.25rem",
-    "&:hover": {
-      color: "var(--accent-blue)",
-    },
+    "&:hover": { color: "var(--accent-blue)" },
   }),
 };
 
@@ -101,203 +94,147 @@ interface Plan {
   id: number;
   name: string;
 }
-
 interface PaymentMethod {
   id: number;
   name: string;
+}
+interface FormData {
+  fullName: string;
+  email: string;
+  phone: string;
+  username: string;
+  planId: number;
+  paymentMethodId: number;
+  dueDate: string;
+  grossAmount: string;
+  isActive: boolean;
+  observations: string;
 }
 
 export default function NewClient() {
   const router = useRouter();
   const { handleUnauthorized } = useAuth();
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [username, setUsername] = useState("");
-  const [planId, setPlanId] = useState<number>(0);
-  const [paymentMethodId, setPaymentMethodId] = useState<number>(0);
-  const [dueDate, setDueDate] = useState("");
-  const [grossAmount, setGrossAmount] = useState("");
-  const [isActive, setIsActive] = useState(true);
-  const [observations, setObservations] = useState("");
+
+  const [formData, setFormData] = useState<FormData>({
+    fullName: "",
+    email: "",
+    phone: "",
+    username: "",
+    planId: 0,
+    paymentMethodId: 0,
+    dueDate: "",
+    grossAmount: "",
+    isActive: true,
+    observations: "",
+  });
+
   const [plans, setPlans] = useState<Plan[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
+  // CORREÇÃO: Função específica para inputs de texto e textarea
+  const handleTextChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // CORREÇÃO: Função específica para o checkbox
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: checked }));
+  };
+
+  const handleSelectChange = (
+    name: "planId" | "paymentMethodId",
+    selectedOption: SelectOption
+  ) => {
+    const value = selectedOption ? parseInt(selectedOption.value, 10) : 0;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
   useEffect(() => {
-    if (planId === 0) {
-      setGrossAmount("");
+    if (formData.planId === 0) {
+      setFormData((prev) => ({ ...prev, grossAmount: "" }));
       return;
     }
-
-    const selectedPlan = plans.find((plan) => plan.id === planId);
+    const selectedPlan = plans.find((plan) => plan.id === formData.planId);
     if (!selectedPlan) return;
 
-    if (selectedPlan.name === "Comum") {
-      setGrossAmount("30.00");
-    } else if (
-      selectedPlan.name === "Platinum" ||
-      selectedPlan.name === "P2P"
-    ) {
-      setGrossAmount("35.00");
-    } else {
-      setGrossAmount("");
-    }
-  }, [planId, plans]);
+    if (selectedPlan.name === "Comum")
+      setFormData((prev) => ({ ...prev, grossAmount: "30.00" }));
+    else if (selectedPlan.name === "Platinum" || selectedPlan.name === "P2P")
+      setFormData((prev) => ({ ...prev, grossAmount: "35.00" }));
+    else setFormData((prev) => ({ ...prev, grossAmount: "" }));
+  }, [formData.planId, plans]);
 
   useEffect(() => {
-    const storedToken =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-    if (!storedToken) {
-      handleUnauthorized();
-      return;
-    }
-
-    const fetchPlans = async () => {
+    const fetchOptions = async () => {
       try {
-        const response = await api.get("/api/clients/plans");
-        setPlans(response.data);
-      } catch (error: unknown) {
-        console.error("Erro ao buscar planos:", error);
+        const [plansResponse, paymentMethodsResponse] = await Promise.all([
+          api.get("/api/clients/plans"),
+          api.get("/api/clients/payment-methods"),
+        ]);
+        setPlans(plansResponse.data);
+        setPaymentMethods(paymentMethodsResponse.data);
+      } catch (error) {
+        console.error("Erro ao carregar opções:", error);
         if (error instanceof AxiosError && error.response?.status === 401) {
           handleUnauthorized();
         } else {
-          toast.error("Erro ao carregar planos.");
+          toast.error("Erro ao carregar opções para o formulário.");
         }
       }
     };
-
-    const fetchPaymentMethods = async () => {
-      try {
-        const response = await api.get("/api/clients/payment-methods");
-        setPaymentMethods(response.data);
-      } catch (error: unknown) {
-        console.error("Erro ao buscar métodos de pagamento:", error);
-        if (error instanceof AxiosError && error.response?.status === 401) {
-          handleUnauthorized();
-        } else {
-          toast.error("Erro ao carregar métodos de pagamento.");
-        }
-      }
-    };
-
-    fetchPlans();
-    fetchPaymentMethods();
+    fetchOptions();
   }, [handleUnauthorized]);
-
-  const handlePlanChange = (selectedOption: SelectOption) => {
-    const updatedValue = selectedOption
-      ? parseInt(selectedOption.value, 10)
-      : 0;
-    setPlanId(updatedValue);
-    console.log("planId alterado:", updatedValue);
-  };
-
-  const handlePaymentMethodChange = (selectedOption: SelectOption) => {
-    const updatedValue = selectedOption
-      ? parseInt(selectedOption.value, 10)
-      : 0;
-    setPaymentMethodId(updatedValue);
-    console.log("paymentMethodId alterado:", updatedValue);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (
-      !fullName ||
-      !email ||
-      !username ||
-      planId === 0 ||
-      paymentMethodId === 0 ||
-      !dueDate ||
-      !grossAmount
+      !formData.fullName ||
+      !formData.email ||
+      !formData.username ||
+      formData.planId === 0 ||
+      formData.paymentMethodId === 0 ||
+      !formData.dueDate ||
+      !formData.grossAmount
     ) {
       toast.error("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
 
-    const grossAmountNum = parseFloat(grossAmount);
-    if (isNaN(grossAmountNum)) {
-      toast.error("O valor bruto deve ser um número válido.");
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast.error("Por favor, insira um email válido.");
-      return;
-    }
-
-    const parsedDueDate = new Date(dueDate);
-    if (isNaN(parsedDueDate.getTime())) {
-      toast.error("Por favor, insira uma data de vencimento válida.");
-      return;
-    }
-    const dueDateISO = parsedDueDate.toISOString();
-
-    const clientData = {
-      fullName,
-      email,
-      phone,
-      username,
-      planId,
-      paymentMethodId,
-      dueDate: dueDateISO,
-      grossAmount: grossAmountNum,
-      isActive,
-      observations,
-    };
-
     try {
-      const response = await api.post("/api/clients", clientData);
-      console.log("Resposta da API:", response.data);
-      toast.success("Cliente cadastrado com sucesso!", {
-        autoClose: 3000,
-        position: "top-right",
+      await api.post("/api/clients", {
+        ...formData,
+        grossAmount: parseFloat(formData.grossAmount),
+        dueDate: new Date(formData.dueDate).toISOString(),
       });
+      toast.success("Cliente cadastrado com sucesso!");
       router.push("/clients");
-    } catch (error: unknown) {
+    } catch (error) {
       if (error instanceof AxiosError) {
         const message = error.response?.data?.message || "Erro desconhecido";
-        const errorDetails =
-          error.response?.data?.error || "Sem detalhes adicionais";
-        toast.error(
-          `Erro ao cadastrar cliente: ${message}. Detalhes: ${errorDetails}`,
-          {
-            autoClose: 5000,
-            position: "top-right",
-          }
-        );
-        console.error("Erro completo:", error.response?.data);
+        toast.error(`Erro ao cadastrar cliente: ${message}`);
         if (error.response?.status === 401) {
           handleUnauthorized();
         }
       } else {
-        toast.error(`Erro ao cadastrar cliente: ${String(error)}`, {
-          autoClose: 5000,
-          position: "top-right",
-        });
+        toast.error(`Erro ao cadastrar cliente: ${String(error)}`);
       }
     }
   };
 
-  const handleBack = () => {
-    router.push("/clients");
-  };
+  const handleBack = () => router.push("/clients");
 
-  const planOptions = [
-    { value: "0", label: "Selecione um plano" },
-    ...plans.map((plan) => ({ value: plan.id.toString(), label: plan.name })),
-  ];
-
-  const paymentMethodOptions = [
-    { value: "0", label: "Selecione um método de pagamento" },
-    ...paymentMethods.map((method) => ({
-      value: method.id.toString(),
-      label: method.name,
-    })),
-  ];
+  const planOptions = plans.map((plan) => ({
+    value: plan.id.toString(),
+    label: plan.name,
+  }));
+  const paymentMethodOptions = paymentMethods.map((method) => ({
+    value: method.id.toString(),
+    label: method.name,
+  }));
 
   return (
     <div>
@@ -316,125 +253,134 @@ export default function NewClient() {
               <span>Voltar</span>
             </button>
           </div>
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
               <label className="block text-sm text-[var(--text-primary)] mb-1">
                 Nome Completo
               </label>
               <input
                 type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleTextChange}
                 className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
                 required
               />
             </div>
-            <div className="mb-4">
+            <div>
               <label className="block text-sm text-[var(--text-primary)] mb-1">
                 Usuário (Username)
               </label>
               <input
                 type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                name="username"
+                value={formData.username}
+                onChange={handleTextChange}
                 className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
                 placeholder="Exemplo: joao.silva"
                 required
               />
             </div>
-            <div className="mb-4">
+            <div>
               <label className="block text-sm text-[var(--text-primary)] mb-1">
                 Email
               </label>
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                name="email"
+                value={formData.email}
+                onChange={handleTextChange}
                 className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
                 required
               />
             </div>
-            <div className="mb-4">
+            <div>
               <label className="block text-sm text-[var(--text-primary)] mb-1">
                 Telefone
               </label>
               <input
                 type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                name="phone"
+                value={formData.phone}
+                onChange={handleTextChange}
                 className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
               />
             </div>
-            <div className="mb-4">
+            <div>
               <label className="block text-sm text-[var(--text-primary)] mb-1">
                 Plano
               </label>
               <Select
                 options={planOptions}
                 value={planOptions.find(
-                  (option) => option.value === planId.toString()
+                  (o) => o.value === String(formData.planId)
                 )}
-                onChange={handlePlanChange}
+                onChange={(opt) => handleSelectChange("planId", opt)}
                 styles={customStyles}
                 placeholder="Selecione um plano"
                 isSearchable={false}
               />
             </div>
-            <div className="mb-4">
+            <div>
               <label className="block text-sm text-[var(--text-primary)] mb-1">
                 Método de Pagamento
               </label>
               <Select
                 options={paymentMethodOptions}
                 value={paymentMethodOptions.find(
-                  (option) => option.value === paymentMethodId.toString()
+                  (o) => o.value === String(formData.paymentMethodId)
                 )}
-                onChange={handlePaymentMethodChange}
+                onChange={(opt) => handleSelectChange("paymentMethodId", opt)}
                 styles={customStyles}
                 placeholder="Selecione um método de pagamento"
                 isSearchable={false}
               />
             </div>
-            <div className="mb-4">
+            <div>
               <label className="block text-sm text-[var(--text-primary)] mb-1">
                 Data de Vencimento
               </label>
               <input
                 type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                name="dueDate"
+                value={formData.dueDate}
+                onChange={handleTextChange}
                 className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
                 required
               />
             </div>
-            <div className="mb-4">
+            <div>
               <label className="block text-sm text-[var(--text-primary)] mb-1">
                 Valor Bruto
               </label>
               <input
                 type="number"
-                value={grossAmount}
+                name="grossAmount"
+                value={formData.grossAmount}
                 readOnly
                 className="w-full px-4 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm opacity-70 cursor-not-allowed"
                 required
               />
             </div>
-            <div className="mb-4">
+            <div>
               <label className="block text-sm text-[var(--text-primary)] mb-1">
                 Observações
               </label>
               <textarea
-                value={observations}
-                onChange={(e) => setObservations(e.target.value)}
+                name="observations"
+                value={formData.observations}
+                onChange={handleTextChange}
                 className="w-full px-4 py-2 bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)] rounded-lg text-[var(--text-primary)] text-sm transition-all duration-300 focus:outline-none focus:border-[var(--accent-blue)] focus:shadow-[0_0_0_2px_rgba(241,145,109,0.3)]"
                 placeholder="Sem observações"
               />
             </div>
-            <div className="mb-4 flex items-center">
+            <div className="flex items-center">
+              {/* CORREÇÃO: Usando a função handleCheckboxChange específica para este input */}
               <input
                 type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
+                name="isActive"
+                checked={formData.isActive}
+                onChange={handleCheckboxChange}
                 className="mr-2 rounded text-[var(--accent-blue)] focus:ring-[var(--accent-blue)] bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.3)]"
               />
               <label className="text-sm text-[var(--text-primary)]">

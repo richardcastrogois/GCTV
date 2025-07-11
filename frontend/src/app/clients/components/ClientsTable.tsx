@@ -118,16 +118,9 @@ export default function ClientsTable({
     null
   );
 
-  // <-- CORREÇÃO: Inicializa o estado diretamente com base nos clientes iniciais.
   const [isPaidVisualStatus, setIsPaidVisualStatus] = useState<
     Map<number, boolean>
-  >(() => {
-    const initialStatus = new Map<number, boolean>();
-    clients.forEach((client) => {
-      initialStatus.set(client.id, client.visualPaymentConfirmed ?? false);
-    });
-    return initialStatus;
-  });
+  >(new Map());
 
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
@@ -137,18 +130,19 @@ export default function ClientsTable({
   const currentDate = useMemo(() => new Date(), []);
 
   useEffect(() => {
+    const newStatusMap = new Map<number, boolean>();
+    if (clients) {
+      clients.forEach((client) => {
+        newStatusMap.set(client.id, client.visualPaymentConfirmed ?? false);
+      });
+    }
+    setIsPaidVisualStatus(newStatusMap);
+  }, [clients]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      console.log("Clique fora detectado");
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setOpenMenu(null);
-      }
-      if (
-        infoModalRef.current &&
-        !infoModalRef.current.contains(event.target as Node) &&
-        event.target instanceof Element &&
-        event.target.closest(".modal-overlay")
-      ) {
-        closeInfoModal();
       }
       if (
         isModalOpen &&
@@ -167,10 +161,8 @@ export default function ClientsTable({
     };
 
     const handleEscKey = (event: KeyboardEvent) => {
-      console.log("Tecla Escape pressionada");
       if (event.key === "Escape") {
         setOpenMenu(null);
-        closeInfoModal();
         if (isModalOpen) closeModal();
         if (isInfoModalOpen) closeInfoModal();
       }
@@ -238,17 +230,16 @@ export default function ClientsTable({
   };
 
   const setVisualPaidStatus = async (clientId: number, isPaid: boolean) => {
-    setIsPaidVisualStatus((prev) => {
-      const newMap = new Map(prev);
-      newMap.set(clientId, isPaid);
-      return newMap;
-    });
+    const originalStatus = isPaidVisualStatus.get(clientId) ?? !isPaid;
+
+    setIsPaidVisualStatus((prev) => new Map(prev).set(clientId, isPaid));
+
     try {
       await onUpdatePaymentStatus(clientId, isPaid);
-      console.log(
-        `Status visual atualizado para client ${clientId}: ${isPaid}`
-      );
     } catch (error) {
+      setIsPaidVisualStatus((prev) =>
+        new Map(prev).set(clientId, originalStatus)
+      );
       console.error(
         `Erro ao atualizar status visual para client ${clientId}:`,
         error
@@ -258,13 +249,31 @@ export default function ClientsTable({
       } else {
         toast.error("Erro ao atualizar status visual");
       }
-      // Reverte em caso de erro
-      setIsPaidVisualStatus((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(clientId, !isPaid);
-        return newMap;
-      });
     }
+  };
+
+  // CORREÇÃO: A função agora usa 'unknown' em vez de 'any' e faz as verificações
+  // de tipo necessárias, resolvendo o erro do ESLint e tornando o código mais seguro.
+  const normalizePaymentHistory = (history: unknown): PaymentEntry[] => {
+    if (!Array.isArray(history)) {
+      return [];
+    }
+
+    return history.map((entry) => {
+      if (typeof entry === "object" && entry !== null) {
+        const pEntry = entry as Partial<PaymentEntry>;
+        return {
+          paymentDate: pEntry.paymentDate || new Date().toISOString(),
+          paymentBruto: pEntry.paymentBruto || 0,
+          paymentLiquido: pEntry.paymentLiquido || 0,
+        };
+      }
+      return {
+        paymentDate: new Date().toISOString(),
+        paymentBruto: 0,
+        paymentLiquido: 0,
+      };
+    });
   };
 
   const openModal = async (clientId: number) => {
@@ -272,7 +281,6 @@ export default function ClientsTable({
     if (!client) return;
 
     try {
-      console.log(`Carregando detalhes do cliente ${clientId}`);
       const response = await api.get(`/api/clients/${clientId}`);
       const normalizedClient = {
         ...response.data,
@@ -319,29 +327,18 @@ export default function ClientsTable({
 
   const handleAddPayment = async () => {
     if (!modalClient) return;
-
-    if (!newPaymentDate || isNaN(new Date(newPaymentDate).getTime())) {
-      toast.error("Data de pagamento inválida");
-      return;
-    }
-
-    if (isNaN(newPaymentBruto) || isNaN(newPaymentLiquido)) {
-      toast.error("Valores de pagamento inválidos");
-      return;
-    }
-
-    if (newPaymentBruto <= 0 || newPaymentLiquido <= 0) {
-      toast.error("Valores de pagamento devem ser maiores que zero");
+    if (
+      !newPaymentDate ||
+      isNaN(new Date(newPaymentDate).getTime()) ||
+      newPaymentBruto <= 0 ||
+      newPaymentLiquido <= 0
+    ) {
+      toast.error("Por favor, preencha todos os campos com valores válidos.");
       return;
     }
 
     try {
-      console.log("Payload:", {
-        paymentDate: new Date(newPaymentDate).toISOString(),
-        paymentBruto: newPaymentBruto,
-        paymentLiquido: newPaymentLiquido,
-      });
-      const putResponse = await api.put(
+      const response = await api.put(
         `/api/clients/payment-status/${modalClient.id}`,
         {
           paymentDate: new Date(newPaymentDate).toISOString(),
@@ -349,15 +346,15 @@ export default function ClientsTable({
           paymentLiquido: newPaymentLiquido,
         }
       );
-      console.log("PUT bem-sucedido:", putResponse.data);
-      const getResponse = await api.get(`/api/clients/${modalClient.id}`);
-      const normalizedClient = {
-        ...getResponse.data,
+
+      const updatedClientFromServer = response.data;
+      setModalClient({
+        ...updatedClientFromServer,
         paymentHistory: normalizePaymentHistory(
-          getResponse.data.paymentHistory || []
+          updatedClientFromServer.paymentHistory || []
         ),
-      };
-      setModalClient(normalizedClient);
+      });
+
       setNewPaymentDate(new Date().toISOString().split("T")[0]);
       setNewPaymentBruto(modalClient.grossAmount);
       setNewPaymentLiquido(modalClient.netAmount);
@@ -381,24 +378,20 @@ export default function ClientsTable({
 
   const handleSaveEditPayment = async () => {
     if (!modalClient || editingPaymentIndex === null) return;
-
-    if (!editPaymentDate || isNaN(new Date(editPaymentDate).getTime())) {
-      toast.error("Data de pagamento inválida");
-      return;
-    }
-
-    if (isNaN(editPaymentBruto) || isNaN(editPaymentLiquido)) {
-      toast.error("Valores de pagamento inválidos");
-      return;
-    }
-
-    if (editPaymentBruto <= 0 || editPaymentLiquido <= 0) {
-      toast.error("Valores de pagamento devem ser maiores que zero");
+    if (
+      !editPaymentDate ||
+      isNaN(new Date(editPaymentDate).getTime()) ||
+      editPaymentBruto <= 0 ||
+      editPaymentLiquido <= 0
+    ) {
+      toast.error(
+        "Por favor, preencha todos os campos de edição com valores válidos."
+      );
       return;
     }
 
     try {
-      const putResponse = await api.put(
+      const response = await api.put(
         `/api/clients/payments/edit/${modalClient.id}`,
         {
           index: editingPaymentIndex,
@@ -407,19 +400,16 @@ export default function ClientsTable({
           paymentLiquido: editPaymentLiquido,
         }
       );
-      console.log("PUT bem-sucedido:", putResponse.data);
-      const getResponse = await api.get(`/api/clients/${modalClient.id}`);
-      const normalizedClient = {
-        ...getResponse.data,
+
+      const updatedClientFromServer = response.data;
+      setModalClient({
+        ...updatedClientFromServer,
         paymentHistory: normalizePaymentHistory(
-          getResponse.data.paymentHistory || []
+          updatedClientFromServer.paymentHistory || []
         ),
-      };
-      setModalClient(normalizedClient);
+      });
+
       setEditingPaymentIndex(null);
-      setEditPaymentDate("");
-      setEditPaymentBruto(0);
-      setEditPaymentLiquido(0);
       toast.success("Pagamento atualizado!");
     } catch (error) {
       console.error("Erro ao atualizar pagamento:", error);
@@ -435,21 +425,20 @@ export default function ClientsTable({
     if (!modalClient) return;
 
     try {
-      const deleteResponse = await api.delete(
+      const response = await api.delete(
         `/api/clients/payments/delete/${modalClient.id}`,
         {
           data: { index },
         }
       );
-      console.log("DELETE bem-sucedido:", deleteResponse.data);
-      const getResponse = await api.get(`/api/clients/${modalClient.id}`);
-      const normalizedClient = {
-        ...getResponse.data,
+
+      const updatedClientFromServer = response.data;
+      setModalClient({
+        ...updatedClientFromServer,
         paymentHistory: normalizePaymentHistory(
-          getResponse.data.paymentHistory || []
+          updatedClientFromServer.paymentHistory || []
         ),
-      };
-      setModalClient(normalizedClient);
+      });
       toast.success("Pagamento excluído!");
     } catch (error) {
       console.error("Erro ao excluir pagamento:", error);
@@ -489,14 +478,6 @@ export default function ClientsTable({
       default:
         return "method-text--outros";
     }
-  };
-
-  const normalizePaymentHistory = (history: PaymentEntry[]): PaymentEntry[] => {
-    return history.map((entry) => ({
-      paymentDate: entry.paymentDate || new Date().toISOString(),
-      paymentBruto: entry.paymentBruto || 0,
-      paymentLiquido: entry.paymentLiquido || 0,
-    }));
   };
 
   if (isLoading) {
@@ -584,7 +565,6 @@ export default function ClientsTable({
             </table>
           </div>
         </div>
-
         <div className="md:hidden space-y-4">
           {[...Array(5)].map((_, index) => (
             <div
@@ -691,7 +671,7 @@ export default function ClientsTable({
                           : "bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)]"
                       }`}
                       title={
-                        isPaidVisualStatus.get(client.id) ?? false
+                        isPaidVisualStatus.get(client.id)
                           ? "Verificado (visual)"
                           : "Não Verificado (visual)"
                       }
@@ -699,20 +679,12 @@ export default function ClientsTable({
                       {isPaidVisualStatus.get(client.id) ? (
                         <FaCheck
                           size={16}
-                          className={`${
-                            isPaidVisualStatus.get(client.id)
-                              ? "text-[var(--button-active-bg)]"
-                              : "text-[var(--text-secondary)]"
-                          }`}
+                          className="text-[var(--button-active-bg)]"
                         />
                       ) : (
                         <FaTimes
                           size={16}
-                          className={`${
-                            !isPaidVisualStatus.get(client.id)
-                              ? "text-[var(--danger-bg)]"
-                              : "text-[var(--text-secondary)]"
-                          }`}
+                          className="text-[var(--danger-bg)]"
                         />
                       )}
                     </button>
@@ -833,7 +805,7 @@ export default function ClientsTable({
                     : "bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.3)]"
                 }`}
                 title={
-                  isPaidVisualStatus.get(client.id) ?? false
+                  isPaidVisualStatus.get(client.id)
                     ? "Verificado (visual)"
                     : "Não Verificado (visual)"
                 }
@@ -841,21 +813,10 @@ export default function ClientsTable({
                 {isPaidVisualStatus.get(client.id) ? (
                   <FaCheck
                     size={16}
-                    className={`${
-                      isPaidVisualStatus.get(client.id)
-                        ? "text-[var(--button-active-bg)]"
-                        : "text-[var(--text-secondary)]"
-                    }`}
+                    className="text-[var(--button-active-bg)]"
                   />
                 ) : (
-                  <FaTimes
-                    size={16}
-                    className={`${
-                      !isPaidVisualStatus.get(client.id)
-                        ? "text-[var(--danger-bg)]"
-                        : "text-[var(--text-secondary)]"
-                    }`}
-                  />
+                  <FaTimes size={16} className="text-[var(--danger-bg)]" />
                 )}
               </button>
             </div>
@@ -1192,16 +1153,10 @@ export default function ClientsTable({
                                   {formatDateToUTC(payment.paymentDate)}
                                 </td>
                                 <td className="border p-2">
-                                  {payment.paymentBruto !== undefined &&
-                                  payment.paymentBruto !== null
-                                    ? payment.paymentBruto.toFixed(2)
-                                    : "0.00"}
+                                  {payment.paymentBruto?.toFixed(2) ?? "0.00"}
                                 </td>
                                 <td className="border p-2">
-                                  {payment.paymentLiquido !== undefined &&
-                                  payment.paymentLiquido !== null
-                                    ? payment.paymentLiquido.toFixed(2)
-                                    : "0.00"}
+                                  {payment.paymentLiquido?.toFixed(2) ?? "0.00"}
                                 </td>
                                 <td className="border p-2">
                                   <button

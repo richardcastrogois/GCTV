@@ -1,8 +1,10 @@
   //frontend/src/app/clients/page.tsx
 
+// frontend/src/app/clients/page.tsx
+
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
@@ -16,18 +18,22 @@ import {
   deleteClient,
   updateClient,
   renewClient,
+  updateClientVisualPaymentStatus,
 } from "./api";
 import { Client, Plan, PaymentMethod, EditFormData } from "./types";
 import { useAuth } from "@/hooks/useAuth";
 import { FaTimes } from "react-icons/fa";
-import api from "@/utils/api"; // Alterado de axios para api
 import { useSearch } from "@/hooks/useSearch";
-import LoadingSimple from "@/components/LoadingSimple"; // Substituído por LoadingSimple
+import LoadingSimple from "@/components/LoadingSimple";
 import EditClientModal from "./components/EditClientModal";
 
 const ClientsTable = dynamic(() => import("./components/ClientsTable"), {
-  loading: () => <LoadingSimple>Carregando tabela...</LoadingSimple>, // Alterado para LoadingSimple
+  loading: () => <LoadingSimple>Carregando tabela...</LoadingSimple>,
 });
+
+// CORREÇÃO: Definindo o tipo para a chave de ordenação para ser reutilizado e seguro
+type SortKey = keyof Omit<Client, "plan" | "paymentMethod" | "user"> | "plan.name" | "paymentMethod.name" | "user.username";
+
 
 const formatDateToLocal = (date: string | Date): string => {
   const d = new Date(date);
@@ -44,27 +50,14 @@ export default function Clients() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [editFormData, setEditFormData] = useState<EditFormData>({
-    fullName: "",
-    email: "",
-    phone: "",
-    planId: 0,
-    paymentMethodId: 0,
-    dueDate: "",
-    grossAmount: 0,
-    isActive: true,
-    observations: "",
-    username: "",
+    fullName: "", email: "", phone: "", planId: 0, paymentMethodId: 0,
+    dueDate: "", grossAmount: 0, isActive: true, observations: "", username: "",
   });
   const [plans, setPlans] = useState<Plan[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const { searchTerm } = useSearch();
   const [sortConfig, setSortConfig] = useState<{
-    key:
-      | keyof Omit<Client, "plan" | "paymentMethod" | "user">
-      | "plan.name"
-      | "paymentMethod.name"
-      | "user.username"
-      | null;
+    key: SortKey | null;
     direction: "asc" | "desc";
   }>({ key: null, direction: "asc" });
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
@@ -99,129 +92,60 @@ export default function Clients() {
     isLoading,
     isFetching,
     error,
-  } = useQuery<{ data: Client[]; total: number; page: number; limit: number }>({
+  } = useQuery({
     queryKey: ["clients", page, limit, searchTerm],
-    queryFn: async () => {
-      try {
-        const response = await fetchClients(page, limit, searchTerm);
-        return response;
-      } catch (error) {
-        if (error instanceof AxiosError) {
-          if (error.response?.status === 401) handleUnauthorized();
-        }
-        throw error;
-      }
-    },
+    queryFn: () => fetchClients(page, limit, searchTerm),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    placeholderData: (previousData) => previousData,
   });
 
-  useEffect(() => {
-    const checkExpiredClients = async () => {
-      if (!clientsResponse?.data) return;
+  const sortedClients = useMemo(() => {
+    const clientsData = clientsResponse?.data ?? [];
+    const sortableClients = [...clientsData];
 
-      const currentDate = new Date();
-      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
-      const clientsToDeactivate: Client[] = [];
+    if (!sortConfig.key) return sortableClients;
 
-      for (const client of clientsResponse.data) {
-        const dueDate = new Date(client.dueDate);
-        const timeDiff = currentDate.getTime() - dueDate.getTime();
+    sortableClients.sort((a, b) => {
+        let valueA: string | number;
+        let valueB: string | number;
 
-        if (client.isActive && timeDiff > thirtyDaysInMs) {
-          clientsToDeactivate.push(client);
-        }
-      }
-
-      for (const client of clientsToDeactivate) {
-        try {
-          await updateClient(client.id, {
-            fullName: client.fullName,
-            email: client.email,
-            phone: client.phone || "",
-            planId: client.plan.id,
-            paymentMethodId: client.paymentMethod.id,
-            dueDate: client.dueDate,
-            grossAmount: client.grossAmount,
-            isActive: false,
-            observations: client.observations || "",
-            username: client.user.username,
-          });
-          toast.info(`Cliente ${client.fullName} movido para inativos.`);
-        } catch (error) {
-          if (error instanceof AxiosError) {
-            toast.error(
-              `Erro ao mover cliente ${client.fullName} para inativos: ${error.message}`
-            );
-            if (error.response?.status === 401) handleUnauthorized();
-          }
-        }
-      }
-
-      if (clientsToDeactivate.length > 0) {
-        queryClient.invalidateQueries({ queryKey: ["clients"] });
-      }
-    };
-
-    checkExpiredClients();
-  }, [clientsResponse, queryClient, handleUnauthorized]);
-
-  const sortedClients = [...(clientsResponse?.data || [])]
-    .map((client) => ({
-      ...client,
-      plan: {
-        ...client.plan,
-      },
-      paymentMethod: {
-        ...client.paymentMethod,
-      },
-    }))
-    .sort((a, b) => {
-      if (!sortConfig.key) return 0;
-
-      let valueA: string | number;
-      let valueB: string | number;
-
-      if (sortConfig.key === "plan.name") {
-        valueA = a.plan?.name?.toLowerCase() ?? "";
-        valueB = b.plan?.name?.toLowerCase() ?? "";
-      } else if (sortConfig.key === "paymentMethod.name") {
-        valueA = a.paymentMethod?.name?.toLowerCase() ?? "";
-        valueB = b.paymentMethod?.name?.toLowerCase() ?? "";
-      } else if (sortConfig.key === "user.username") {
-        valueA = a.user?.username?.toLowerCase() ?? "";
-        valueB = b.user?.username?.toLowerCase() ?? "";
-      } else {
-        const rawValueA = a[sortConfig.key];
-        const rawValueB = b[sortConfig.key];
-
-        if (sortConfig.key === "dueDate") {
-          valueA = new Date(rawValueA as string).getTime() || 0;
-          valueB = new Date(rawValueB as string).getTime() || 0;
-        } else if (sortConfig.key === "isActive") {
-          valueA = rawValueA === true ? 1 : 0;
-          valueB = rawValueB === true ? 1 : 0;
-        } else if (typeof rawValueA === "string") {
-          valueA = (rawValueA as string).toLowerCase() ?? "";
-          valueB = (rawValueB as string).toLowerCase() ?? "";
+        if (sortConfig.key === "plan.name") {
+            valueA = a.plan?.name?.toLowerCase() ?? "";
+            valueB = b.plan?.name?.toLowerCase() ?? "";
+        } else if (sortConfig.key === "paymentMethod.name") {
+            valueA = a.paymentMethod?.name?.toLowerCase() ?? "";
+            valueB = b.paymentMethod?.name?.toLowerCase() ?? "";
+        } else if (sortConfig.key === "user.username") {
+            valueA = a.user?.username?.toLowerCase() ?? "";
+            valueB = b.user?.username?.toLowerCase() ?? "";
         } else {
-          valueA = (rawValueA as number) ?? 0;
-          valueB = (rawValueB as number) ?? 0;
+            // CORREÇÃO: Acessando a chave de forma segura para o TypeScript
+            const key = sortConfig.key as keyof Omit<Client, "plan" | "paymentMethod" | "user">;
+            const rawValueA = a[key];
+            const rawValueB = b[key];
+            
+            if (sortConfig.key === "dueDate") {
+                valueA = new Date(rawValueA as string).getTime() || 0;
+                valueB = new Date(rawValueB as string).getTime() || 0;
+            } else if (typeof rawValueA === "string") {
+                valueA = rawValueA.toLowerCase();
+                valueB = (rawValueB as string).toLowerCase();
+            } else {
+                valueA = (rawValueA as number) ?? 0;
+                valueB = (rawValueB as number) ?? 0;
+            }
         }
-      }
 
-      if (valueA < valueB) return sortConfig.direction === "asc" ? -1 : 1;
-      if (valueA > valueB) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
+        if (valueA < valueB) return sortConfig.direction === "asc" ? -1 : 1;
+        if (valueA > valueB) return sortConfig.direction === "asc" ? 1 : -1;
+        return 0;
     });
+    return sortableClients;
+  }, [clientsResponse?.data, sortConfig]);
 
-  const handleSort = (
-    key:
-      | keyof Omit<Client, "plan" | "paymentMethod" | "user">
-      | "plan.name"
-      | "paymentMethod.name"
-      | "user.username"
-  ) => {
+  // CORREÇÃO: Adicionada a tipagem correta para o parâmetro 'key'
+  const handleSort = (key: SortKey) => {
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
@@ -241,13 +165,15 @@ export default function Clients() {
       await deleteClient(clientToDelete);
       toast.success("Cliente excluído!");
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      setIsDeleteModalOpen(false);
-      setClientToDelete(null);
     } catch (error) {
+      // CORREÇÃO: Utilizando a variável de erro
       if (error instanceof AxiosError) {
-        toast.error(`Erro: ${error.message}`);
+        toast.error(`Erro: ${error.response?.data?.message || error.message}`);
         if (error.response?.status === 401) handleUnauthorized();
       }
+    } finally {
+        setIsDeleteModalOpen(false);
+        setClientToDelete(null);
     }
   };
 
@@ -275,40 +201,22 @@ export default function Clients() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !selectedClient ||
-      !editFormData.fullName ||
-      !editFormData.email ||
-      !editFormData.username ||
-      editFormData.planId === 0 ||
-      editFormData.paymentMethodId === 0 ||
-      !editFormData.dueDate ||
-      editFormData.grossAmount === 0
-    ) {
-      toast.error("Preencha todos os campos!");
-      return;
-    }
-    const grossAmountNum = parseFloat(editFormData.grossAmount.toString());
-    if (isNaN(grossAmountNum)) {
-      toast.error("Valor bruto inválido!");
-      return;
-    }
-    const dueDateISO = new Date(editFormData.dueDate).toISOString();
-    const dataToSend = {
-      ...editFormData,
-      grossAmount: grossAmountNum,
-      dueDate: dueDateISO,
-    };
-    console.log("Dados enviados para updateClient:", dataToSend);
+    if (!selectedClient) return;
+    
     try {
-      await updateClient(selectedClient.id, dataToSend);
+      await updateClient(selectedClient.id, {
+        ...editFormData,
+        grossAmount: Number(editFormData.grossAmount),
+        dueDate: new Date(editFormData.dueDate).toISOString(),
+      });
       toast.success("Cliente atualizado!");
       setIsModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["clients"] });
     } catch (error) {
+      // CORREÇÃO: Utilizando a variável de erro
       if (error instanceof AxiosError) {
         console.error("Erro ao atualizar cliente:", error.response?.data);
-        toast.error(`Erro: ${error.message}`);
+        toast.error(`Erro: ${error.response?.data?.message || error.message}`);
         if (error.response?.status === 401) handleUnauthorized();
       }
     }
@@ -332,8 +240,9 @@ export default function Clients() {
       setIsRenewModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["clients"] });
     } catch (error) {
+      // CORREÇÃO: Utilizando a variável de erro
       if (error instanceof AxiosError) {
-        toast.error(`Erro: ${error.message}`);
+        toast.error(`Erro: ${error.response?.data?.message || error.message}`);
         if (error.response?.status === 401) handleUnauthorized();
       }
     }
@@ -342,7 +251,6 @@ export default function Clients() {
   const closeRenewModal = () => {
     setIsRenewModalOpen(false);
     setClientToRenew(null);
-    setNewDueDate("");
   };
 
   useEffect(() => {
@@ -350,21 +258,14 @@ export default function Clients() {
       if (event.key === "Escape") {
         if (isRenewModalOpen) closeRenewModal();
         if (isDeleteModalOpen) closeDeleteModal();
+        if (isModalOpen) setIsModalOpen(false);
       }
     };
     document.addEventListener("keydown", handleEscKey);
     return () => document.removeEventListener("keydown", handleEscKey);
-  }, [isRenewModalOpen, isDeleteModalOpen]);
+  }, [isRenewModalOpen, isDeleteModalOpen, isModalOpen]);
 
-  const handlePageChange = (newPage: number) => {
-    if (
-      clientsResponse &&
-      newPage > 0 &&
-      newPage <= Math.ceil(clientsResponse.total / limit)
-    )
-      setPage(newPage);
-  };
-
+  const handlePageChange = (newPage: number) => setPage(newPage);
   const handleLimitChange = (newLimit: number) => {
     setLimit(newLimit);
     setPage(1);
@@ -375,41 +276,31 @@ export default function Clients() {
     verified: boolean
   ) => {
     try {
-      await api.put(`/api/clients/visual-payment-status/${clientId}`, {
-        status: verified,
-      });
-      toast.success("Status atualizado!");
-      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      await updateClientVisualPaymentStatus(clientId, verified);
+      queryClient.invalidateQueries({ queryKey: ["clients", page, limit, searchTerm] });
     } catch (error) {
+      // CORREÇÃO: Utilizando a variável de erro
       if (error instanceof AxiosError) {
-        toast.error(`Erro: ${error.message}`);
+        toast.error(`Erro: ${error.response?.data?.message || error.message}`);
         if (error.response?.status === 401) handleUnauthorized();
       }
     }
   };
 
-  if (error) {
-    return (
-      <div className="error-message">Erro: {(error as Error).message}</div>
-    );
-  }
-
-  const isDataReady = clientsResponse?.data && clientsResponse.data.length > 0;
+  if (error) return <div className="error-message">Erro: {(error as Error).message}</div>;
 
   return (
     <div className="dashboard-container">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">
-          Clientes Ativos
-        </h1>
-        <button onClick={handleNewClient} className="new-client-button">
-          Cadastrar Novo Cliente
-        </button>
+        <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">Clientes Ativos</h1>
+        <button onClick={handleNewClient} className="new-client-button">Cadastrar Novo Cliente</button>
       </div>
       <ClientSearch />
       <div className="clients-table-container">
         <div className="table-wrapper">
-          {isDataReady ? (
+          {isLoading ? (
+             <LoadingSimple>Carregando clientes...</LoadingSimple>
+          ) : clientsResponse && clientsResponse.data.length > 0 ? (
             <ClientsTable
               clients={sortedClients}
               onEdit={handleEdit}
@@ -425,38 +316,16 @@ export default function Clients() {
             <p className="text-center mt-4">Nenhum cliente encontrado.</p>
           )}
         </div>
-        {isFetching && <LoadingSimple>Atualizando...</LoadingSimple>}{" "}
-        {/* Alterado para LoadingSimple */}
+        {isFetching && !isLoading && <LoadingSimple>Atualizando...</LoadingSimple>}
         <div className="pagination">
-          <select
-            value={limit}
-            onChange={(e) => handleLimitChange(parseInt(e.target.value))}
-            className="pagination-select"
-          >
+          <select value={limit} onChange={(e) => handleLimitChange(parseInt(e.target.value))} className="pagination-select">
             <option value={10}>10</option>
             <option value={20}>20</option>
             <option value={30}>30</option>
           </select>
-          <button
-            onClick={() => handlePageChange(page - 1)}
-            disabled={page === 1}
-            className="pagination-button"
-          >
-            Anterior
-          </button>
-          <span className="pagination-info">
-            Página {page} de{" "}
-            {clientsResponse ? Math.ceil(clientsResponse.total / limit) : 1}
-          </span>
-          <button
-            onClick={() => handlePageChange(page + 1)}
-            disabled={
-              clientsResponse ? page * limit >= clientsResponse.total : true
-            }
-            className="pagination-button"
-          >
-            Próxima
-          </button>
+          <button onClick={() => handlePageChange(page - 1)} disabled={page === 1} className="pagination-button">Anterior</button>
+          <span className="pagination-info">Página {page} de {clientsResponse ? Math.ceil(clientsResponse.total / limit) : 1}</span>
+          <button onClick={() => handlePageChange(page + 1)} disabled={clientsResponse ? page * limit >= clientsResponse.total : true} className="pagination-button">Próxima</button>
         </div>
       </div>
       <EditClientModal
@@ -474,35 +343,16 @@ export default function Clients() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Renovar Cliente</h2>
-              <button onClick={closeRenewModal} className="modal-close-button">
-                <FaTimes size={20} />
-              </button>
+              <button onClick={closeRenewModal} className="modal-close-button"><FaTimes size={20} /></button>
             </div>
             <form onSubmit={handleRenewSubmit}>
               <div className="modal-body">
                 <label className="modal-label">Nova Data de Vencimento</label>
-                <input
-                  type="date"
-                  value={newDueDate}
-                  onChange={(e) => setNewDueDate(e.target.value)}
-                  className="modal-input"
-                  required
-                />
+                <input type="date" value={newDueDate} onChange={(e) => setNewDueDate(e.target.value)} className="modal-input" required />
               </div>
               <div className="modal-footer">
-                <button
-                  type="button"
-                  onClick={closeRenewModal}
-                  className="modal-button modal-button-cancel"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="modal-button modal-button-save"
-                >
-                  Renovar
-                </button>
+                <button type="button" onClick={closeRenewModal} className="modal-button modal-button-cancel">Cancelar</button>
+                <button type="submit" className="modal-button modal-button-save">Renovar</button>
               </div>
             </form>
           </div>
@@ -510,34 +360,17 @@ export default function Clients() {
       )}
       {isDeleteModalOpen && (
         <div className="modal-overlay" onClick={closeDeleteModal}>
-          <div
-            className="modal-content delete-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Confirmar Exclusão</h2>
-              <button onClick={closeDeleteModal} className="modal-close-button">
-                <FaTimes size={20} />
-              </button>
+              <button onClick={closeDeleteModal} className="modal-close-button"><FaTimes size={20} /></button>
             </div>
             <div className="modal-body">
-              <p className="text-[var(--text-primary)]">
-                Tem certeza que deseja excluir este cliente?
-              </p>
+              <p className="text-[var(--text-primary)]">Tem certeza que deseja excluir este cliente?</p>
             </div>
             <div className="modal-footer">
-              <button
-                onClick={closeDeleteModal}
-                className="modal-button modal-button-cancel delete-modal-button"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="modal-button modal-button-save delete-modal-button"
-              >
-                Excluir
-              </button>
+              <button onClick={closeDeleteModal} className="modal-button modal-button-cancel delete-modal-button">Cancelar</button>
+              <button onClick={confirmDelete} className="modal-button modal-button-save delete-modal-button">Excluir</button>
             </div>
           </div>
         </div>
