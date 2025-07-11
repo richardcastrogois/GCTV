@@ -2,7 +2,7 @@
 
 import { Request, Response, RequestHandler } from "express";
 import { Prisma } from "@prisma/client";
-import prisma from "../lib/prisma"; // OTIMIZAÇÃO: Usando a instância única e estável do Prisma.
+import prisma from "../lib/prisma";
 
 export const getDashboardStats: RequestHandler = async (
   req: Request,
@@ -29,108 +29,104 @@ export const getDashboardStats: RequestHandler = async (
       return;
     }
 
-    // Voltando para a lógica original que busca todos os clientes, pois é mais estável.
-    const clients = await prisma.client.findMany({
-      include: {
-        paymentMethod: true,
-        user: true,
+    // --- QUERIES OTIMIZADAS ---
+    // Todas as queries são preparadas para serem executadas em paralelo.
+
+    // 1. Query para totais gerais (independente do filtro de data)
+    const totalAmountsQuery = prisma.client.aggregate({
+      _sum: {
+        grossAmount: true,
+        netAmount: true,
       },
     });
 
-    const gross_amount = clients.reduce(
-      (sum, client) => sum + (client.grossAmount || 0),
-      0
-    );
-    const net_amount = clients.reduce(
-      (sum, client) => sum + (client.netAmount || 0),
-      0
-    );
-    const active_clients = clients.filter((client) => client.isActive).length;
-
-    let totalPaymentLiquido = 0;
-    let totalPayments = 0;
-    clients.forEach((client) => {
-      const paymentHistory = (
-        Array.isArray(client.paymentHistory) ? client.paymentHistory : []
-      ) as any[]; // Tipagem como 'any[]' para simplicidade no forEach
-
-      paymentHistory.forEach((payment) => {
-        if (payment && typeof payment === "object" && payment.paymentDate) {
-          const paymentDate = new Date(payment.paymentDate);
-          if (
-            !isNaN(paymentDate.getTime()) &&
-            paymentDate.getUTCMonth() + 1 === filterMonth &&
-            paymentDate.getUTCFullYear() === filterYear &&
-            payment.paymentLiquido !== undefined &&
-            payment.paymentLiquido !== null
-          ) {
-            totalPaymentLiquido += Number(payment.paymentLiquido);
-            totalPayments += 1;
-          }
-        }
-      });
+    // 2. Query para contar clientes ativos (independente do filtro de data)
+    const activeClientsQuery = prisma.client.count({
+      where: { isActive: true },
     });
+
+    // 3. Query para totais do mês filtrado (usando o campo JSON)
+    const monthlyTotalsQuery = prisma.$queryRaw<
+      [{ totalPaymentLiquido: number; totalPayments: string }]
+    >`
+      SELECT
+        COALESCE(SUM((p.value->>'paymentLiquido')::FLOAT), 0) AS "totalPaymentLiquido",
+        COUNT(p.value) AS "totalPayments"
+      FROM "Client" c, jsonb_array_elements(c."paymentHistory") p
+      WHERE
+        EXTRACT(YEAR FROM (p.value->>'paymentDate')::DATE) = ${filterYear} AND
+        EXTRACT(MONTH FROM (p.value->>'paymentDate')::DATE) = ${filterMonth};
+    `;
+
+    // 4. Query para agrupar faturamento por método de pagamento no mês filtrado
+    const grossByMethodQuery = prisma.$queryRaw<
+      [{ name: string; total: number }]
+    >`
+      SELECT
+        pm.name,
+        COALESCE(SUM((p.value->>'paymentLiquido')::FLOAT), 0) as "total"
+      FROM "Client" c
+      JOIN "PaymentMethod" pm ON c."paymentMethodId" = pm.id,
+      jsonb_array_elements(c."paymentHistory") p
+      WHERE
+        EXTRACT(YEAR FROM (p.value->>'paymentDate')::DATE) = ${filterYear} AND
+        EXTRACT(MONTH FROM (p.value->>'paymentDate')::DATE) = ${filterMonth}
+      GROUP BY pm.name;
+    `;
+
+    // 5. Query para lucro líquido diário (sua query original, que já era boa)
+    const dailyNetProfitQuery = prisma.$queryRaw<
+      { date: Date; netAmount: number }[]
+    >`
+      SELECT
+        (p.value->>'paymentDate')::DATE AS date,
+        SUM((p.value->>'paymentLiquido')::FLOAT) AS "netAmount"
+      FROM "Client" c, jsonb_array_elements(c."paymentHistory") p
+      WHERE
+        EXTRACT(YEAR FROM (p.value->>'paymentDate')::DATE) = ${filterYear} AND
+        EXTRACT(MONTH FROM (p.value->>'paymentDate')::DATE) = ${filterMonth}
+      GROUP BY date
+      ORDER BY date ASC;
+    `;
+
+    // --- EXECUÇÃO PARALELA ---
+    // Executa todas as queries ao mesmo tempo para máxima eficiência.
+    const [
+      totalAmounts,
+      active_clients,
+      monthlyTotalsResult,
+      grossByMethodResult,
+      dailyNetProfit,
+    ] = await Promise.all([
+      totalAmountsQuery,
+      activeClientsQuery,
+      monthlyTotalsQuery,
+      grossByMethodQuery,
+      dailyNetProfitQuery,
+    ]);
+
+    // --- PROCESSAMENTO DOS RESULTADOS ---
+    // Cálculos e formatação final, agora com os dados já agregados.
+
+    const { totalPaymentLiquido, totalPayments } = {
+      totalPaymentLiquido: monthlyTotalsResult[0]?.totalPaymentLiquido || 0,
+      totalPayments: parseInt(monthlyTotalsResult[0]?.totalPayments || "0", 10),
+    };
+
     const activationCost8 = totalPayments * 8;
     const activationCost15 = totalPayments * 15;
     const totalNetAmount8 = totalPaymentLiquido - activationCost8;
     const totalNetAmount15 = totalPaymentLiquido - activationCost15;
 
-    const paymentMethods = await prisma.paymentMethod.findMany();
-    const initialGrossByPaymentMethod = paymentMethods.reduce((acc, method) => {
-      acc[method.name] = 0;
+    // Converte o resultado do 'grossByMethod' para o formato de objeto { methodName: total }
+    const grossByPaymentMethod = grossByMethodResult.reduce((acc, item) => {
+      acc[item.name] = item.total;
       return acc;
     }, {} as Record<string, number>);
 
-    const grossByPaymentMethod = clients.reduce((acc, client) => {
-      // CORREÇÃO: Garante que paymentMethod existe antes de acessar o nome.
-      if (client.paymentMethod) {
-        const methodName = client.paymentMethod.name;
-        const paymentHistory = (
-          Array.isArray(client.paymentHistory) ? client.paymentHistory : []
-        ) as any[];
-
-        const totalLiquido = paymentHistory.reduce(
-          (sum: number, payment: any) => {
-            if (payment && typeof payment === "object" && payment.paymentDate) {
-              const paymentDate = new Date(payment.paymentDate);
-              if (
-                !isNaN(paymentDate.getTime()) &&
-                paymentDate.getUTCMonth() + 1 === filterMonth &&
-                paymentDate.getUTCFullYear() === filterYear
-              ) {
-                return sum + (Number(payment.paymentLiquido) || 0);
-              }
-            }
-            return sum;
-          },
-          0
-        );
-
-        if (acc.hasOwnProperty(methodName)) {
-          acc[methodName] += totalLiquido;
-        }
-      }
-      return acc;
-    }, initialGrossByPaymentMethod);
-
-    // OTIMIZAÇÃO: Usando uma query SQL pura para agregar dados do campo JSON.
-    const dailyNetProfitQuery = Prisma.sql`
-        SELECT
-            (p.value->>'paymentDate')::DATE AS date,
-            SUM((p.value->>'paymentLiquido')::FLOAT) AS "netAmount"
-        FROM "Client" c, jsonb_array_elements(c."paymentHistory") p
-        WHERE
-            EXTRACT(YEAR FROM (p.value->>'paymentDate')::DATE) = ${filterYear} AND
-            EXTRACT(MONTH FROM (p.value->>'paymentDate')::DATE) = ${filterMonth}
-        GROUP BY date
-        ORDER BY date ASC;
-    `;
-    const dailyNetProfit: { date: Date; netAmount: number }[] =
-      await prisma.$queryRaw(dailyNetProfitQuery);
-
     res.json({
-      gross_amount,
-      net_amount,
+      gross_amount: totalAmounts._sum.grossAmount || 0,
+      net_amount: totalAmounts._sum.netAmount || 0,
       active_clients,
       totalNetAmount8: parseFloat(totalNetAmount8.toFixed(2)),
       totalNetAmount15: parseFloat(totalNetAmount15.toFixed(2)),
@@ -146,6 +142,8 @@ export const getDashboardStats: RequestHandler = async (
   }
 };
 
+// A função getCurrentMonthStats já estava bem otimizada, usando uma query nativa.
+// Mantida como está para consistência.
 export const getCurrentMonthStats: RequestHandler = async (
   req: Request,
   res: Response
@@ -155,7 +153,6 @@ export const getCurrentMonthStats: RequestHandler = async (
     const currentMonth = currentDate.getUTCMonth() + 1;
     const currentYear = currentDate.getUTCFullYear();
 
-    // OTIMIZAÇÃO: Query SQL para buscar e agregar dados do mês atual diretamente no banco.
     const paymentStatsQuery = Prisma.sql`
       SELECT
         COALESCE(SUM((p.value->>'paymentLiquido')::FLOAT), 0) AS "totalPaymentLiquido",

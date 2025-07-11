@@ -4,7 +4,7 @@ import { RequestHandler, Request, Response } from "express";
 import { Prisma } from "@prisma/client";
 import { ParsedQs } from "qs";
 import bcrypt from "bcryptjs";
-import prisma from "../lib/prisma"; // OTIMIZAÇÃO: Usando a instância única e estável do Prisma.
+import prisma from "../lib/prisma";
 
 // Tipos de dados (sem alterações)
 type ParamsWithId = { id: string };
@@ -39,19 +39,22 @@ type VisualPaymentStatusBody = {
   status: boolean;
 };
 
-// OTIMIZAÇÃO: Função auxiliar para construir a cláusula de busca de forma segura e eficiente
-function buildSearchWhereClause(searchTerm: string, isActive: boolean): Prisma.ClientWhereInput {
+// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Função auxiliar já eficiente.
+function buildSearchWhereClause(
+  searchTerm: string,
+  isActive: boolean
+): Prisma.ClientWhereInput {
   const searchClauses: Prisma.ClientWhereInput[] = [
-    { fullName: { contains: searchTerm, mode: 'insensitive' } },
-    { email: { contains: searchTerm, mode: 'insensitive' } },
-    { phone: { contains: searchTerm, mode: 'insensitive' } },
-    { observations: { contains: searchTerm, mode: 'insensitive' } },
-    { plan: { name: { contains: searchTerm, mode: 'insensitive' } } },
-    { paymentMethod: { name: { contains: searchTerm, mode: 'insensitive' } } },
-    { user: { username: { contains: searchTerm, mode: 'insensitive' } } },
+    { fullName: { contains: searchTerm, mode: "insensitive" } },
+    { email: { contains: searchTerm, mode: "insensitive" } },
+    { phone: { contains: searchTerm, mode: "insensitive" } },
+    { observations: { contains: searchTerm, mode: "insensitive" } },
+    { plan: { name: { contains: searchTerm, mode: "insensitive" } } },
+    { paymentMethod: { name: { contains: searchTerm, mode: "insensitive" } } },
+    { user: { username: { contains: searchTerm, mode: "insensitive" } } },
   ];
 
-  const numericSearchTerm = parseFloat(searchTerm.replace(',', '.'));
+  const numericSearchTerm = parseFloat(searchTerm.replace(",", "."));
   if (!isNaN(numericSearchTerm)) {
     searchClauses.push({ grossAmount: { equals: numericSearchTerm } });
     searchClauses.push({ netAmount: { equals: numericSearchTerm } });
@@ -63,7 +66,7 @@ function buildSearchWhereClause(searchTerm: string, isActive: boolean): Prisma.C
   };
 }
 
-
+// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Uso de $transaction já é a melhor prática aqui.
 export const getClients: RequestHandler = async (
   req: Request,
   res: Response
@@ -96,6 +99,7 @@ export const getClients: RequestHandler = async (
   }
 };
 
+// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Segue o mesmo padrão eficiente de getClients.
 export const getExpiredClients: RequestHandler = async (
   req: Request,
   res: Response
@@ -128,6 +132,7 @@ export const getExpiredClients: RequestHandler = async (
   }
 };
 
+// NENHUMA OTIMIZAÇÃO NECESSÁRIA: findUnique é a forma mais eficiente de buscar por ID.
 export const getClientById: RequestHandler<ParamsWithId> = async (
   req: Request<ParamsWithId>,
   res: Response
@@ -157,14 +162,10 @@ export const getClientById: RequestHandler<ParamsWithId> = async (
   }
 };
 
-export const getPlans: RequestHandler = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Abordagem correta e direta.
+export const getPlans: RequestHandler = async (req, res): Promise<void> => {
   try {
-    const plans = await prisma.plan.findMany({
-      where: { isActive: true },
-    });
+    const plans = await prisma.plan.findMany({ where: { isActive: true } });
     res.json(plans);
   } catch (error) {
     console.error("Erro ao buscar planos:", error);
@@ -172,9 +173,10 @@ export const getPlans: RequestHandler = async (
   }
 };
 
+// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Abordagem correta e direta.
 export const getPaymentMethods: RequestHandler = async (
-  req: Request,
-  res: Response
+  req,
+  res
 ): Promise<void> => {
   try {
     const paymentMethods = await prisma.paymentMethod.findMany({
@@ -187,15 +189,13 @@ export const getPaymentMethods: RequestHandler = async (
   }
 };
 
+// OTIMIZAÇÃO APLICADA: Executa buscas independentes em paralelo com Promise.all.
 export const createClient: RequestHandler<
   never,
   unknown,
   ClientBody,
   ParsedQs
-> = async (
-  req: Request<never, unknown, ClientBody, ParsedQs>,
-  res: Response
-): Promise<void> => {
+> = async (req, res): Promise<void> => {
   try {
     const {
       fullName,
@@ -214,36 +214,33 @@ export const createClient: RequestHandler<
       res.status(400).json({ message: "Username é obrigatório" });
       return;
     }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       res.status(400).json({ message: "Email inválido" });
       return;
     }
-
     const parsedDueDate = new Date(dueDate);
     if (isNaN(parsedDueDate.getTime())) {
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
 
-    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    const [plan, paymentMethod, discountEntry] = await Promise.all([
+      prisma.plan.findUnique({ where: { id: planId } }),
+      prisma.paymentMethod.findUnique({ where: { id: paymentMethodId } }),
+      prisma.planPaymentMethodDiscount.findUnique({
+        where: { planId_paymentMethodId: { planId, paymentMethodId } },
+      }),
+    ]);
+
     if (!plan) {
       res.status(400).json({ message: "Plano inválido" });
       return;
     }
-
-    const paymentMethod = await prisma.paymentMethod.findUnique({
-      where: { id: paymentMethodId },
-    });
     if (!paymentMethod) {
       res.status(400).json({ message: "Método de pagamento inválido" });
       return;
     }
-
-    const discountEntry = await prisma.planPaymentMethodDiscount.findUnique({
-      where: { planId_paymentMethodId: { planId, paymentMethodId } },
-    });
 
     const discountFactor = discountEntry ? discountEntry.discount : 0;
     const netAmount = grossAmount * (1 - discountFactor);
@@ -252,10 +249,7 @@ export const createClient: RequestHandler<
     try {
       const password = bcrypt.hashSync("tempPassword123", 10);
       user = await prisma.user.create({
-        data: {
-          username,
-          password,
-        },
+        data: { username, password },
       });
     } catch (error) {
       if (
@@ -268,6 +262,12 @@ export const createClient: RequestHandler<
         return;
       }
       throw error;
+    }
+
+    // CORREÇÃO: Garante que 'user' não é indefinido antes de prosseguir.
+    if (!user) {
+      // A resposta de erro já foi enviada no bloco catch, então apenas retornamos.
+      return;
     }
 
     const newClient = await prisma.client.create({
@@ -298,17 +298,14 @@ export const createClient: RequestHandler<
   }
 };
 
+// OTIMIZAÇÃO APLICADA: Executa buscas independentes em paralelo com Promise.all.
 export const updateClient: RequestHandler<
   ParamsWithId,
   unknown,
   ClientBody,
   ParsedQs
-> = async (
-  req: Request<ParamsWithId, unknown, ClientBody, ParsedQs>,
-  res: Response
-): Promise<void> => {
+> = async (req, res): Promise<void> => {
   const { id } = req.params;
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
@@ -344,35 +341,36 @@ export const updateClient: RequestHandler<
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
-    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+
+    const [plan, paymentMethod, discountEntry, clientToUpdate] =
+      await Promise.all([
+        prisma.plan.findUnique({ where: { id: planId } }),
+        prisma.paymentMethod.findUnique({ where: { id: paymentMethodId } }),
+        prisma.planPaymentMethodDiscount.findUnique({
+          where: { planId_paymentMethodId: { planId, paymentMethodId } },
+        }),
+        prisma.client.findUnique({
+          where: { id: parseInt(id) },
+          include: { user: true },
+        }),
+      ]);
+
+    // CORREÇÃO: Adiciona verificações explícitas para satisfazer o TypeScript.
     if (!plan) {
       res.status(400).json({ message: "Plano inválido" });
       return;
     }
-    const paymentMethod = await prisma.paymentMethod.findUnique({
-      where: { id: paymentMethodId },
-    });
     if (!paymentMethod) {
       res.status(400).json({ message: "Método de pagamento inválido" });
       return;
     }
-
-    const discountEntry = await prisma.planPaymentMethodDiscount.findUnique({
-      where: { planId_paymentMethodId: { planId, paymentMethodId } },
-    });
-
-    const discountFactor = discountEntry ? discountEntry.discount : 0;
-    const netAmount = grossAmount * (1 - discountFactor);
-
-    const clientToUpdate = await prisma.client.findUnique({
-      where: { id: parseInt(id) },
-      include: { user: true },
-    });
-
     if (!clientToUpdate) {
       res.status(404).json({ message: "Cliente não encontrado" });
       return;
     }
+
+    const discountFactor = discountEntry ? discountEntry.discount : 0;
+    const netAmount = grossAmount * (1 - discountFactor);
 
     if (
       username &&
@@ -437,17 +435,16 @@ export const updateClient: RequestHandler<
   }
 };
 
+// NENHUMA OTIMIZAÇÃO NECESSÁRIA: `delete` é uma operação atômica e direta.
 export const deleteClient: RequestHandler<ParamsWithId> = async (
-  req: Request<ParamsWithId>,
-  res: Response
+  req,
+  res
 ): Promise<void> => {
   const { id } = req.params;
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
   }
-
   try {
     await prisma.client.delete({
       where: { id: parseInt(id) },
@@ -455,198 +452,169 @@ export const deleteClient: RequestHandler<ParamsWithId> = async (
     res.status(204).send();
   } catch (error) {
     console.error("Erro ao deletar cliente:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2025") {
-        res.status(404).json({ message: "Cliente não encontrado" });
-        return;
-      }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      res.status(404).json({ message: "Cliente não encontrado" });
+      return;
     }
     res.status(500).json({ message: "Erro ao deletar cliente" });
   }
 };
 
+// OTIMIZAÇÃO APLICADA: Remove busca prévia, atualiza direto e trata erro P2025.
 export const renewClient: RequestHandler<
   ParamsWithId,
   unknown,
   RenewClientBody,
   ParsedQs
-> = async (
-  req: Request<ParamsWithId, unknown, RenewClientBody, ParsedQs>,
-  res: Response
-): Promise<void> => {
+> = async (req, res): Promise<void> => {
   const { id } = req.params;
   const { dueDate } = req.body;
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
   }
-
   try {
     const parsedDueDate = new Date(dueDate);
     if (isNaN(parsedDueDate.getTime())) {
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
-
-    const clientExists = await prisma.client.findUnique({
-      where: { id: parseInt(id) },
-    });
-    if (!clientExists) {
-      res.status(404).json({ message: "Cliente não encontrado" });
-      return;
-    }
-
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: { dueDate: parsedDueDate, isActive: true },
       include: { plan: true, paymentMethod: true, user: true },
     });
-
     res.status(200).json(updatedClient);
   } catch (error) {
     console.error("Erro ao renovar cliente:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2025") {
-        res.status(404).json({ message: "Cliente não encontrado" });
-        return;
-      }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      res.status(404).json({ message: "Cliente não encontrado" });
+      return;
     }
     res.status(500).json({ message: "Erro ao renovar cliente" });
   }
 };
 
+// OTIMIZAÇÃO APLICADA: Combina verificação e atualização em uma única chamada.
 export const reactivateClient: RequestHandler<
   ParamsWithId,
   unknown,
   ReactivateClientBody,
   ParsedQs
-> = async (
-  req: Request<ParamsWithId, unknown, ReactivateClientBody, ParsedQs>,
-  res: Response
-): Promise<void> => {
+> = async (req, res): Promise<void> => {
   const { id } = req.params;
   const { dueDate } = req.body;
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
   }
   if (!dueDate) {
-    res.status(400).json({
-      message: "Nova data de vencimento é obrigatória para reativar.",
-    });
+    res
+      .status(400)
+      .json({
+        message: "Nova data de vencimento é obrigatória para reativar.",
+      });
     return;
   }
-
   try {
     const parsedDueDate = new Date(dueDate);
     if (isNaN(parsedDueDate.getTime())) {
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
-
-    const clientExists = await prisma.client.findUnique({
-      where: { id: parseInt(id) },
-    });
-
-    if (!clientExists) {
-      res.status(404).json({ message: "Cliente não encontrado" });
-      return;
-    }
-    if (clientExists.isActive) {
-      res.status(400).json({ message: "Cliente já está ativo." });
-      return;
-    }
-
     const updatedClient = await prisma.client.update({
-      where: { id: parseInt(id) },
+      where: { id: parseInt(id), isActive: false },
       data: { isActive: true, dueDate: parsedDueDate },
       include: { plan: true, paymentMethod: true, user: true },
     });
-
     res.status(200).json(updatedClient);
   } catch (error) {
     console.error("Erro ao reativar cliente:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2025") {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      const clientExists = await prisma.client.findUnique({
+        where: { id: parseInt(id) },
+      });
+      if (!clientExists) {
         res.status(404).json({ message: "Cliente não encontrado" });
-        return;
+      } else {
+        res.status(400).json({ message: "Cliente já está ativo." });
       }
+      return;
     }
     res.status(500).json({ message: "Erro ao reativar cliente" });
   }
 };
 
+// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Manipulação de JSON com ORM já é a prática recomendada.
 export const updatePaymentStatus: RequestHandler<
   ParamsWithId,
   unknown,
   PaymentBody,
   ParsedQs
-> = async (
-  req: Request<ParamsWithId, unknown, PaymentBody, ParsedQs>,
-  res: Response
-): Promise<void> => {
+> = async (req, res): Promise<void> => {
   const { id } = req.params;
   const { paymentDate, paymentBruto, paymentLiquido } = req.body;
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
   }
-
   try {
     const parsedPaymentDate = new Date(paymentDate);
     if (isNaN(parsedPaymentDate.getTime())) {
       res.status(400).json({ message: "Data de pagamento inválida" });
       return;
     }
-
     if (
       typeof paymentBruto !== "number" ||
       isNaN(paymentBruto) ||
       paymentBruto <= 0
     ) {
-      res.status(400).json({
-        message:
-          "Valor bruto do pagamento inválido, deve ser um número maior que zero.",
-      });
+      res
+        .status(400)
+        .json({
+          message:
+            "Valor bruto do pagamento inválido, deve ser um número maior que zero.",
+        });
       return;
     }
-
     if (
       typeof paymentLiquido !== "number" ||
       isNaN(paymentLiquido) ||
       paymentLiquido <= 0
     ) {
-      res.status(400).json({
-        message:
-          "Valor líquido do pagamento inválido, deve ser um número maior que zero.",
-      });
+      res
+        .status(400)
+        .json({
+          message:
+            "Valor líquido do pagamento inválido, deve ser um número maior que zero.",
+        });
       return;
     }
-
     const client = await prisma.client.findUnique({
       where: { id: parseInt(id) },
     });
-
     if (!client) {
       res.status(404).json({ message: "Cliente não encontrado" });
       return;
     }
-
     const currentPayments = (
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
-
     const newPayment = {
       paymentDate: parsedPaymentDate.toISOString(),
       paymentBruto,
       paymentLiquido,
     };
-
     const updatedPayments = [...currentPayments, newPayment];
-
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: {
@@ -654,32 +622,29 @@ export const updatePaymentStatus: RequestHandler<
       },
       include: { plan: true, paymentMethod: true, user: true },
     });
-
     res.status(200).json(updatedClient);
   } catch (error) {
     console.error("Erro ao atualizar status de pagamento:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2025") {
-        res.status(404).json({ message: "Cliente não encontrado" });
-        return;
-      }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      res.status(404).json({ message: "Cliente não encontrado" });
+      return;
     }
     res.status(500).json({ message: "Erro ao atualizar status de pagamento" });
   }
 };
 
+// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Manipulação de JSON com ORM já é a prática recomendada.
 export const editPayment: RequestHandler<
   ParamsWithId,
   unknown,
   UpdatePaymentBody,
   ParsedQs
-> = async (
-  req: Request<ParamsWithId, unknown, UpdatePaymentBody, ParsedQs>,
-  res: Response
-): Promise<void> => {
+> = async (req, res): Promise<void> => {
   const { id } = req.params;
   const { index, paymentDate, paymentBruto, paymentLiquido } = req.body;
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
@@ -688,7 +653,6 @@ export const editPayment: RequestHandler<
     res.status(400).json({ message: "Índice de pagamento inválido." });
     return;
   }
-
   try {
     const parsedPaymentDate = new Date(paymentDate);
     if (isNaN(parsedPaymentDate.getTime())) {
@@ -700,10 +664,12 @@ export const editPayment: RequestHandler<
       isNaN(paymentBruto) ||
       paymentBruto <= 0
     ) {
-      res.status(400).json({
-        message:
-          "Valor bruto do pagamento inválido, deve ser um número maior que zero.",
-      });
+      res
+        .status(400)
+        .json({
+          message:
+            "Valor bruto do pagamento inválido, deve ser um número maior que zero.",
+        });
       return;
     }
     if (
@@ -711,39 +677,35 @@ export const editPayment: RequestHandler<
       isNaN(paymentLiquido) ||
       paymentLiquido <= 0
     ) {
-      res.status(400).json({
-        message:
-          "Valor líquido do pagamento inválido, deve ser um número maior que zero.",
-      });
+      res
+        .status(400)
+        .json({
+          message:
+            "Valor líquido do pagamento inválido, deve ser um número maior que zero.",
+        });
       return;
     }
-
     const client = await prisma.client.findUnique({
       where: { id: parseInt(id) },
     });
-
     if (!client) {
       res.status(404).json({ message: "Cliente não encontrado" });
       return;
     }
-
     let currentPayments = (
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
-
     if (index >= currentPayments.length) {
       res
         .status(400)
         .json({ message: "Índice de pagamento fora dos limites." });
       return;
     }
-
     currentPayments[index] = {
       paymentDate: parsedPaymentDate.toISOString(),
       paymentBruto,
       paymentLiquido,
     } as Prisma.JsonValue;
-
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: {
@@ -751,7 +713,6 @@ export const editPayment: RequestHandler<
       },
       include: { plan: true, paymentMethod: true, user: true },
     });
-
     res.status(200).json(updatedClient);
   } catch (error) {
     console.error("Erro ao editar pagamento:", error);
@@ -766,18 +727,15 @@ export const editPayment: RequestHandler<
   }
 };
 
+// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Manipulação de JSON com ORM já é a prática recomendada.
 export const deletePayment: RequestHandler<
   ParamsWithId,
   unknown,
   DeletePaymentBody,
   ParsedQs
-> = async (
-  req: Request<ParamsWithId, unknown, DeletePaymentBody, ParsedQs>,
-  res: Response
-): Promise<void> => {
+> = async (req, res): Promise<void> => {
   const { id } = req.params;
   const { index } = req.body;
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
@@ -786,30 +744,24 @@ export const deletePayment: RequestHandler<
     res.status(400).json({ message: "Índice de pagamento inválido." });
     return;
   }
-
   try {
     const client = await prisma.client.findUnique({
       where: { id: parseInt(id) },
     });
-
     if (!client) {
       res.status(404).json({ message: "Cliente não encontrado" });
       return;
     }
-
     let currentPayments = (
       Array.isArray(client.paymentHistory) ? client.paymentHistory : []
     ) as Prisma.JsonArray;
-
     if (index >= currentPayments.length) {
       res
         .status(400)
         .json({ message: "Índice de pagamento fora dos limites." });
       return;
     }
-
     currentPayments.splice(index, 1);
-
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: {
@@ -817,7 +769,6 @@ export const deletePayment: RequestHandler<
       },
       include: { plan: true, paymentMethod: true, user: true },
     });
-
     res.status(200).json(updatedClient);
   } catch (error) {
     console.error("Erro ao excluir pagamento:", error);
@@ -832,32 +783,20 @@ export const deletePayment: RequestHandler<
   }
 };
 
+// OTIMIZAÇÃO APLICADA: Remove busca prévia, atualiza direto e trata erro P2025.
 export const updateClientObservations: RequestHandler<
   ParamsWithId,
   unknown,
   ObservationBody,
   ParsedQs
-> = async (
-  req: Request<ParamsWithId, unknown, ObservationBody, ParsedQs>,
-  res: Response
-): Promise<void> => {
+> = async (req, res): Promise<void> => {
   const { id } = req.params;
   const { observations } = req.body;
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
   }
-
   try {
-    const clientExists = await prisma.client.findUnique({
-      where: { id: parseInt(id) },
-    });
-    if (!clientExists) {
-      res.status(404).json({ message: "Cliente não encontrado." });
-      return;
-    }
-
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: { observations: observations || null },
@@ -866,53 +805,39 @@ export const updateClientObservations: RequestHandler<
     res.json(updatedClient);
   } catch (error) {
     console.error("Erro ao atualizar observações:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2025") {
-        res.status(404).json({ message: "Cliente não encontrado" });
-        return;
-      }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      res.status(404).json({ message: "Cliente não encontrado" });
+      return;
     }
     res.status(500).json({ message: "Erro ao atualizar observações" });
   }
 };
 
+// OTIMIZAÇÃO APLICADA: Remove busca prévia, atualiza direto e trata erro P2025.
 export const updateVisualPaymentStatus: RequestHandler<
   ParamsWithId,
   unknown,
   VisualPaymentStatusBody
-> = async (
-  req: Request<ParamsWithId, unknown, VisualPaymentStatusBody>,
-  res: Response
-): Promise<void> => {
+> = async (req, res): Promise<void> => {
   const { id } = req.params;
   const { status } = req.body;
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
   }
-
   if (typeof status !== "boolean") {
     res.status(400).json({ message: "Status inválido. Deve ser um booleano." });
     return;
   }
-
   try {
-    const clientExists = await prisma.client.findUnique({
-      where: { id: parseInt(id) },
-    });
-
-    if (!clientExists) {
-      res.status(404).json({ message: "Cliente não encontrado" });
-      return;
-    }
-
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: { visualPaymentConfirmed: status },
       include: { plan: true, paymentMethod: true, user: true },
     });
-
     res.json(updatedClient);
   } catch (error) {
     console.error("Erro ao atualizar status visual de pagamento:", error);
@@ -925,8 +850,10 @@ export const updateVisualPaymentStatus: RequestHandler<
         .json({ message: "Cliente não encontrado durante a atualização." });
       return;
     }
-    res.status(500).json({
-      message: "Erro interno ao atualizar status visual de pagamento",
-    });
+    res
+      .status(500)
+      .json({
+        message: "Erro interno ao atualizar status visual de pagamento",
+      });
   }
-}
+};
