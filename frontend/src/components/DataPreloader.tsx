@@ -1,20 +1,15 @@
-// frontend/src/components/DataPreloader.tsx
-
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
 import api from "@/utils/api";
-import LoadingSimple from "@/components/LoadingSimple"; // Substituído por LoadingSimple
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect, useState } from "react";
 import { AxiosError } from "axios";
+// MUDANÇA: A linha abaixo, que importava o LoadingSimple, foi removida.
 
 const preloadData = async () => {
   const token = localStorage.getItem("token");
   if (!token) {
-    throw new Error(
-      "Token de autenticação não encontrado. Faça login primeiro."
-    );
+    return null;
   }
 
   const [plans, paymentMethods] = await Promise.all([
@@ -33,37 +28,26 @@ export default function DataPreloader({
 }: {
   children: React.ReactNode;
 }) {
-  const { handleUnauthorized, token } = useAuth();
-  const [isReady, setIsReady] = useState(false);
+  const { token, handleUnauthorized } = useAuth();
 
-  useEffect(() => {
-    if (token) {
-      setIsReady(true);
-    }
-  }, [token]);
-
-  const { isLoading, error } = useQuery({
+  const { error } = useQuery({
     queryKey: ["preloadData"],
     queryFn: preloadData,
-    staleTime: 600000,
-    gcTime: 1200000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     retry: 1,
-    retryDelay: 2000,
-    enabled: isReady,
+    enabled: !!token,
   });
 
-  if (isLoading)
-    return <LoadingSimple>Carregando dados iniciais...</LoadingSimple>; // Alterado para LoadingSimple
-
+  // Trata o erro de autenticação de forma silenciosa, se ocorrer.
   if (error) {
     if (error instanceof AxiosError && error.response?.status === 401) {
       handleUnauthorized();
-    } else if (error instanceof Error && error.message.includes("Token")) {
-      // Não faz nada ou exibe uma mensagem
     } else {
-      console.error("Erro ao carregar dados:", error);
+      console.error("Erro ao pré-carregar dados:", error);
     }
   }
 
+  // O componente não bloqueia mais a renderização.
   return <>{children}</>;
 }
