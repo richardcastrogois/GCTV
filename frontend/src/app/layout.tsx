@@ -1,9 +1,9 @@
-//frontend/src/app/layout.tsx
+// frontend/src/app/layout.tsx
 
 "use client";
 
 import "./globals.css";
-import "./toast.css"; // Importação do estilo personalizado para o react-toastify
+import "./toast.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -11,19 +11,16 @@ import { Inter } from "next/font/google";
 import { usePathname } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { SearchProvider } from "@/components/SearchContext";
-import DataPreloader from "@/components/DataPreloader";
+import { useState } from "react"; // Importar useState
 
 function AppContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  const routesWithNavbar = [
-    "/dashboard",
-    "/clients",
-    "/expired",
-    "/clients/new",
-  ];
-  const hasNavbar = routesWithNavbar.some(
-    (route) => pathname === route || pathname.startsWith(route)
+  // Otimização: A lógica de verificação de rota já está eficiente.
+  const routesWithNavbar = ["/dashboard", "/clients", "/expired"];
+  // Usar startsWith garante que rotas como /clients/new ou /clients/123 também tenham a navbar.
+  const hasNavbar = routesWithNavbar.some((route) =>
+    pathname.startsWith(route)
   );
 
   return (
@@ -35,14 +32,13 @@ function AppContent({ children }: { children: React.ReactNode }) {
         {children}
         <ToastContainer
           position="top-right"
-          autoClose={2000} // 2 segundos
+          autoClose={2000}
           hideProgressBar={false}
           newestOnTop={false}
           closeOnClick
           rtl={false}
-          pauseOnFocusLoss={false} // Não pausar ao mudar de tela
-          draggable={false}
-          pauseOnHover={false} // Não pausar ao passar o mouse
+          pauseOnFocusLoss={false}
+          pauseOnHover={false}
           theme="dark"
         />
       </main>
@@ -52,13 +48,16 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
 const inter = Inter({ subsets: ["latin"] });
 
-const queryClient = new QueryClient();
-
+// O DataPreloader foi removido pois pode introduzir complexidade e delays.
+// É melhor carregar dados específicos por página com React Query.
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Otimização: Instancia o client dentro do componente para garantir um novo client por request.
+  const [queryClient] = useState(() => new QueryClient());
+
   return (
     <html lang="pt-BR">
       <body
@@ -66,9 +65,7 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         <QueryClientProvider client={queryClient}>
-          <DataPreloader>
-            <AppContent>{children}</AppContent>
-          </DataPreloader>
+          <AppContent>{children}</AppContent>
         </QueryClientProvider>
       </body>
     </html>

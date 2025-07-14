@@ -19,6 +19,7 @@ export default function Navbar() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     toast.success("Logout realizado com sucesso!");
     router.push("/");
   };
@@ -30,33 +31,19 @@ export default function Navbar() {
         icon: <TbLayoutDashboardFilled />,
         label: "Dashboard",
       },
-      {
-        href: "/clients",
-        icon: <MdOutlineTableView />,
-        label: "Clientes",
-      },
-      {
-        href: "/expired",
-        icon: <BsDatabaseX />,
-        label: "Notificações",
-      },
+      { href: "/clients", icon: <MdOutlineTableView />, label: "Clientes" },
+      { href: "/expired", icon: <BsDatabaseX />, label: "Notificações" },
     ],
     []
   );
 
-  const handleIconClick = (href: string) => {
-    setActiveIcon(href);
-    router.push(href);
-  };
-
   return (
+    // MUDANÇA: Removido o bg-gray e backdrop-blur. Adicionado um box-shadow com cor escura e pouca opacidade.
     <nav
-      className="text-white p-3 fixed top-0 left-0 right-0 z-50 border-opacity-30 border-white"
+      className="text-white p-3 fixed top-0 left-0 right-0 z-50 transition-shadow duration-300"
       style={{
-        borderBottomLeftRadius: "10px",
-        borderBottomRightRadius: "10px",
-        borderTopLeftRadius: "0",
-        borderTopRightRadius: "0",
+        // A sombra sutil cria a profundidade necessária sem adicionar cor de fundo.
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
       }}
     >
       <div className="container mx-auto flex justify-between items-center">
@@ -66,22 +53,18 @@ export default function Navbar() {
               key={item.href}
               href={item.href}
               prefetch={true}
-              onClick={() => handleIconClick(item.href)}
-              // AQUI ESTÁ A MUDANÇA PRINCIPAL:
-              // Criamos um container de tamanho fixo (w-16 h-16) para cada ícone.
-              // Agora, o ícone pode mudar de tamanho internamente sem afetar o layout externo.
               className="group flex h-16 w-16 items-center justify-center rounded-full"
             >
               <span
-                // O span agora só controla a aparência do ícone, sem impactar o layout.
-                // Usei `scale` no hover para um efeito de crescimento mais suave e sem quebrar o layout.
                 className={`transition-all duration-300 ease-in-out ${
-                  activeIcon === item.href
-                    ? "text-5xl" // Ícone ativo fica grande
-                    : "text-3xl group-hover:scale-125" // Ícone inativo cresce com zoom no hover
+                  activeIcon?.startsWith(item.href)
+                    ? "text-5xl"
+                    : "text-3xl group-hover:scale-125"
                 }`}
                 style={{
-                  color: activeIcon === item.href ? "#F1916D" : "#AE7DAC",
+                  color: activeIcon?.startsWith(item.href)
+                    ? "#F1916D"
+                    : "#AE7DAC",
                 }}
               >
                 {item.icon}
@@ -89,19 +72,12 @@ export default function Navbar() {
             </Link>
           ))}
         </div>
+
         <button
           onClick={handleLogout}
-          className="px-4 py-2 rounded-full transition-all duration-300"
-          style={{
-            backgroundColor: "#e63946",
-            color: "#FFFFFF",
-          }}
-          onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = "#b82e38")
-          }
-          onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "#e63946")
-          }
+          className="px-4 py-2 rounded-full text-white font-semibold
+                     bg-red-600 hover:bg-red-700 
+                     transition-colors duration-300"
         >
           Sair
         </button>
