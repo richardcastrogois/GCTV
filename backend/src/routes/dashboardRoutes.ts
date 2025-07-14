@@ -1,18 +1,15 @@
 // backend/src/routes/dashboardRoutes.ts
+// SUBSTITUA TODO O CONTEÚDO DESTE ARQUIVO POR ISTO:
 
 import { Router } from "express";
-import { getDashboardStats } from "../controllers/dashboardController";
+// MUDANÇA CRÍTICA: Importa a nova função unificada
+import { getUnifiedDashboardData } from "../controllers/dashboardController";
 import { authMiddleware } from "../middleware/authMiddleware";
 
 const router: Router = Router();
 
-// --- OTIMIZAÇÃO E BOAS PRÁTICAS ---
-// Assim como as outras rotas, este arquivo está perfeito.
-// Ele protege o endpoint com o middleware de autenticação e direciona
-// a requisição para a função de controller correta, mantendo o código
-// organizado e seguro.
-
-// Rota principal para buscar os dados da dashboard.
-router.get("/", authMiddleware, getDashboardStats);
+// MUDANÇA CRÍTICA: A rota agora é /all e chama a nova função.
+// O front-end está esperando a rota GET /api/dashboard/all
+router.get("/all", authMiddleware, getUnifiedDashboardData);
 
 export default router;

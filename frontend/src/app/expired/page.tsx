@@ -1,33 +1,40 @@
-//frontend/src/app/expired/page.tsx
+// frontend/src/app/expired/page.tsx
+
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { AxiosError } from "axios";
 import dynamic from "next/dynamic";
 import ClientSearch from "@/components/ClientSearch";
-import { fetchExpiredClients, reactivateClient } from "./api.ts";
+import { fetchExpiredClients, reactivateClient } from "./api";
 import { Client } from "../clients/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearch } from "@/hooks/useSearch";
-import LoadingSimple from "@/components/LoadingSimple"; // Novo import
+import LoadingSimple from "@/components/LoadingSimple";
 
 const ExpiredClientsTable = dynamic(
   () => import("./components/ExpiredClientsTable"),
   {
-    loading: () => <LoadingSimple>Carregando tabela...</LoadingSimple>, // Substitui Loading
+    loading: () => <LoadingSimple>Carregando tabela...</LoadingSimple>,
   }
 );
+
+type SortConfig = {
+  key: keyof Client | "plan.name" | "user.username" | null;
+  direction: "asc" | "desc";
+};
 
 export default function Expired() {
   const { handleUnauthorized } = useAuth();
   const queryClient = useQueryClient();
   const { searchTerm } = useSearch();
-  const [sortConfig, setSortConfig] = useState<{
-    key: keyof Client | "plan.name" | "user.username" | null;
-    direction: "asc" | "desc";
-  }>({ key: null, direction: "asc" });
+
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: "dueDate",
+    direction: "desc",
+  });
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
 
@@ -36,15 +43,20 @@ export default function Expired() {
     isLoading,
     isFetching,
     error,
-  } = useQuery<{ data: Client[]; total: number; page: number; limit: number }>({
-    queryKey: ["expiredClients", page, limit, searchTerm],
+  } = useQuery({
+    queryKey: ["expiredClients", page, limit, searchTerm, sortConfig],
     queryFn: async () => {
       try {
-        const response = await fetchExpiredClients(page, limit, searchTerm);
-        return response;
+        return await fetchExpiredClients(
+          page,
+          limit,
+          searchTerm,
+          sortConfig.key,
+          sortConfig.direction
+        );
       } catch (error) {
-        if (error instanceof AxiosError) {
-          if (error.response?.status === 401) handleUnauthorized();
+        if (error instanceof AxiosError && error.response?.status === 401) {
+          handleUnauthorized();
         }
         throw error;
       }
@@ -53,85 +65,62 @@ export default function Expired() {
     refetchOnReconnect: false,
   });
 
-  const sortedClients = [...(clientsResponse?.data || [])].sort((a, b) => {
-    if (!sortConfig.key) return 0;
+  const clients = useMemo(
+    () => clientsResponse?.data || [],
+    [clientsResponse?.data]
+  );
 
-    let valueA: string | number;
-    let valueB: string | number;
+  const handleSort = useCallback(
+    (key: keyof Client | "plan.name" | "user.username") => {
+      setSortConfig((prev) => ({
+        key,
+        direction:
+          prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+      }));
+    },
+    []
+  );
 
-    if (sortConfig.key === "plan.name") {
-      valueA = a.plan?.name?.toLowerCase() ?? "";
-      valueB = b.plan?.name?.toLowerCase() ?? "";
-    } else if (sortConfig.key === "user.username") {
-      valueA = a.user?.username?.toLowerCase() ?? "";
-      valueB = b.user?.username?.toLowerCase() ?? "";
-    } else {
-      const rawValueA = a[sortConfig.key];
-      const rawValueB = b[sortConfig.key];
-
-      if (sortConfig.key === "dueDate") {
-        valueA = new Date(rawValueA as string).getTime() || 0;
-        valueB = new Date(rawValueB as string).getTime() || 0;
-      } else if (sortConfig.key === "isActive") {
-        valueA = rawValueA === true ? 1 : 0;
-        valueB = rawValueB === true ? 1 : 0;
-      } else if (typeof rawValueA === "string") {
-        valueA = (rawValueA as string).toLowerCase() ?? "";
-        valueB = (rawValueB as string).toLowerCase() ?? "";
-      } else {
-        valueA = (rawValueA as number) ?? 0;
-        valueB = (rawValueB as number) ?? 0;
-      }
-    }
-
-    if (valueA < valueB) return sortConfig.direction === "asc" ? -1 : 1;
-    if (valueA > valueB) return sortConfig.direction === "asc" ? 1 : -1;
-    return 0;
-  });
-
-  const handleSort = (key: keyof Client | "plan.name" | "user.username") => {
-    setSortConfig((prev) => ({
-      key,
-      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
-    }));
-  };
-
-  const handleReactivate = async (client: Client, newDueDate: string) => {
-    try {
-      await reactivateClient(client.id, newDueDate);
-      toast.success("Cliente reativado com sucesso!", {
-        autoClose: 2000,
-        pauseOnHover: false,
-        pauseOnFocusLoss: false,
-      });
-      queryClient.invalidateQueries({ queryKey: ["expiredClients"] });
-      queryClient.invalidateQueries({ queryKey: ["clients"] });
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        toast.error(`Erro ao reativar cliente: ${error.message}`, {
+  const handleReactivate = useCallback(
+    async (client: Client, newDueDate: string) => {
+      try {
+        await reactivateClient(client.id, newDueDate);
+        toast.success("Cliente reativado com sucesso!", {
           autoClose: 2000,
           pauseOnHover: false,
-          pauseOnFocusLoss: false,
         });
-        if (error.response?.status === 401) handleUnauthorized();
+        await queryClient.invalidateQueries({ queryKey: ["expiredClients"] });
+        await queryClient.invalidateQueries({ queryKey: ["clients"] });
+      } catch (error) {
+        if (error instanceof AxiosError) {
+          toast.error(`Erro ao reativar cliente: ${error.message}`, {
+            autoClose: 2000,
+            pauseOnHover: false,
+          });
+          if (error.response?.status === 401) handleUnauthorized();
+        }
       }
-    }
-  };
+    },
+    [queryClient, handleUnauthorized]
+  );
 
-  const handlePageChange = (newPage: number) => {
-    if (
-      clientsResponse &&
-      newPage > 0 &&
-      newPage <= Math.ceil(clientsResponse.total / limit)
-    ) {
-      setPage(newPage);
-    }
-  };
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      if (
+        clientsResponse &&
+        newPage > 0 &&
+        newPage <= Math.ceil(clientsResponse.total / limit)
+      ) {
+        setPage(newPage);
+      }
+    },
+    [clientsResponse, limit]
+  );
 
-  const handleLimitChange = (newLimit: number) => {
+  const handleLimitChange = useCallback((newLimit: number) => {
     setLimit(newLimit);
     setPage(1);
-  };
+  }, []);
 
   if (error) {
     return (
@@ -139,7 +128,7 @@ export default function Expired() {
     );
   }
 
-  const isDataReady = clientsResponse?.data && clientsResponse.data.length > 0;
+  const isDataReady = !isLoading && clients.length > 0;
 
   return (
     <div className="dashboard-container">
@@ -151,54 +140,57 @@ export default function Expired() {
       <ClientSearch />
       <div className="clients-table-container">
         <div className="table-wrapper">
-          {isDataReady ? (
-            <ExpiredClientsTable
-              clients={sortedClients}
-              onSort={handleSort}
-              onReactivate={handleReactivate}
-              sortConfig={sortConfig}
-              isFetching={isFetching}
-              isLoading={isLoading}
-            />
-          ) : (
+          <ExpiredClientsTable
+            clients={clients}
+            onSort={handleSort}
+            onReactivate={handleReactivate}
+            sortConfig={sortConfig}
+            isFetching={isFetching}
+            isLoading={isLoading} // Pass isLoading para o componente filho
+          />
+          {!isLoading && !isDataReady && (
             <p className="text-center mt-4">
               Nenhum cliente expirado encontrado.
             </p>
           )}
         </div>
-        {isFetching && <LoadingSimple>Atualizando...</LoadingSimple>}{" "}
-        {/* Substitui texto */}
-        <div className="pagination">
-          <select
-            value={limit}
-            onChange={(e) => handleLimitChange(parseInt(e.target.value))}
-            className="pagination-select"
-          >
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={30}>30</option>
-          </select>
-          <button
-            onClick={() => handlePageChange(page - 1)}
-            disabled={page === 1}
-            className="pagination-button"
-          >
-            Anterior
-          </button>
-          <span className="pagination-info">
-            Página {page} de{" "}
-            {clientsResponse ? Math.ceil(clientsResponse.total / limit) : 1}
-          </span>
-          <button
-            onClick={() => handlePageChange(page + 1)}
-            disabled={
-              clientsResponse ? page * limit >= clientsResponse.total : true
-            }
-            className="pagination-button"
-          >
-            Próxima
-          </button>
-        </div>
+        {isFetching && !isLoading && (
+          <LoadingSimple>Atualizando...</LoadingSimple>
+        )}
+
+        {isDataReady && (
+          <div className="pagination">
+            <select
+              value={limit}
+              onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+              className="pagination-select"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={30}>30</option>
+            </select>
+            <button
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1}
+              className="pagination-button"
+            >
+              Anterior
+            </button>
+            <span className="pagination-info">
+              Página {page} de{" "}
+              {clientsResponse ? Math.ceil(clientsResponse.total / limit) : 1}
+            </span>
+            <button
+              onClick={() => handlePageChange(page + 1)}
+              disabled={
+                clientsResponse ? page * limit >= clientsResponse.total : true
+              }
+              className="pagination-button"
+            >
+              Próxima
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

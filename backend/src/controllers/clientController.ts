@@ -40,7 +40,6 @@ type VisualPaymentStatusBody = {
   status: boolean;
 };
 
-// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Função auxiliar já eficiente.
 function buildSearchWhereClause(
   searchTerm: string,
   isActive: boolean
@@ -67,7 +66,6 @@ function buildSearchWhereClause(
   };
 }
 
-// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Uso de $transaction já é a melhor prática aqui.
 export const getClients: RequestHandler = async (
   req: Request,
   res: Response
@@ -100,7 +98,7 @@ export const getClients: RequestHandler = async (
   }
 };
 
-// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Segue o mesmo padrão eficiente de getClients.
+// OTIMIZAÇÃO APLICADA: Esta função agora aceita parâmetros de ordenação do front-end.
 export const getExpiredClients: RequestHandler = async (
   req: Request,
   res: Response
@@ -110,6 +108,28 @@ export const getExpiredClients: RequestHandler = async (
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
     const searchTerm = (req.query.search as string) || "";
+
+    // --- INÍCIO DA OTIMIZAÇÃO DE ORDENAÇÃO ---
+
+    // 1. Recebe os parâmetros de ordenação da requisição, com valores padrão.
+    const {
+      sortKey = "dueDate", // Chave de ordenação padrão
+      sortDirection = "desc", // Direção padrão
+    } = req.query as { sortKey?: string; sortDirection?: "asc" | "desc" };
+
+    // 2. Constrói o objeto 'orderBy' dinamicamente para o Prisma.
+    // Isso traduz a chave do front-end (ex: 'plan.name') para o formato que o Prisma entende.
+    const orderBy: Prisma.ClientOrderByWithRelationInput = {};
+    if (sortKey === "plan.name") {
+      orderBy.plan = { name: sortDirection };
+    } else if (sortKey === "user.username") {
+      orderBy.user = { username: sortDirection };
+    } else if (sortKey) {
+      // Mapeia chaves diretas como 'fullName', 'email', 'dueDate'
+      (orderBy as any)[sortKey] = sortDirection;
+    }
+
+    // --- FIM DA OTIMIZAÇÃO DE ORDENAÇÃO ---
 
     const whereClause: Prisma.ClientWhereInput = searchTerm
       ? buildSearchWhereClause(searchTerm, false)
@@ -121,7 +141,8 @@ export const getExpiredClients: RequestHandler = async (
         include: { plan: true, paymentMethod: true, user: true },
         skip,
         take: limit,
-        orderBy: { updatedAt: "desc" },
+        // 3. Aplica a ordenação dinâmica na query, substituindo a ordenação fixa.
+        orderBy: orderBy,
       }),
       prisma.client.count({ where: whereClause }),
     ]);
@@ -133,7 +154,6 @@ export const getExpiredClients: RequestHandler = async (
   }
 };
 
-// NENHUMA OTIMIZAÇÃO NECESSÁRIA: findUnique é a forma mais eficiente de buscar por ID.
 export const getClientById: RequestHandler<ParamsWithId> = async (
   req: Request<ParamsWithId>,
   res: Response
@@ -163,7 +183,6 @@ export const getClientById: RequestHandler<ParamsWithId> = async (
   }
 };
 
-// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Abordagem correta e direta.
 export const getPlans: RequestHandler = async (req, res): Promise<void> => {
   try {
     const plans = await prisma.plan.findMany({ where: { isActive: true } });
@@ -174,7 +193,6 @@ export const getPlans: RequestHandler = async (req, res): Promise<void> => {
   }
 };
 
-// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Abordagem correta e direta.
 export const getPaymentMethods: RequestHandler = async (
   req,
   res
@@ -190,7 +208,6 @@ export const getPaymentMethods: RequestHandler = async (
   }
 };
 
-// OTIMIZAÇÃO APLICADA: Executa buscas independentes em paralelo com Promise.all.
 export const createClient: RequestHandler<
   never,
   unknown,
@@ -265,9 +282,7 @@ export const createClient: RequestHandler<
       throw error;
     }
 
-    // CORREÇÃO: Garante que 'user' não é indefinido antes de prosseguir.
     if (!user) {
-      // A resposta de erro já foi enviada no bloco catch, então apenas retornamos.
       return;
     }
 
@@ -299,7 +314,6 @@ export const createClient: RequestHandler<
   }
 };
 
-// OTIMIZAÇÃO APLICADA: Executa buscas independentes em paralelo com Promise.all.
 export const updateClient: RequestHandler<
   ParamsWithId,
   unknown,
@@ -356,7 +370,6 @@ export const updateClient: RequestHandler<
         }),
       ]);
 
-    // CORREÇÃO: Adiciona verificações explícitas para satisfazer o TypeScript.
     if (!plan) {
       res.status(400).json({ message: "Plano inválido" });
       return;
@@ -436,7 +449,6 @@ export const updateClient: RequestHandler<
   }
 };
 
-// NENHUMA OTIMIZAÇÃO NECESSÁRIA: `delete` é uma operação atômica e direta.
 export const deleteClient: RequestHandler<ParamsWithId> = async (
   req,
   res
@@ -464,7 +476,6 @@ export const deleteClient: RequestHandler<ParamsWithId> = async (
   }
 };
 
-// OTIMIZAÇÃO APLICADA: Remove busca prévia, atualiza direto e trata erro P2025.
 export const renewClient: RequestHandler<
   ParamsWithId,
   unknown,
@@ -502,7 +513,6 @@ export const renewClient: RequestHandler<
   }
 };
 
-// OTIMIZAÇÃO APLICADA: Combina verificação e atualização em uma única chamada.
 export const reactivateClient: RequestHandler<
   ParamsWithId,
   unknown,
@@ -516,11 +526,9 @@ export const reactivateClient: RequestHandler<
     return;
   }
   if (!dueDate) {
-    res
-      .status(400)
-      .json({
-        message: "Nova data de vencimento é obrigatória para reativar.",
-      });
+    res.status(400).json({
+      message: "Nova data de vencimento é obrigatória para reativar.",
+    });
     return;
   }
   try {
@@ -555,7 +563,6 @@ export const reactivateClient: RequestHandler<
   }
 };
 
-// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Manipulação de JSON com ORM já é a prática recomendada.
 export const updatePaymentStatus: RequestHandler<
   ParamsWithId,
   unknown,
@@ -579,12 +586,10 @@ export const updatePaymentStatus: RequestHandler<
       isNaN(paymentBruto) ||
       paymentBruto <= 0
     ) {
-      res
-        .status(400)
-        .json({
-          message:
-            "Valor bruto do pagamento inválido, deve ser um número maior que zero.",
-        });
+      res.status(400).json({
+        message:
+          "Valor bruto do pagamento inválido, deve ser um número maior que zero.",
+      });
       return;
     }
     if (
@@ -592,12 +597,10 @@ export const updatePaymentStatus: RequestHandler<
       isNaN(paymentLiquido) ||
       paymentLiquido <= 0
     ) {
-      res
-        .status(400)
-        .json({
-          message:
-            "Valor líquido do pagamento inválido, deve ser um número maior que zero.",
-        });
+      res.status(400).json({
+        message:
+          "Valor líquido do pagamento inválido, deve ser um número maior que zero.",
+      });
       return;
     }
     const client = await prisma.client.findUnique({
@@ -637,7 +640,6 @@ export const updatePaymentStatus: RequestHandler<
   }
 };
 
-// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Manipulação de JSON com ORM já é a prática recomendada.
 export const editPayment: RequestHandler<
   ParamsWithId,
   unknown,
@@ -665,12 +667,10 @@ export const editPayment: RequestHandler<
       isNaN(paymentBruto) ||
       paymentBruto <= 0
     ) {
-      res
-        .status(400)
-        .json({
-          message:
-            "Valor bruto do pagamento inválido, deve ser um número maior que zero.",
-        });
+      res.status(400).json({
+        message:
+          "Valor bruto do pagamento inválido, deve ser um número maior que zero.",
+      });
       return;
     }
     if (
@@ -678,12 +678,10 @@ export const editPayment: RequestHandler<
       isNaN(paymentLiquido) ||
       paymentLiquido <= 0
     ) {
-      res
-        .status(400)
-        .json({
-          message:
-            "Valor líquido do pagamento inválido, deve ser um número maior que zero.",
-        });
+      res.status(400).json({
+        message:
+          "Valor líquido do pagamento inválido, deve ser um número maior que zero.",
+      });
       return;
     }
     const client = await prisma.client.findUnique({
@@ -728,7 +726,6 @@ export const editPayment: RequestHandler<
   }
 };
 
-// NENHUMA OTIMIZAÇÃO NECESSÁRIA: Manipulação de JSON com ORM já é a prática recomendada.
 export const deletePayment: RequestHandler<
   ParamsWithId,
   unknown,
@@ -784,7 +781,6 @@ export const deletePayment: RequestHandler<
   }
 };
 
-// OTIMIZAÇÃO APLICADA: Remove busca prévia, atualiza direto e trata erro P2025.
 export const updateClientObservations: RequestHandler<
   ParamsWithId,
   unknown,
@@ -817,7 +813,6 @@ export const updateClientObservations: RequestHandler<
   }
 };
 
-// OTIMIZAÇÃO APLICADA: Remove busca prévia, atualiza direto e trata erro P2025.
 export const updateVisualPaymentStatus: RequestHandler<
   ParamsWithId,
   unknown,
@@ -851,31 +846,26 @@ export const updateVisualPaymentStatus: RequestHandler<
         .json({ message: "Cliente não encontrado durante a atualização." });
       return;
     }
-    res
-      .status(500)
-      .json({
-        message: "Erro interno ao atualizar status visual de pagamento",
-      });
+    res.status(500).json({
+      message: "Erro interno ao atualizar status visual de pagamento",
+    });
   }
 };
 
-// NOVA FUNÇÃO para inativar clientes expirados
 export const deactivateExpiredClients: RequestHandler = async (req, res) => {
-  // 1. Segurança: Protege a rota para que só o Cron Job da Vercel possa executá-la
-  const authHeader = req.headers['authorization'];
+  const authHeader = req.headers["authorization"];
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ message: 'Acesso não autorizado' });
+    return res.status(401).json({ message: "Acesso não autorizado" });
   }
 
   try {
     const thirtyDaysAgo = subDays(new Date(), 30);
 
-    // 2. Eficiência: Usa 'updateMany' para atualizar todos os clientes de uma só vez
     const result = await prisma.client.updateMany({
       where: {
-        isActive: true, // Apenas clientes que ainda estão ativos
+        isActive: true,
         dueDate: {
-          lt: thirtyDaysAgo, // 'lt' significa 'less than' (menor que)
+          lt: thirtyDaysAgo,
         },
       },
       data: {
@@ -884,7 +874,9 @@ export const deactivateExpiredClients: RequestHandler = async (req, res) => {
     });
 
     console.log(`${result.count} clientes foram inativados por expiração.`);
-    res.status(200).json({ message: `${result.count} clientes inativados com sucesso.` });
+    res
+      .status(200)
+      .json({ message: `${result.count} clientes inativados com sucesso.` });
   } catch (error) {
     console.error("Erro ao inativar clientes expirados:", error);
     res.status(500).json({ message: "Erro interno no servidor." });

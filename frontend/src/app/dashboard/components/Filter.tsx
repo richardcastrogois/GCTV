@@ -1,6 +1,7 @@
-//frontend/src/app/dashboard/components/Filter.tsx
+// frontend/src/app/dashboard/components/Filter.tsx
 
-import { useState, useEffect, useMemo } from "react";
+// Otimização: Adicionado React.memo e useCallback para as funções
+import { useState, useEffect, useMemo, memo, useCallback } from "react";
 import Select, { StylesConfig } from "react-select";
 
 // Interface para as opções do react-select
@@ -9,9 +10,10 @@ interface SelectOption {
   label: string;
 }
 
-// Estilos customizados para o react-select
+// Estilos customizados para o react-select (mantido fora para não ser recriado)
 const customStyles: StylesConfig<SelectOption, false> = {
   control: (provided) => ({
+    // ... (seu código de estilos permanece o mesmo aqui)
     ...provided,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     backdropFilter: "blur(5px)",
@@ -26,6 +28,7 @@ const customStyles: StylesConfig<SelectOption, false> = {
     },
   }),
   menu: (provided) => ({
+    // ... (seu código de estilos permanece o mesmo aqui)
     ...provided,
     backgroundColor: "rgba(255, 255, 255, 0.5)",
     backdropFilter: "blur(5px)",
@@ -36,6 +39,7 @@ const customStyles: StylesConfig<SelectOption, false> = {
     zIndex: 9999,
   }),
   menuList: (provided) => ({
+    // ... (seu código de estilos permanece o mesmo aqui)
     ...provided,
     padding: 0,
     maxHeight: "200px",
@@ -56,6 +60,7 @@ const customStyles: StylesConfig<SelectOption, false> = {
     },
   }),
   option: (provided, state) => ({
+    // ... (seu código de estilos permanece o mesmo aqui)
     ...provided,
     backgroundColor: state.isSelected
       ? "var(--accent-blue)"
@@ -95,7 +100,9 @@ interface FilterProps {
   onFilterChange: (month: number, year: number) => void;
 }
 
-export default function Filter({ onFilterChange }: FilterProps) {
+// Otimização: Usando React.memo para evitar re-renderizações desnecessárias
+const Filter = memo(({ onFilterChange }: FilterProps) => {
+  // useMemo aqui está correto, pois os valores são constantes
   const months = useMemo(
     () => [
       { value: 1, label: "Janeiro" },
@@ -126,31 +133,38 @@ export default function Filter({ onFilterChange }: FilterProps) {
   const [selectedMonth, setSelectedMonth] = useState<SelectOption | null>(null);
   const [selectedYear, setSelectedYear] = useState<SelectOption | null>(null);
 
+  // Este useEffect é bom para inicialização no lado do cliente e evitar erros de hidratação (SSR)
   useEffect(() => {
-    // Inicializa os valores com base na data atual apenas no cliente
+    const currentDate = new Date();
     const currentMonth = months.find(
-      (m) => m.value === new Date().getMonth() + 1
+      (m) => m.value === currentDate.getMonth() + 1
     );
-    const currentYear = years.find((y) => y.value === new Date().getFullYear());
+    const currentYear = years.find(
+      (y) => y.value === currentDate.getFullYear()
+    );
     setSelectedMonth(currentMonth || null);
     setSelectedYear(currentYear || null);
   }, [months, years]);
 
-  const handleMonthChange = (option: SelectOption | null) => {
-    setSelectedMonth(option);
-    onFilterChange(
-      option?.value || new Date().getMonth() + 1,
-      selectedYear?.value || new Date().getFullYear()
-    );
-  };
+  const handleMonthChange = useCallback(
+    (option: SelectOption | null) => {
+      setSelectedMonth(option);
+      if (option && selectedYear) {
+        onFilterChange(option.value, selectedYear.value);
+      }
+    },
+    [selectedYear, onFilterChange]
+  );
 
-  const handleYearChange = (option: SelectOption | null) => {
-    setSelectedYear(option);
-    onFilterChange(
-      selectedMonth?.value || new Date().getMonth() + 1,
-      option?.value || new Date().getFullYear()
-    );
-  };
+  const handleYearChange = useCallback(
+    (option: SelectOption | null) => {
+      setSelectedYear(option);
+      if (option && selectedMonth) {
+        onFilterChange(selectedMonth.value, option.value);
+      }
+    },
+    [selectedMonth, onFilterChange]
+  );
 
   return (
     <div className="flex flex-col sm:flex-row items-center">
@@ -168,9 +182,10 @@ export default function Filter({ onFilterChange }: FilterProps) {
           className="w-40"
           classNamePrefix="custom-select"
           styles={customStyles}
+          placeholder="Selecione..."
         />
       </div>
-      <div className="flex items-center">
+      <div className="flex items-center mt-2 sm:mt-0 sm:ml-4">
         <label
           className="mr-2 text-lg"
           style={{ color: "var(--text-secondary)" }}
@@ -181,12 +196,15 @@ export default function Filter({ onFilterChange }: FilterProps) {
           options={years}
           value={selectedYear}
           onChange={handleYearChange}
-          // AQUI ESTÁ A CORREÇÃO: Aumentei a largura para caber o conteúdo
           className="w-32"
           classNamePrefix="custom-select"
           styles={customStyles}
+          placeholder="Selecione..."
         />
       </div>
     </div>
   );
-}
+});
+
+Filter.displayName = "Filter"; // Bom para depuração
+export default Filter;

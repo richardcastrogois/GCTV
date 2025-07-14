@@ -10,7 +10,7 @@ import {
   FaPencilAlt,
 } from "react-icons/fa";
 import { Client } from "../../clients/types";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { Skeleton } from "@mui/material";
 
 const formatDateToUTC = (date: string | Date): string => {
@@ -33,7 +33,8 @@ interface ExpiredClientsTableProps {
   isLoading?: boolean;
 }
 
-export default function ExpiredClientsTable({
+// OTIMIZAÇÃO: Componente envolvido com memo para evitar re-renderizações desnecessárias.
+const ExpiredClientsTable = memo(function ExpiredClientsTable({
   clients,
   onSort,
   onReactivate,
@@ -50,11 +51,9 @@ export default function ExpiredClientsTable({
   );
   const [newDueDate, setNewDueDate] = useState<string>("");
 
-  // Referências para os modais
   const infoModalRef = useRef<HTMLDivElement>(null);
   const confirmModalRef = useRef<HTMLDivElement>(null);
 
-  // Fechar modais com a tecla ESC e clique fora
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -62,9 +61,7 @@ export default function ExpiredClientsTable({
         closeConfirmModal();
       }
     };
-
     const handleClickOutside = (e: MouseEvent) => {
-      // Verificar se o clique foi fora do modal de informações
       if (
         isInfoModalOpen &&
         infoModalRef.current &&
@@ -72,8 +69,6 @@ export default function ExpiredClientsTable({
       ) {
         closeInfoModal();
       }
-
-      // Verificar se o clique foi fora do modal de confirmação
       if (
         isConfirmModalOpen &&
         confirmModalRef.current &&
@@ -82,10 +77,8 @@ export default function ExpiredClientsTable({
         closeConfirmModal();
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("mousedown", handleClickOutside);
-
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("mousedown", handleClickOutside);
@@ -120,7 +113,6 @@ export default function ExpiredClientsTable({
     setSelectedClient(client);
     setIsInfoModalOpen(true);
   };
-
   const closeInfoModal = () => {
     setIsInfoModalOpen(false);
     setSelectedClient(null);
@@ -128,10 +120,9 @@ export default function ExpiredClientsTable({
 
   const openConfirmModal = (client: Client) => {
     setClientToReactivate(client);
-    setNewDueDate(new Date().toISOString().split("T")[0]); // Data atual como padrão
+    setNewDueDate(new Date().toISOString().split("T")[0]);
     setIsConfirmModalOpen(true);
   };
-
   const closeConfirmModal = () => {
     setIsConfirmModalOpen(false);
     setClientToReactivate(null);
@@ -149,10 +140,8 @@ export default function ExpiredClientsTable({
     closeConfirmModal();
   };
 
-  const getStatusClass = (isActive: boolean) => {
-    return isActive ? "status-text--ativo" : "status-text--inativo";
-  };
-
+  const getStatusClass = (isActive: boolean) =>
+    isActive ? "status-text--ativo" : "status-text--inativo";
   const getPlanClass = (planName: string) => {
     switch (planName.toLowerCase()) {
       case "p2p":
@@ -165,7 +154,6 @@ export default function ExpiredClientsTable({
         return "plan-text--outros";
     }
   };
-
   const getMethodClass = (methodName: string) => {
     switch (methodName.toLowerCase()) {
       case "nubank":
@@ -244,7 +232,6 @@ export default function ExpiredClientsTable({
             </table>
           </div>
         </div>
-
         <div className="md:hidden space-y-4">
           {[...Array(5)].map((_, index) => (
             <div
@@ -368,7 +355,6 @@ export default function ExpiredClientsTable({
           </table>
         </div>
       </div>
-
       <div className="md:hidden space-y-4">
         {clients.map((client) => (
           <div
@@ -403,7 +389,6 @@ export default function ExpiredClientsTable({
                 </p>
               </div>
             </div>
-
             {expandedRows.includes(client.id) && (
               <div className="mt-3 space-y-2 expanded-content">
                 <p className="text-sm text-[var(--text-primary)]">
@@ -430,7 +415,6 @@ export default function ExpiredClientsTable({
           </div>
         ))}
       </div>
-
       {isInfoModalOpen && selectedClient && (
         <div className="modal-overlay">
           <div className="modal-content" ref={infoModalRef}>
@@ -502,7 +486,6 @@ export default function ExpiredClientsTable({
           </div>
         </div>
       )}
-
       {isConfirmModalOpen && clientToReactivate && (
         <div className="modal-overlay">
           <div className="modal-content" ref={confirmModalRef}>
@@ -584,4 +567,8 @@ export default function ExpiredClientsTable({
       )}
     </>
   );
-}
+});
+
+ExpiredClientsTable.displayName = "ExpiredClientsTable";
+
+export default ExpiredClientsTable;

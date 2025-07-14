@@ -1,4 +1,4 @@
-//frontend/src/app/expired/api.ts
+// frontend/src/app/expired/api.ts
 
 import api from "@/utils/api";
 import { Client } from "../clients/types";
@@ -10,14 +10,23 @@ interface ClientResponse {
   limit: number;
 }
 
+// Otimização: Adicionados sortKey e sortDirection para que o back-end faça a ordenação
 export const fetchExpiredClients = async (
   page: number,
   limit: number,
-  search: string
+  search: string,
+  sortKey: string | null,
+  sortDirection: "asc" | "desc"
 ): Promise<ClientResponse> => {
   try {
     const response = await api.get<ClientResponse>("/api/expired-clients", {
-      params: { page, limit, search },
+      params: {
+        page,
+        limit,
+        search,
+        sortKey,
+        sortDirection,
+      },
     });
     return response.data;
   } catch (error) {
