@@ -66,15 +66,31 @@ function buildSearchWhereClause(
   };
 }
 
-export const getClients: RequestHandler = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+// OTIMIZAÇÃO APLICADA: Esta função agora aceita parâmetros de ordenação
+export const getClients: RequestHandler = async (req: Request, res: Response): Promise<void> => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
     const searchTerm = (req.query.search as string) || "";
+
+    // --- INÍCIO DA OTIMIZAÇÃO DE ORDENAÇÃO ---
+    const {
+        sortKey = 'createdAt', // Chave de ordenação padrão
+        sortDirection = 'desc'
+    } = req.query as { sortKey?: string; sortDirection?: 'asc' | 'desc' };
+
+    const orderBy: Prisma.ClientOrderByWithRelationInput = {};
+    if (sortKey === 'plan.name') {
+        orderBy.plan = { name: sortDirection };
+    } else if (sortKey === 'paymentMethod.name') {
+        orderBy.paymentMethod = { name: sortDirection };
+    } else if (sortKey === 'user.username') {
+        orderBy.user = { username: sortDirection };
+    } else if (sortKey) {
+        (orderBy as any)[sortKey] = sortDirection;
+    }
+    // --- FIM DA OTIMIZAÇÃO DE ORDENAÇÃO ---
 
     const whereClause: Prisma.ClientWhereInput = searchTerm
       ? buildSearchWhereClause(searchTerm, true)
@@ -86,7 +102,7 @@ export const getClients: RequestHandler = async (
         include: { plan: true, paymentMethod: true, user: true },
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy: orderBy, // <-- APLICA A ORDENAÇÃO DINÂMICA
       }),
       prisma.client.count({ where: whereClause }),
     ]);

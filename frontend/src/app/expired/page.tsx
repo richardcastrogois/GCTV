@@ -1,5 +1,3 @@
-// frontend/src/app/expired/page.tsx
-
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
@@ -12,12 +10,142 @@ import { fetchExpiredClients, reactivateClient } from "./api";
 import { Client } from "../clients/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearch } from "@/hooks/useSearch";
-import LoadingSimple from "@/components/LoadingSimple";
+import { Skeleton } from "@mui/material";
+
+// --- INÍCIO: COMPONENTE SKELETON (SEM ALTERAÇÃO) ---
+const ExpiredClientsTableSkeleton = () => (
+  <>
+    <div className="clients-table-container hidden md:block animate-pulse">
+      <div className="table-wrapper">
+        <table className="clients-table">
+          <thead>
+            <tr>
+              <th className="user-column">
+                <Skeleton
+                  variant="text"
+                  sx={{ bgcolor: "grey.800" }}
+                  width="80%"
+                />
+              </th>
+              <th className="name-column">
+                <Skeleton
+                  variant="text"
+                  sx={{ bgcolor: "grey.800" }}
+                  width="80%"
+                />
+              </th>
+              <th className="email-column hidden lg:table-cell">
+                <Skeleton
+                  variant="text"
+                  sx={{ bgcolor: "grey.800" }}
+                  width="80%"
+                />
+              </th>
+              <th className="plan-column">
+                <Skeleton
+                  variant="text"
+                  sx={{ bgcolor: "grey.800" }}
+                  width="80%"
+                />
+              </th>
+              <th className="due-date-column">
+                <Skeleton
+                  variant="text"
+                  sx={{ bgcolor: "grey.800" }}
+                  width="80%"
+                />
+              </th>
+              <th className="status-column">
+                <Skeleton
+                  variant="text"
+                  sx={{ bgcolor: "grey.800" }}
+                  width="80%"
+                />
+              </th>
+              <th className="actions-column">
+                <Skeleton
+                  variant="text"
+                  sx={{ bgcolor: "grey.800" }}
+                  width="50%"
+                />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...Array(10)].map((_, index) => (
+              <tr key={index}>
+                <td className="user-column">
+                  <Skeleton variant="text" sx={{ bgcolor: "grey.900" }} />
+                </td>
+                <td className="name-column">
+                  <Skeleton variant="text" sx={{ bgcolor: "grey.900" }} />
+                </td>
+                <td className="email-column hidden lg:table-cell">
+                  <Skeleton variant="text" sx={{ bgcolor: "grey.900" }} />
+                </td>
+                <td className="plan-column">
+                  <Skeleton variant="text" sx={{ bgcolor: "grey.900" }} />
+                </td>
+                <td className="due-date-column">
+                  <Skeleton variant="text" sx={{ bgcolor: "grey.900" }} />
+                </td>
+                <td className="status-column">
+                  <Skeleton variant="text" sx={{ bgcolor: "grey.900" }} />
+                </td>
+                <td className="actions-column">
+                  <Skeleton variant="text" sx={{ bgcolor: "grey.900" }} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div className="md:hidden space-y-4 animate-pulse">
+      {[...Array(5)].map((_, index) => (
+        <div
+          key={index}
+          className="client-card bg-[var(--table-bg)] backdrop-blur-sm rounded-lg p-4 shadow-md"
+        >
+          <div className="flex justify-between items-start">
+            <div className="w-full">
+              <Skeleton
+                variant="text"
+                sx={{ bgcolor: "grey.800" }}
+                width="40%"
+                height={20}
+              />
+              <Skeleton
+                variant="text"
+                sx={{ bgcolor: "grey.800" }}
+                width="60%"
+                height={30}
+              />
+              <Skeleton
+                variant="text"
+                sx={{ bgcolor: "grey.800" }}
+                width="50%"
+                height={20}
+              />
+              <Skeleton
+                variant="text"
+                sx={{ bgcolor: "grey.800" }}
+                width="50%"
+                height={20}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </>
+);
+// --- FIM: COMPONENTE SKELETON ---
 
 const ExpiredClientsTable = dynamic(
   () => import("./components/ExpiredClientsTable"),
   {
-    loading: () => <LoadingSimple>Carregando tabela...</LoadingSimple>,
+    loading: () => <ExpiredClientsTableSkeleton />,
   }
 );
 
@@ -69,7 +197,6 @@ export default function Expired() {
     () => clientsResponse?.data || [],
     [clientsResponse?.data]
   );
-
   const handleSort = useCallback(
     (key: keyof Client | "plan.name" | "user.username") => {
       setSortConfig((prev) => ({
@@ -128,8 +255,6 @@ export default function Expired() {
     );
   }
 
-  const isDataReady = !isLoading && clients.length > 0;
-
   return (
     <div className="dashboard-container">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
@@ -140,25 +265,26 @@ export default function Expired() {
       <ClientSearch />
       <div className="clients-table-container">
         <div className="table-wrapper">
-          <ExpiredClientsTable
-            clients={clients}
-            onSort={handleSort}
-            onReactivate={handleReactivate}
-            sortConfig={sortConfig}
-            isFetching={isFetching}
-            isLoading={isLoading} // Pass isLoading para o componente filho
-          />
-          {!isLoading && !isDataReady && (
+          {isLoading ? (
+            <ExpiredClientsTableSkeleton />
+          ) : clients.length > 0 ? (
+            <ExpiredClientsTable
+              clients={clients}
+              onSort={handleSort}
+              onReactivate={handleReactivate}
+              sortConfig={sortConfig}
+              isFetching={isFetching} // <-- MUDANÇA: Passando a prop para o componente da tabela
+            />
+          ) : (
             <p className="text-center mt-4">
               Nenhum cliente expirado encontrado.
             </p>
           )}
         </div>
-        {isFetching && !isLoading && (
-          <LoadingSimple>Atualizando...</LoadingSimple>
-        )}
 
-        {isDataReady && (
+        {/* MUDANÇA: O bloco que mostrava o LoadingSimple foi removido daqui */}
+
+        {clients.length > 0 && !isLoading && (
           <div className="pagination">
             <select
               value={limit}

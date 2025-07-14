@@ -1,4 +1,4 @@
-// frontend/src/app/clients/components/ClientsTable.tsx
+"use client";
 
 import {
   FaEdit,
@@ -14,14 +14,14 @@ import {
   FaSave,
 } from "react-icons/fa";
 import { Client, PaymentEntry } from "@/types/client";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, memo } from "react";
 import { createPortal } from "react-dom";
-import { Skeleton } from "@mui/material";
 import api from "@/utils/api";
 import { toast } from "react-toastify";
 import { useAuth } from "@/hooks/useAuth";
 import { AxiosError } from "axios";
 
+// --- Tipos e Funções Auxiliares (sem alteração) ---
 const formatDateToUTC = (date: string | Date): string => {
   const d = new Date(date);
   const day = String(d.getUTCDate()).padStart(2, "0");
@@ -42,7 +42,6 @@ const getDueDateClass = (dueDate: string, currentDate: Date): string => {
   const due = new Date(dueDate);
   const timeDiff = due.getTime() - currentDate.getTime();
   const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
-
   if (due < currentDate) {
     return "text-[#ff4d4f]";
   } else if (daysDiff <= 7) {
@@ -55,37 +54,28 @@ interface ExtendedClient extends Client {
   paymentHistory: PaymentEntry[] | null;
 }
 
+// CORREÇÃO: Definindo o tipo específico para as chaves de ordenação
+type SortKey =
+  | keyof Omit<Client, "plan" | "paymentMethod" | "user">
+  | "plan.name"
+  | "paymentMethod.name"
+  | "user.username";
+
 interface ClientsTableProps {
   clients: ExtendedClient[];
   onEdit: (client: Client) => void;
   onDelete: (id: number) => void;
   onRenew: (client: Client) => void;
-  onSort: (
-    key:
-      | keyof Omit<Client, "plan" | "paymentMethod" | "user">
-      | "plan.name"
-      | "paymentMethod.name"
-      | "user.username"
-  ) => void;
+  onSort: (key: SortKey) => void; // CORREÇÃO: Usando o tipo SortKey em vez de 'any'
   sortConfig: {
-    key:
-      | keyof Omit<Client, "plan" | "paymentMethod" | "user">
-      | "plan.name"
-      | "paymentMethod.name"
-      | "user.username"
-      | null;
+    key: SortKey | null; // CORREÇÃO: Usando o tipo SortKey em vez de 'any'
     direction: "asc" | "desc";
   };
   isFetching?: boolean;
-  isLoading?: boolean;
-  onUpdatePaymentStatus: (
-    clientId: number,
-    verified: boolean,
-    date?: string
-  ) => Promise<void>;
+  onUpdatePaymentStatus: (clientId: number, verified: boolean) => Promise<void>;
 }
 
-export default function ClientsTable({
+export default memo(function ClientsTable({
   clients,
   onEdit,
   onDelete,
@@ -93,7 +83,6 @@ export default function ClientsTable({
   onSort,
   sortConfig,
   isFetching = false,
-  isLoading = false,
   onUpdatePaymentStatus,
 }: ClientsTableProps) {
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
@@ -117,7 +106,6 @@ export default function ClientsTable({
   const [selectedClient, setSelectedClient] = useState<ExtendedClient | null>(
     null
   );
-
   const [isPaidVisualStatus, setIsPaidVisualStatus] = useState<
     Map<number, boolean>
   >(new Map());
@@ -126,7 +114,6 @@ export default function ClientsTable({
   const buttonRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   const infoModalRef = useRef<HTMLDivElement>(null);
   const { handleUnauthorized } = useAuth();
-
   const currentDate = useMemo(() => new Date(), []);
 
   useEffect(() => {
@@ -141,25 +128,21 @@ export default function ClientsTable({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node))
         setOpenMenu(null);
-      }
       if (
         isModalOpen &&
         event.target instanceof Element &&
         !event.target.closest(".modal-content")
-      ) {
+      )
         closeModal();
-      }
       if (
         isInfoModalOpen &&
         event.target instanceof Element &&
         !event.target.closest(".modal-content")
-      ) {
+      )
         closeInfoModal();
-      }
     };
-
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpenMenu(null);
@@ -167,7 +150,6 @@ export default function ClientsTable({
         if (isInfoModalOpen) closeInfoModal();
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscKey);
     return () => {
@@ -176,13 +158,8 @@ export default function ClientsTable({
     };
   }, [isModalOpen, isInfoModalOpen]);
 
-  const getSortIcon = (
-    columnKey:
-      | keyof Omit<Client, "plan" | "paymentMethod" | "user">
-      | "plan.name"
-      | "paymentMethod.name"
-      | "user.username"
-  ) => {
+  const getSortIcon = (columnKey: SortKey) => {
+    // CORREÇÃO: Usando o tipo SortKey
     if (sortConfig.key !== columnKey) return <FaSort className="sort-icon" />;
     return sortConfig.direction === "asc" ? (
       <FaSortUp className="sort-icon" />
@@ -209,57 +186,39 @@ export default function ClientsTable({
     e.stopPropagation();
     const button = buttonRefs.current.get(clientId);
     if (!button) return;
-
     const rect = button.getBoundingClientRect();
     const menuWidth = 192;
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
-
     let top = rect.bottom + window.scrollY + 4;
-    let left = rect.left + window.scrollX;
-
-    if (left + menuWidth > windowWidth) {
-      left = windowWidth - menuWidth - 10;
-    }
-    if (top + 150 > windowHeight + window.scrollY) {
+    let left = rect.left + window.scrollX - menuWidth / 2; // Centraliza melhor o menu
+    if (left + menuWidth > windowWidth) left = windowWidth - menuWidth - 10;
+    if (left < 10) left = 10;
+    if (top + 150 > windowHeight + window.scrollY)
       top = rect.top + window.scrollY - 150;
-    }
-
     setMenuPosition({ top, left });
     setOpenMenu((prev) => (prev === clientId ? null : clientId));
   };
 
   const setVisualPaidStatus = async (clientId: number, isPaid: boolean) => {
     const originalStatus = isPaidVisualStatus.get(clientId) ?? !isPaid;
-
     setIsPaidVisualStatus((prev) => new Map(prev).set(clientId, isPaid));
-
     try {
       await onUpdatePaymentStatus(clientId, isPaid);
     } catch (error) {
       setIsPaidVisualStatus((prev) =>
         new Map(prev).set(clientId, originalStatus)
       );
-      console.error(
-        `Erro ao atualizar status visual para client ${clientId}:`,
-        error
-      );
-      if (error instanceof AxiosError && error.response?.status === 401) {
+      if (error instanceof AxiosError && error.response?.status === 401)
         handleUnauthorized();
-      } else {
-        toast.error("Erro ao atualizar status visual");
-      }
+      else toast.error("Erro ao atualizar status visual");
     }
   };
 
-  // CORREÇÃO: A função agora usa 'unknown' em vez de 'any' e faz as verificações
-  // de tipo necessárias, resolvendo o erro do ESLint e tornando o código mais seguro.
   const normalizePaymentHistory = (history: unknown): PaymentEntry[] => {
-    if (!Array.isArray(history)) {
-      return [];
-    }
-
-    return history.map((entry) => {
+    if (!Array.isArray(history)) return [];
+    return history.map((entry: unknown) => {
+      // CORREÇÃO: Usando 'unknown' em vez de 'any'
       if (typeof entry === "object" && entry !== null) {
         const pEntry = entry as Partial<PaymentEntry>;
         return {
@@ -279,7 +238,6 @@ export default function ClientsTable({
   const openModal = async (clientId: number) => {
     const client = clients.find((c) => c.id === clientId);
     if (!client) return;
-
     try {
       const response = await api.get(`/api/clients/${clientId}`);
       const normalizedClient = {
@@ -294,12 +252,9 @@ export default function ClientsTable({
       setNewPaymentLiquido(client.netAmount);
       setIsModalOpen(true);
     } catch (error) {
-      console.error("Erro ao carregar detalhes do cliente:", error);
-      if (error instanceof AxiosError && error.response?.status === 401) {
+      if (error instanceof AxiosError && error.response?.status === 401)
         handleUnauthorized();
-      } else {
-        toast.error("Erro ao carregar detalhes do cliente");
-      }
+      else toast.error("Erro ao carregar detalhes do cliente");
     }
   };
 
@@ -336,7 +291,6 @@ export default function ClientsTable({
       toast.error("Por favor, preencha todos os campos com valores válidos.");
       return;
     }
-
     try {
       const response = await api.put(
         `/api/clients/payment-status/${modalClient.id}`,
@@ -346,7 +300,6 @@ export default function ClientsTable({
           paymentLiquido: newPaymentLiquido,
         }
       );
-
       const updatedClientFromServer = response.data;
       setModalClient({
         ...updatedClientFromServer,
@@ -354,18 +307,14 @@ export default function ClientsTable({
           updatedClientFromServer.paymentHistory || []
         ),
       });
-
       setNewPaymentDate(new Date().toISOString().split("T")[0]);
       setNewPaymentBruto(modalClient.grossAmount);
       setNewPaymentLiquido(modalClient.netAmount);
       toast.success("Pagamento adicionado!");
     } catch (error) {
-      console.error("Erro ao adicionar pagamento:", error);
-      if (error instanceof AxiosError && error.response?.status === 401) {
+      if (error instanceof AxiosError && error.response?.status === 401)
         handleUnauthorized();
-      } else {
-        toast.error("Erro ao adicionar pagamento");
-      }
+      else toast.error("Erro ao adicionar pagamento");
     }
   };
 
@@ -389,7 +338,6 @@ export default function ClientsTable({
       );
       return;
     }
-
     try {
       const response = await api.put(
         `/api/clients/payments/edit/${modalClient.id}`,
@@ -400,7 +348,6 @@ export default function ClientsTable({
           paymentLiquido: editPaymentLiquido,
         }
       );
-
       const updatedClientFromServer = response.data;
       setModalClient({
         ...updatedClientFromServer,
@@ -408,30 +355,22 @@ export default function ClientsTable({
           updatedClientFromServer.paymentHistory || []
         ),
       });
-
       setEditingPaymentIndex(null);
       toast.success("Pagamento atualizado!");
     } catch (error) {
-      console.error("Erro ao atualizar pagamento:", error);
-      if (error instanceof AxiosError && error.response?.status === 401) {
+      if (error instanceof AxiosError && error.response?.status === 401)
         handleUnauthorized();
-      } else {
-        toast.error("Erro ao atualizar pagamento");
-      }
+      else toast.error("Erro ao atualizar pagamento");
     }
   };
 
   const handleDeletePayment = async (index: number) => {
     if (!modalClient) return;
-
     try {
       const response = await api.delete(
         `/api/clients/payments/delete/${modalClient.id}`,
-        {
-          data: { index },
-        }
+        { data: { index } }
       );
-
       const updatedClientFromServer = response.data;
       setModalClient({
         ...updatedClientFromServer,
@@ -441,17 +380,14 @@ export default function ClientsTable({
       });
       toast.success("Pagamento excluído!");
     } catch (error) {
-      console.error("Erro ao excluir pagamento:", error);
-      if (error instanceof AxiosError && error.response?.status === 401) {
+      if (error instanceof AxiosError && error.response?.status === 401)
         handleUnauthorized();
-      } else {
-        toast.error("Erro ao excluir pagamento");
-      }
+      else toast.error("Erro ao excluir pagamento");
     }
   };
 
   const getPlanClass = (planName: string) => {
-    switch (planName.toLowerCase()) {
+    switch (planName?.toLowerCase()) {
       case "p2p":
         return "plan-text--p2p";
       case "platinum":
@@ -464,7 +400,7 @@ export default function ClientsTable({
   };
 
   const getMethodClass = (methodName: string) => {
-    switch (methodName.toLowerCase()) {
+    switch (methodName?.toLowerCase()) {
       case "nubank":
         return "method-text--nubank";
       case "banco do brasil":
@@ -480,128 +416,15 @@ export default function ClientsTable({
     }
   };
 
-  if (isLoading) {
-    return (
-      <>
-        <div className="clients-table-container hidden md:block">
-          <div className="table-wrapper">
-            <table className="clients-table">
-              <thead>
-                <tr>
-                  <th className="status-column">
-                    <Skeleton variant="text" width={50} />
-                  </th>
-                  <th className="user-column">
-                    <Skeleton variant="text" width={150} />
-                  </th>
-                  <th className="name-column">
-                    <Skeleton variant="text" width={150} />
-                  </th>
-                  <th className="email-column hidden md:table-cell">
-                    <Skeleton variant="text" width={200} />
-                  </th>
-                  <th className="phone-column hidden sm:table-cell">
-                    <Skeleton variant="text" width={100} />
-                  </th>
-                  <th className="plan-column hidden lg:table-cell">
-                    <Skeleton variant="text" width={120} />
-                  </th>
-                  <th className="method-column hidden xl:table-cell">
-                    <Skeleton variant="text" width={120} />
-                  </th>
-                  <th className="due-date-column hidden xl:table-cell">
-                    <Skeleton variant="text" width={100} />
-                  </th>
-                  <th className="gross-amount-column hidden 2xl:table-cell">
-                    <Skeleton variant="text" width={80} />
-                  </th>
-                  <th className="net-amount-column hidden 2xl:table-cell">
-                    <Skeleton variant="text" width={80} />
-                  </th>
-                  <th className="actions-column">
-                    <Skeleton variant="text" width={40} />
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...Array(5)].map((_, index) => (
-                  <tr key={index}>
-                    <td className="status-column">
-                      <Skeleton variant="text" width={50} />
-                    </td>
-                    <td className="user-column">
-                      <Skeleton variant="text" width={150} />
-                    </td>
-                    <td className="name-column">
-                      <Skeleton variant="text" width={150} />
-                    </td>
-                    <td className="email-column hidden md:table-cell">
-                      <Skeleton variant="text" width={200} />
-                    </td>
-                    <td className="phone-column hidden sm:table-cell">
-                      <Skeleton variant="text" width={100} />
-                    </td>
-                    <td className="plan-column hidden lg:table-cell">
-                      <Skeleton variant="text" width={120} />
-                    </td>
-                    <td className="method-column hidden xl:table-cell">
-                      <Skeleton variant="text" width={120} />
-                    </td>
-                    <td className="due-date-column hidden xl:table-cell">
-                      <Skeleton variant="text" width={100} />
-                    </td>
-                    <td className="gross-amount-column hidden 2xl:table-cell">
-                      <Skeleton variant="text" width={80} />
-                    </td>
-                    <td className="net-amount-column hidden 2xl:table-cell">
-                      <Skeleton variant="text" width={80} />
-                    </td>
-                    <td className="actions-column">
-                      <Skeleton variant="text" width={40} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="md:hidden space-y-4">
-          {[...Array(5)].map((_, index) => (
-            <div
-              key={index}
-              className="client-card bg-[var(--table-bg)] backdrop-blur-sm rounded-lg p-4 shadow-md"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <Skeleton variant="text" width={150} height={30} />
-                  <Skeleton variant="text" width={120} height={20} />
-                  <Skeleton variant="text" width={100} height={20} />
-                  <Skeleton variant="text" width={80} height={20} />
-                </div>
-                <Skeleton variant="circular" width={24} height={24} />
-              </div>
-              <div className="mt-3 space-y-2 expanded-content">
-                <Skeleton variant="text" width={200} height={20} />
-                <Skeleton variant="text" width={150} height={20} />
-                <Skeleton variant="text" width={150} height={20} />
-                <div className="flex gap-2 mt-2">
-                  <Skeleton variant="rectangular" width={40} height={40} />
-                  <Skeleton variant="rectangular" width={40} height={40} />
-                  <Skeleton variant="rectangular" width={40} height={40} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
-      <div className="clients-table-container hidden md:block">
+      <div
+        className={`clients-table-container hidden md:block transition-opacity duration-300 ${
+          isFetching ? "opacity-50" : "opacity-100"
+        }`}
+      >
         <div className="table-wrapper">
-          <table className={`clients-table ${isFetching ? "fade" : ""}`}>
+          <table className="clients-table">
             <thead>
               <tr>
                 <th className="status-column">Pago</th>
@@ -727,7 +550,10 @@ export default function ClientsTable({
                   <td className="actions-column relative">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => openInfoModal(client)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openInfoModal(client);
+                        }}
                         className="action-button"
                         title="Mais Informações"
                       >
@@ -755,14 +581,15 @@ export default function ClientsTable({
           </table>
         </div>
       </div>
-
-      <div className="md:hidden space-y-4">
+      <div
+        className={`md:hidden space-y-4 transition-opacity duration-300 ${
+          isFetching ? "opacity-50" : "opacity-100"
+        }`}
+      >
         {clients.map((client) => (
           <div
             key={client.id}
-            className={`client-card bg-[var(--table-bg)] backdrop-blur-sm rounded-lg p-4 shadow-md ${
-              isFetching ? "fade" : ""
-            }`}
+            className="client-card bg-[var(--table-bg)] backdrop-blur-sm rounded-lg p-4 shadow-md"
             onClick={(e) => handleCardClick(client.id, e)}
           >
             <div className="flex justify-between items-start">
@@ -771,7 +598,7 @@ export default function ClientsTable({
                   {client.fullName}
                 </h3>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  Usuário: <span style={{ color: "#AE7DAC" }}>Usuário</span>{" "}
+                  Usuário: <span style={{ color: "#AE7DAC" }}></span>{" "}
                   {client.user.username}
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
@@ -820,7 +647,6 @@ export default function ClientsTable({
                 )}
               </button>
             </div>
-
             {expandedRows.includes(client.id) && (
               <div className="mt-3 space-y-2 expanded-content">
                 <p className="text-sm text-[var(--text-primary)]">
@@ -837,7 +663,10 @@ export default function ClientsTable({
                 </p>
                 <div className="flex gap-2 mt-2">
                   <button
-                    onClick={() => openInfoModal(client)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfoModal(client);
+                    }}
                     className="action-button"
                     title="Mais Informações"
                   >
@@ -983,7 +812,6 @@ export default function ClientsTable({
                     />
                   </button>
                 </h3>
-
                 <h3 className="text-lg font-semibold mb-2">
                   Adicionar Pagamento
                 </h3>
@@ -1045,11 +873,10 @@ export default function ClientsTable({
                     </button>
                   </div>
                 </div>
-
                 <h3 className="text-lg font-semibold mb-2">
                   Pagamentos Registrados
                 </h3>
-                {modalClient.paymentHistory !== null &&
+                {modalClient.paymentHistory &&
                 modalClient.paymentHistory.length > 0 ? (
                   <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
                     <table className="w-full border-collapse">
@@ -1205,7 +1032,6 @@ export default function ClientsTable({
           </div>,
           document.body
         )}
-
       {isInfoModalOpen &&
         selectedClient &&
         createPortal(
@@ -1232,7 +1058,8 @@ export default function ClientsTable({
                   <strong>Email:</strong> {selectedClient.email}
                 </p>
                 <p>
-                  <strong>Telefone:</strong> {selectedClient.phone}
+                  <strong>Telefone:</strong>{" "}
+                  {selectedClient.phone || "Não informado"}
                 </p>
                 <p>
                   <strong>Plano:</strong> {selectedClient.plan.name}
@@ -1272,4 +1099,4 @@ export default function ClientsTable({
         )}
     </>
   );
-}
+});

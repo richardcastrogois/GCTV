@@ -1,5 +1,4 @@
 // frontend/src/app/dashboard/page.tsx
-// SUBSTITUA TODO O CONTEÚDO DESTE ARQUIVO PELA VERSÃO FINAL ABAIXO.
 
 "use client";
 
@@ -34,7 +33,6 @@ import {
   BarElement,
 } from "chart.js";
 import { AxiosError } from "axios";
-import LoadingSimple from "@/components/LoadingSimple";
 
 ChartJS.register(
   CategoryScale,
@@ -48,16 +46,19 @@ ChartJS.register(
   BarElement
 );
 
+// O dynamic import do gráfico agora pode usar um skeleton como placeholder
 const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
-  loading: () => <LoadingSimple>Carregando gráfico...</LoadingSimple>,
+  loading: () => (
+    <div className="h-full w-full bg-gray-700/50 animate-pulse rounded-lg" />
+  ),
   ssr: false,
 });
 
+// --- Interfaces (sem alteração) ---
 interface FilteredMonthStats {
   grossByPaymentMethod: Record<string, number>;
   dailyNetProfit: { date: string; netAmount: number }[];
 }
-
 interface LiveStats {
   totalNetAmount8: number;
   totalNetAmount15: number;
@@ -65,16 +66,15 @@ interface LiveStats {
   clientsByPlan: Record<string, number>;
   clientsByPaymentMethod: Record<string, number>;
 }
-
 interface DashboardData {
   filteredData: FilteredMonthStats;
   liveData: LiveStats;
 }
-
 interface ApiErrorData {
   message?: string;
 }
 
+// --- QueryClient e Fetch (sem alteração) ---
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -97,6 +97,65 @@ const fetchDashboardData = async (
   );
   return data;
 };
+
+// --- INÍCIO: NOVOS COMPONENTES SKELETON ---
+
+const GrossBalanceCardsSkeleton = () => (
+  <>
+    <h2 className="text-xl font-semibold h-7 w-48 bg-gray-700/50 rounded animate-pulse" />
+    <div className="card-container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[...Array(3)].map((_, i) => (
+        <div
+          key={i}
+          className="card h-36 bg-gray-800/80 p-4 flex flex-col justify-between rounded-lg animate-pulse"
+        >
+          <div className="flex justify-between items-start">
+            <div className="w-6 h-6 rounded bg-gray-700/50" />
+          </div>
+          <div className="w-3/4 h-8 bg-gray-700/50 rounded" />
+          <div className="flex justify-between items-end">
+            <div className="w-1/2 h-6 bg-gray-700/50 rounded" />
+            <div className="flex gap-1">
+              <span className="w-6 h-6 rounded-full bg-gray-700/50"></span>
+              <span className="w-6 h-6 rounded-full bg-gray-700/50"></span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </>
+);
+
+const DailyProfitChartSkeleton = () => (
+  <div className="card w-full chart-card h-[224px] bg-gray-800/80 p-4 rounded-lg animate-pulse">
+    <div className="w-1/2 h-7 bg-gray-700/50 rounded mb-4" />
+    <div className="h-40 w-full bg-gray-700/50 rounded-lg" />
+  </div>
+);
+
+// CORREÇÃO: O esqueleto da coluna direita não precisa mais das classes de layout,
+// pois a div pai cuidará disso.
+const ClientAnalysisCardSkeleton = () => (
+  <div className="flex flex-col gap-4 animate-pulse w-full">
+    <div className="card w-full h-40 bg-gray-800/80 p-4 rounded-lg">
+      <div className="w-3/4 h-7 bg-gray-700/50 rounded mb-4" />
+      <div className="w-1/2 h-8 bg-gray-700/50 rounded mb-2" />
+      <div className="w-1/2 h-8 bg-gray-700/50 rounded" />
+    </div>
+    <div className="card w-full min-h-[300px] bg-gray-800/80 p-4 rounded-lg">
+      <div className="w-full h-9 bg-gray-700/50 rounded mb-4" />
+      <div className="w-1/2 h-8 bg-gray-700/50 rounded mb-4" />
+      <div className="w-1/3 h-6 bg-gray-700/50 rounded mb-2" />
+      <div className="w-1/3 h-6 bg-gray-700/50 rounded mb-4" />
+      <div className="w-3/4 h-7 bg-gray-700/50 rounded mb-4" />
+      <div className="w-1/3 h-6 bg-gray-700/50 rounded" />
+    </div>
+  </div>
+);
+
+// --- FIM: NOVOS COMPONENTES SKELETON ---
+
+// --- COMPONENTE PRINCIPAL DO DASHBOARD (COM LAYOUT CORRIGIDO) ---
 
 function Dashboard() {
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
@@ -123,40 +182,62 @@ function Dashboard() {
     setFilterYear(year);
   }, []);
 
-  const filteredStats = useMemo(() => data?.filteredData, [data]);
-  const liveStats = useMemo(() => data?.liveData, [data]);
-
+  // CORREÇÃO ESTRUTURAL: A lógica de isLoading foi movida para DENTRO das divs de coluna.
+  // Isso preserva seu layout de duas colunas em todos os momentos.
   if (isLoading) {
-    return <LoadingSimple>Carregando dashboard...</LoadingSimple>;
-  }
-
-  if (error || !filteredStats || !liveStats) {
     return (
-      <div className="text-center p-8">Não foi possível carregar os dados.</div>
+      <div className="dashboard-container">
+        <header className="w-full flex justify-between items-center flex-wrap gap-4 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
+          <div style={{ maxWidth: "380px", width: "100%" }}>
+            <Filter onFilterChange={handleFilterChange} />
+          </div>
+        </header>
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Coluna Esquerda com Skeletons */}
+          <div className="w-full lg:w-2/3 flex flex-col gap-6">
+            <GrossBalanceCardsSkeleton />
+            <DailyProfitChartSkeleton />
+          </div>
+          {/* Coluna Direita com Skeleton */}
+          <div className="w-full lg:w-1/3 flex flex-col gap-4">
+            <ClientAnalysisCardSkeleton />
+          </div>
+        </div>
+      </div>
     );
   }
 
+  if (error || !data || !data.filteredData || !data.liveData) {
+    return (
+      <div className="text-center p-8">
+        Não foi possível carregar os dados do dashboard.
+      </div>
+    );
+  }
+
+  // Renderização normal quando os dados estão prontos
   return (
     <div className="dashboard-container">
+      <header className="w-full flex justify-between items-center flex-wrap gap-4 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
+        <div style={{ maxWidth: "380px", width: "100%" }}>
+          <Filter onFilterChange={handleFilterChange} />
+        </div>
+      </header>
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="w-full lg:w-2/3 flex flex-col gap-6">
-          <header className="w-full flex justify-between items-center flex-wrap gap-4">
-            <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
-            <div style={{ maxWidth: "380px", width: "100%" }}>
-              <Filter onFilterChange={handleFilterChange} />
-            </div>
-          </header>
           <GrossBalanceCards
-            grossByPaymentMethod={filteredStats.grossByPaymentMethod}
+            grossByPaymentMethod={data.filteredData.grossByPaymentMethod}
           />
           <DailyProfitChart
-            dailyNetProfit={filteredStats.dailyNetProfit}
+            dailyNetProfit={data.filteredData.dailyNetProfit}
             filterMonth={filterMonth}
             filterYear={filterYear}
           />
         </div>
         <div className="w-full lg:w-1/3 flex flex-col gap-4">
-          <ClientAnalysisCard liveStats={liveStats} />
+          <ClientAnalysisCard liveStats={data.liveData} />
         </div>
       </div>
     </div>
@@ -170,6 +251,8 @@ export default function DashboardPage() {
     </QueryClientProvider>
   );
 }
+
+// --- INÍCIO: SEUS COMPONENTES ORIGINAIS (SEM ALTERAÇÃO NO CÓDIGO INTERNO) ---
 
 const GrossBalanceCards = memo(
   ({
@@ -485,3 +568,5 @@ const ClientAnalysisCard = memo(({ liveStats }: { liveStats: LiveStats }) => {
   );
 });
 ClientAnalysisCard.displayName = "ClientAnalysisCard";
+
+// --- FIM: SEUS COMPONENTES ORIGINAIS ---

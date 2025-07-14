@@ -1,7 +1,7 @@
-//frontend/src/app/clients/api.ts
+"use client";
 
 import api from "@/utils/api";
-// ***** ALTERAÇÃO IMPORTANTE: Importar tipos do local global/principal *****
+// O caminho de importação dos tipos foi mantido como você enviou.
 import { Client, Plan, PaymentMethod, EditFormData } from "@/types/client";
 
 export const fetchPlans = async (): Promise<Plan[]> => {
@@ -16,10 +16,13 @@ export const fetchPaymentMethods = async (): Promise<PaymentMethod[]> => {
   return response.data;
 };
 
+// OTIMIZAÇÃO: A função agora aceita e envia os parâmetros de ordenação para a API.
 export const fetchClients = async (
   page: number,
   limit: number,
-  search: string
+  search: string,
+  sortKey: string | null,
+  sortDirection: "asc" | "desc"
 ): Promise<{ data: Client[]; total: number; page: number; limit: number }> => {
   const response = await api.get<{
     data: Client[];
@@ -27,7 +30,8 @@ export const fetchClients = async (
     page: number;
     limit: number;
   }>("/api/clients", {
-    params: { page, limit, search },
+    // Adicionados os novos parâmetros que serão enviados ao back-end
+    params: { page, limit, search, sortKey, sortDirection },
   });
   return response.data;
 };

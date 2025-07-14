@@ -1,4 +1,6 @@
-// frontend/src/app/expired/components/ExpiredClientsTable.tsx
+//backend/src/app/expired/components/ExpiredClientsTable.tsx
+
+"use client";
 
 import {
   FaSort,
@@ -11,7 +13,6 @@ import {
 } from "react-icons/fa";
 import { Client } from "../../clients/types";
 import { useState, useEffect, useRef, memo } from "react";
-import { Skeleton } from "@mui/material";
 
 const formatDateToUTC = (date: string | Date): string => {
   const d = new Date(date);
@@ -30,17 +31,14 @@ interface ExpiredClientsTableProps {
     direction: "asc" | "desc";
   };
   isFetching?: boolean;
-  isLoading?: boolean;
 }
 
-// OTIMIZAÇÃO: Componente envolvido com memo para evitar re-renderizações desnecessárias.
 const ExpiredClientsTable = memo(function ExpiredClientsTable({
   clients,
   onSort,
   onReactivate,
   sortConfig,
   isFetching = false,
-  isLoading = false,
 }: ExpiredClientsTableProps) {
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
@@ -171,104 +169,15 @@ const ExpiredClientsTable = memo(function ExpiredClientsTable({
     }
   };
 
-  if (isLoading) {
-    return (
-      <>
-        <div className="clients-table-container hidden md:block">
-          <div className="table-wrapper">
-            <table className="clients-table">
-              <thead>
-                <tr>
-                  <th className="user-column">
-                    <Skeleton variant="text" width={120} />
-                  </th>
-                  <th className="name-column">
-                    <Skeleton variant="text" width={150} />
-                  </th>
-                  <th className="email-column hidden lg:table-cell">
-                    <Skeleton variant="text" width={200} />
-                  </th>
-                  <th className="plan-column">
-                    <Skeleton variant="text" width={120} />
-                  </th>
-                  <th className="due-date-column">
-                    <Skeleton variant="text" width={100} />
-                  </th>
-                  <th className="status-column">
-                    <Skeleton variant="text" width={80} />
-                  </th>
-                  <th className="actions-column">
-                    <Skeleton variant="text" width={40} />
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...Array(5)].map((_, index) => (
-                  <tr key={index}>
-                    <td className="user-column">
-                      <Skeleton variant="text" width={120} />
-                    </td>
-                    <td className="name-column">
-                      <Skeleton variant="text" width={150} />
-                    </td>
-                    <td className="email-column hidden lg:table-cell">
-                      <Skeleton variant="text" width={200} />
-                    </td>
-                    <td className="plan-column">
-                      <Skeleton variant="text" width={120} />
-                    </td>
-                    <td className="due-date-column">
-                      <Skeleton variant="text" width={100} />
-                    </td>
-                    <td className="status-column">
-                      <Skeleton variant="text" width={80} />
-                    </td>
-                    <td className="actions-column">
-                      <Skeleton variant="text" width={40} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="md:hidden space-y-4">
-          {[...Array(5)].map((_, index) => (
-            <div
-              key={index}
-              className="client-card bg-[var(--table-bg)] backdrop-blur-sm rounded-lg p-4 shadow-md"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <Skeleton variant="text" width={120} height={20} />
-                  <Skeleton variant="text" width={150} height={30} />
-                  <Skeleton variant="text" width={120} height={20} />
-                  <Skeleton variant="text" width={100} height={20} />
-                  <Skeleton variant="text" width={80} height={20} />
-                </div>
-                <Skeleton variant="circular" width={24} height={24} />
-              </div>
-              <div className="mt-3 space-y-2 expanded-content">
-                <p>
-                  <Skeleton variant="text" width={200} height={20} />
-                </p>
-                <div className="flex gap-2 mt-2">
-                  <Skeleton variant="rectangular" width={40} height={40} />
-                  <Skeleton variant="rectangular" width={40} height={40} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
-      <div className="clients-table-container hidden md:block">
+      <div
+        className={`clients-table-container hidden md:block transition-opacity duration-300 ${
+          isFetching ? "opacity-50" : "opacity-100"
+        }`}
+      >
         <div className="table-wrapper">
-          <table className={`clients-table ${isFetching ? "fade" : ""}`}>
+          <table className="clients-table">
             <thead>
               <tr>
                 <th
@@ -334,14 +243,20 @@ const ExpiredClientsTable = memo(function ExpiredClientsTable({
                   <td className="actions-column">
                     <div className="flex justify-center space-x-2">
                       <button
-                        onClick={() => openInfoModal(client)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openInfoModal(client);
+                        }}
                         className="action-button"
                         title="Mais Informações"
                       >
                         <FaInfoCircle size={16} />
                       </button>
                       <button
-                        onClick={() => openConfirmModal(client)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openConfirmModal(client);
+                        }}
                         className="action-button"
                         title="Reativar"
                       >
@@ -355,13 +270,16 @@ const ExpiredClientsTable = memo(function ExpiredClientsTable({
           </table>
         </div>
       </div>
-      <div className="md:hidden space-y-4">
+
+      <div
+        className={`md:hidden space-y-4 transition-opacity duration-300 ${
+          isFetching ? "opacity-50" : "opacity-100"
+        }`}
+      >
         {clients.map((client) => (
           <div
             key={client.id}
-            className={`client-card bg-[var(--table-bg)] backdrop-blur-sm rounded-lg p-4 shadow-md ${
-              isFetching ? "fade" : ""
-            }`}
+            className="client-card bg-[var(--table-bg)] backdrop-blur-sm rounded-lg p-4 shadow-md"
             onClick={(e) => handleCardClick(client.id, e)}
           >
             <div className="flex justify-between items-start">
@@ -396,14 +314,20 @@ const ExpiredClientsTable = memo(function ExpiredClientsTable({
                 </p>
                 <div className="flex gap-2 mt-2">
                   <button
-                    onClick={() => openInfoModal(client)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInfoModal(client);
+                    }}
                     className="action-button"
                     title="Mais Informações"
                   >
                     <FaInfoCircle size={16} />
                   </button>
                   <button
-                    onClick={() => openConfirmModal(client)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openConfirmModal(client);
+                    }}
                     className="action-button"
                     title="Reativar"
                   >
@@ -415,6 +339,7 @@ const ExpiredClientsTable = memo(function ExpiredClientsTable({
           </div>
         ))}
       </div>
+
       {isInfoModalOpen && selectedClient && (
         <div className="modal-overlay">
           <div className="modal-content" ref={infoModalRef}>
@@ -486,6 +411,7 @@ const ExpiredClientsTable = memo(function ExpiredClientsTable({
           </div>
         </div>
       )}
+
       {isConfirmModalOpen && clientToReactivate && (
         <div className="modal-overlay">
           <div className="modal-content" ref={confirmModalRef}>
