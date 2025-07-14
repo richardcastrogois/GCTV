@@ -1,8 +1,5 @@
-// frontend/src/app/page.tsx
-
 "use client";
 
-// MUDANÇA: Removidos 'useRef' e 'useCallback' que não estavam sendo usados.
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/utils/api";
@@ -12,7 +9,6 @@ import { jwtDecode } from "jwt-decode";
 import { AxiosError } from "axios";
 import LoadingSimple from "@/components/LoadingSimple";
 
-// --- Interfaces (sem alteração) ---
 interface ErrorResponse {
   error?: string;
 }
@@ -27,7 +23,6 @@ interface TMDBResponse {
   results: Movie[];
 }
 
-// --- Funções Auxiliares (Otimizadas e Simplificadas) ---
 const isTokenValid = (token: string | null): boolean => {
   if (!token) return false;
   try {
@@ -54,14 +49,12 @@ function useLoginBackground() {
         const moviesWithImages = res.data.results.filter(
           (movie) => movie.backdrop_path
         );
-
         if (moviesWithImages.length > 0) {
           const randomMovie =
             moviesWithImages[
               Math.floor(Math.random() * moviesWithImages.length)
             ];
           const imageUrl = `https://image.tmdb.org/t/p/w1280${randomMovie.backdrop_path}`;
-
           if (isMounted) {
             setBackgroundImage(imageUrl);
             setMovieTitle(randomMovie.title || "Imagem Aleatória");
@@ -71,9 +64,7 @@ function useLoginBackground() {
         console.error("Erro ao buscar imagem da TMDB:", error);
       }
     };
-
     fetchImage();
-
     return () => {
       isMounted = false;
     };
@@ -87,7 +78,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoginLoading, setIsLoginLoading] = useState(false);
-  const [isPageLoading, setIsPageLoading] = useState(true);
+
+  const [isSessionChecking, setIsSessionChecking] = useState(true);
 
   const router = useRouter();
   const { backgroundImage, movieTitle } = useLoginBackground();
@@ -97,7 +89,7 @@ export default function Login() {
     if (isTokenValid(token)) {
       router.push("/dashboard");
     } else {
-      setIsPageLoading(false);
+      setIsSessionChecking(false);
     }
   }, [router]);
 
@@ -109,7 +101,6 @@ export default function Login() {
         username,
         password,
       });
-
       if (data.accessToken && data.refreshToken) {
         localStorage.setItem("token", data.accessToken);
         localStorage.setItem("refreshToken", data.refreshToken);
@@ -130,17 +121,18 @@ export default function Login() {
     }
   };
 
-  if (isPageLoading) {
-    return <LoadingSimple>Verificando sessão...</LoadingSimple>;
-  }
-
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-gray-900 bg-cover bg-center relative transition-all duration-1000"
-      style={{
-        backgroundImage: backgroundImage ? `url(${backgroundImage})` : "none",
-      }}
+      className="min-h-screen flex items-center justify-center bg-gray-900 bg-cover bg-center relative"
+      style={{ backgroundImage: `url(${backgroundImage})` }}
     >
+      <div
+        className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
+        style={{
+          backgroundImage: `url(${backgroundImage})`,
+          opacity: backgroundImage ? 1 : 0,
+        }}
+      />
       <div className="absolute inset-0 bg-black opacity-50"></div>
 
       {movieTitle && (
@@ -148,76 +140,78 @@ export default function Login() {
           {movieTitle}
         </div>
       )}
-
       <form
         onSubmit={handleLogin}
-        className="bg-gradient-to-br from-white/10 to-gray-100/5 p-6 sm:p-8 rounded-3xl w-full max-w-sm sm:max-w-md shadow-[0_4px_20px_rgba(0,0,0,0.3)] ring-1 ring-white/15 backdrop-blur-lg z-20 bg-opacity-20 text-white"
+        className={`bg-gradient-to-br from-white/10 to-gray-100/5 p-6 sm:p-8 rounded-3xl w-full max-w-sm sm:max-w-md shadow-[0_4px_20px_rgba(0,0,0,0.3)] ring-1 ring-white/15 backdrop-blur-lg z-20 bg-opacity-20 text-white transition-opacity duration-500 ${
+          isSessionChecking ? "opacity-50 cursor-wait" : "opacity-100"
+        }`}
       >
-        <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-center text-white">
-          Login
-        </h2>
+        <fieldset disabled={isSessionChecking || isLoginLoading}>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-center text-white">
+            Login
+          </h2>
 
-        <div className="mb-4 relative">
-          <label
-            htmlFor="username"
-            className="block text-sm sm:text-base font-medium mb-1 text-white"
-          >
-            Usuário
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-lg text-gray-300">
-              <FaUser />
-            </span>
-            <input
-              id="username"
-              type="text"
-              placeholder="User Name"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="pl-12 p-3 bg-gray-800/70 text-white text-base sm:text-lg border border-gray-600 rounded-full w-full focus:outline-none focus:ring-2 focus:ring-pink-500"
-              required
-              autoComplete="username"
-            />
-          </div>
-        </div>
-
-        <div className="mb-6 relative">
-          <label
-            htmlFor="password"
-            className="block text-sm sm:text-base font-medium mb-1 text-white"
-          >
-            Senha
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-lg text-gray-300">
-              <FaLock />
-            </span>
-            <input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="pl-12 pr-12 p-3 bg-gray-800/70 text-white text-base sm:text-lg border border-gray-600 rounded-full w-full focus:outline-none focus:ring-2 focus:ring-pink-500"
-              required
-              autoComplete="current-password"
-            />
-            <span
-              className="absolute right-6 top-1/2 transform -translate-y-1/2 text-lg sm:text-xl md:text-2xl text-gray-300 cursor-pointer"
-              onClick={() => setShowPassword(!showPassword)}
+          <div className="mb-4 relative">
+            <label
+              htmlFor="username"
+              className="block text-sm sm:text-base font-medium mb-1 text-white"
             >
-              {showPassword ? <FaEyeSlash /> : <FaEye />}
-            </span>
+              Usuário
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-lg text-gray-300">
+                <FaUser />
+              </span>
+              <input
+                id="username"
+                type="text"
+                placeholder="User Name"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="pl-12 p-3 bg-gray-800/70 text-white text-base sm:text-lg border border-gray-600 rounded-full w-full focus:outline-none focus:ring-2 focus:ring-pink-500 disabled:opacity-70"
+                required
+                autoComplete="username"
+              />
+            </div>
           </div>
-        </div>
 
-        <button
-          type="submit"
-          disabled={isLoginLoading}
-          className="bg-pink-500 hover:bg-pink-600 text-white text-base sm:text-lg p-3 sm:p-4 rounded-full w-full transition-colors uppercase font-semibold disabled:bg-pink-800 disabled:cursor-not-allowed flex items-center justify-center"
-        >
-          {isLoginLoading ? <LoadingSimple isButton={true} /> : "Entrar"}
-        </button>
+          <div className="mb-6 relative">
+            <label
+              htmlFor="password"
+              className="block text-sm sm:text-base font-medium mb-1 text-white"
+            >
+              Senha
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-lg text-gray-300">
+                <FaLock />
+              </span>
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="pl-12 pr-12 p-3 bg-gray-800/70 text-white text-base sm:text-lg border border-gray-600 rounded-full w-full focus:outline-none focus:ring-2 focus:ring-pink-500 disabled:opacity-70"
+                required
+                autoComplete="current-password"
+              />
+              <span
+                className="absolute right-6 top-1/2 transform -translate-y-1/2 text-lg sm:text-xl md:text-2xl text-gray-300 cursor-pointer"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <FaEyeSlash /> : <FaEye />}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="bg-pink-500 hover:bg-pink-600 text-white text-base sm:text-lg p-3 sm:p-4 rounded-full w-full transition-colors uppercase font-semibold disabled:bg-pink-800 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            {isLoginLoading ? <LoadingSimple isButton={true} /> : "Entrar"}
+          </button>
+        </fieldset>
       </form>
     </div>
   );

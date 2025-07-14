@@ -1,7 +1,15 @@
-//frontend/src/axiosConfig.ts
-
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
+
+// Criando uma função centralizada para o logout para evitar repetição de código.
+const logoutUser = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+  // Garante que o redirecionamento só ocorra no lado do cliente.
+  if (typeof window !== "undefined") {
+    window.location.href = "/";
+  }
+};
 
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -10,11 +18,14 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   async (config) => {
     const token = localStorage.getItem("token");
+
     if (token) {
       const decoded = jwtDecode<{ exp: number }>(token);
       const currentTime = Date.now() / 1000;
+
+      // A lógica de renovar o token proativamente (antes de expirar) é excelente.
       if (decoded.exp < currentTime + 120) {
-        // Renovar se faltar menos de 2 minutos
+        // Renova se faltar menos de 2 minutos
         const refreshToken = localStorage.getItem("refreshToken");
         if (refreshToken) {
           try {
@@ -25,16 +36,12 @@ axiosInstance.interceptors.request.use(
             const newAccessToken = data.accessToken;
             localStorage.setItem("token", newAccessToken);
             config.headers.Authorization = `Bearer ${newAccessToken}`;
-            console.log("Token renovado com sucesso:", newAccessToken);
           } catch (error) {
-            console.error("Erro ao renovar token:", error);
-            localStorage.removeItem("token");
-            localStorage.removeItem("refreshToken");
-            window.location.href = "/";
+            console.error("Erro ao renovar token, deslogando:", error);
+            logoutUser(); // OTIMIZAÇÃO: Usa a função centralizada.
           }
         } else {
-          localStorage.removeItem("token");
-          window.location.href = "/";
+          logoutUser(); // OTIMIZAÇÃO: Usa a função centralizada.
         }
       } else {
         config.headers.Authorization = `Bearer ${token}`;
@@ -48,11 +55,20 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("refreshToken");
-      window.location.href = "/";
+    // AJUSTE CRÍTICO: Adicionada uma verificação para não deslogar o usuário
+    // se o erro 401 acontecer na própria tela de login (ex: senha errada).
+    if (
+      error.response?.status === 401 &&
+      error.config?.url !== "/api/auth/login"
+    ) {
+      console.error(
+        "Interceptor de resposta: Token inválido ou expirado. Deslogando..."
+      );
+      logoutUser(); // OTIMIZAÇÃO: Usa a função centralizada.
     }
+
+    // Para todos os outros erros, a promessa é rejeitada para que a
+    // função que fez a chamada possa tratar o erro (ex: mostrar um toast).
     return Promise.reject(error);
   }
 );

@@ -1,4 +1,4 @@
-//frontend/src/utils/api.ts
+// frontend/src/utils/api.ts
 
 import axios, {
   InternalAxiosRequestConfig,
@@ -7,24 +7,23 @@ import axios, {
 } from "axios";
 import { jwtDecode } from "jwt-decode";
 
-console.log(
-  "API Base URL que o frontend está usando:",
-  process.env.NEXT_PUBLIC_API_URL
-);
-
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
 });
 
+// O uso de interceptors é a forma mais eficiente e centralizada
+// de gerenciar a autenticação em todas as requisições.
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem("token");
-    // Removido o console.log do token para limpar o console em produção
     if (token) {
       const decoded = jwtDecode<{ exp: number }>(token);
       const currentTime = Date.now() / 1000;
+
+      // A lógica de renovar o token proativamente (antes de expirar) é excelente
+      // para a experiência do usuário, evitando que uma requisição falhe.
       if (decoded.exp < currentTime + 120) {
-        // Renovar se faltar menos de 2 minutos
+        // Renova se faltar menos de 2 minutos
         const refreshToken = localStorage.getItem("refreshToken");
         if (refreshToken) {
           try {
@@ -36,7 +35,7 @@ api.interceptors.request.use(
             localStorage.setItem("token", newAccessToken);
             config.headers.Authorization = `Bearer ${newAccessToken}`;
           } catch (error) {
-            console.error("Erro ao renovar token:", error);
+            console.error("Erro ao renovar token, deslogando:", error);
             localStorage.removeItem("token");
             localStorage.removeItem("refreshToken");
             if (typeof window !== "undefined") {
@@ -44,6 +43,7 @@ api.interceptors.request.use(
             }
           }
         } else {
+          // Se não há refresh token, desloga o usuário.
           localStorage.removeItem("token");
           if (typeof window !== "undefined") {
             window.location.href = "/";
@@ -61,14 +61,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error: AxiosError) => {
-    // --- INÍCIO DA CORREÇÃO ---
-    // Verificamos se o erro é 401 E se a requisição original NÃO FOI para a rota de login.
+    // A verificação para não deslogar na própria tela de login é crucial e está correta.
     if (
       error.response?.status === 401 &&
       error.config?.url !== "/api/auth/login"
     ) {
-      // Esta lógica agora só será executada se o usuário já estiver logado
-      // e o token expirar em outra página, que não a de login.
+      // Esta lógica centralizada garante que qualquer chamada de API com token
+      // expirado em qualquer lugar do site resulte em um logout seguro.
       console.log("Interceptor: Token inválido ou expirado. Deslogando...");
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
@@ -76,11 +75,9 @@ api.interceptors.response.use(
         window.location.href = "/";
       }
     }
-    // --- FIM DA CORREÇÃO ---
 
-    // Para todos os outros erros (incluindo o 401 do login),
-    // nós simplesmente rejeitamos o erro para que a função que fez a chamada (handleLogin)
-    // possa capturá-lo em seu próprio bloco 'catch'.
+    // Rejeitar o erro permite que os componentes que fizeram a chamada (ex: no useQuery)
+    // possam tratar o erro de forma específica (ex: exibir um toast).
     return Promise.reject(error);
   }
 );

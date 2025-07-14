@@ -14,13 +14,11 @@ export default function LoadingSimple({
   children,
   isButton = false,
 }: LoadingSimpleProps) {
-  // 2. Define quais classes usar com base na prop 'isButton'
   const spinnerSizeClass = isButton
     ? styles.spinnerButton
     : styles.spinnerLarge;
   const dotSizeClass = isButton ? styles.dotButton : styles.dotLarge;
 
-  // Renderiza apenas o spinner se for para um botão e não tiver texto
   if (isButton && !children) {
     return (
       <div className={`${styles.loadingSpinner} ${spinnerSizeClass}`}>
@@ -42,7 +40,6 @@ export default function LoadingSimple({
     );
   }
 
-  // Renderiza o spinner com o texto para o carregamento de página
   return (
     <div className={styles.loadingWrapper}>
       <div className={`${styles.loadingSpinner} ${spinnerSizeClass}`}>

@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/utils/api";
 import { useAuth } from "@/hooks/useAuth";
 import { AxiosError } from "axios";
-// MUDANÇA: A linha abaixo, que importava o LoadingSimple, foi removida.
 
 const preloadData = async () => {
   const token = localStorage.getItem("token");

@@ -282,8 +282,6 @@ export default function Expired() {
           )}
         </div>
 
-        {/* MUDANÇA: O bloco que mostrava o LoadingSimple foi removido daqui */}
-
         {clients.length > 0 && !isLoading && (
           <div className="pagination">
             <select
