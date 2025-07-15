@@ -16,9 +16,8 @@ import { useState } from "react"; // Importar useState
 function AppContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Otimização: A lógica de verificação de rota já está eficiente.
   const routesWithNavbar = ["/dashboard", "/clients", "/expired"];
-  // Usar startsWith garante que rotas como /clients/new ou /clients/123 também tenham a navbar.
+
   const hasNavbar = routesWithNavbar.some((route) =>
     pathname.startsWith(route)
   );
@@ -48,14 +47,12 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
 const inter = Inter({ subsets: ["latin"] });
 
-// O DataPreloader foi removido pois pode introduzir complexidade e delays.
-// É melhor carregar dados específicos por página com React Query.
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Otimização: Instancia o client dentro do componente para garantir um novo client por request.
+  
   const [queryClient] = useState(() => new QueryClient());
 
   return (

@@ -1,7 +1,3 @@
-// backend/prisma/schema.prisma
-
-// O gerador de cliente foi simplificado para usar os padrões da Vercel.
-// O output em node_modules é o padrão e não precisa ser declarado.
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-1.0.x"]
@@ -14,18 +10,18 @@ datasource db {
 
 model User {
   id        Int      @id @default(autoincrement())
-  username  String   @unique
+  username  String   @unique // O @unique JÁ cria um índice. Nenhuma outra diretiva é necessária aqui.
   password  String
   createdAt DateTime @default(now())
   client    Client?
 }
 
 model PaymentMethod {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   clients   Client[]
   discounts PlanPaymentMethodDiscount[]
 
@@ -33,11 +29,11 @@ model PaymentMethod {
 }
 
 model Plan {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   clients   Client[]
   discounts PlanPaymentMethodDiscount[]
 
@@ -60,30 +56,29 @@ model PlanPaymentMethodDiscount {
 }
 
 model Client {
-  id                     Int      @id @default(autoincrement())
+  id                     Int       @id @default(autoincrement())
   fullName               String
   email                  String
   phone                  String?
   dueDate                DateTime
   grossAmount            Float
   netAmount              Float
-  isActive               Boolean  @default(true)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  paymentMethodId        Int      @default(999)
-  planId                 Int      @default(999)
+  isActive               Boolean   @default(true)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  paymentMethodId        Int       @default(999)
+  planId                 Int       @default(999)
   observations           String?
-  userId                 Int      @unique
-  paymentHistory         Json?    @default("[]")
-  visualPaymentConfirmed Boolean  @default(false)
+  userId                 Int       @unique
+  paymentHistory         Json?     @default("[]")
+  visualPaymentConfirmed Boolean   @default(false)
   paymentMethod          PaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: SetDefault)
   plan                   Plan          @relation(fields: [planId], references: [id], onDelete: SetDefault)
   user                   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // OTIMIZAÇÃO: Adicionados índices para as colunas mais buscadas.
-  // Isso acelera drasticamente as buscas por nome, email e status.
   @@index([fullName])
   @@index([email])
   @@index([isActive])
   @@index([dueDate])
+  @@index([userId]) 
 }

@@ -13,14 +13,12 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     setSearchTerm(storedSearchTerm);
   }, []);
 
-  // OTIMIZAÇÃO E CORREÇÃO: Usando useMemo para criar a função debounced.
-  // Esta é a prática recomendada para memoizar o resultado de uma função como debounce.
   const debouncedSave = useMemo(
     () =>
       debounce((term: string) => {
         localStorage.setItem("clientSearchTerm", term);
-      }, 500), // Salva 500ms após o usuário parar de digitar
-    [] // O array de dependências vazio garante que a função seja criada apenas uma vez
+      }, 500),
+    []
   );
 
   useEffect(() => {

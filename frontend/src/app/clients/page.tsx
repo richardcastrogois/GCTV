@@ -1,6 +1,6 @@
 "use client";
 
-// MUDANÇA: useMemo foi removido pois a ordenação agora é feita no back-end
+// MUDANÇA: 'useMemo' foi removido das importações pois não é mais necessário.
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
@@ -10,8 +10,7 @@ import dynamic from "next/dynamic";
 import ClientSearch from "@/components/ClientSearch";
 import {
   fetchClients,
-  fetchPlans,
-  fetchPaymentMethods,
+  // MUDANÇA: fetchPlans e fetchPaymentMethods não são mais importados aqui.
   deleteClient,
   updateClient,
   renewClient,
@@ -23,8 +22,9 @@ import { FaTimes } from "react-icons/fa";
 import { useSearch } from "@/hooks/useSearch";
 import { Skeleton } from "@mui/material";
 import EditClientModal from "./components/EditClientModal";
+import { usePreloadedData } from "@/hooks/usePreloadedData";
 
-// --- INÍCIO: NOVO COMPONENTE SKELETON ---
+// --- COMPONENTE SKELETON (sem alteração) ---
 const ClientsTableSkeleton = () => (
   <>
     <div className="clients-table-container hidden md:block animate-pulse">
@@ -189,7 +189,6 @@ const ClientsTableSkeleton = () => (
     </div>
   </>
 );
-// --- FIM: NOVO COMPONENTE SKELETON ---
 
 const ClientsTable = dynamic(() => import("./components/ClientsTable"), {
   loading: () => <ClientsTableSkeleton />,
@@ -229,8 +228,11 @@ export default function Clients() {
     observations: "",
     username: "",
   });
+
+  // MUDANÇA: Os estados agora começam vazios e são preenchidos pelo hook.
   const [plans, setPlans] = useState<Plan[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+
   const [sortConfig, setSortConfig] = useState<{
     key: SortKey | null;
     direction: "asc" | "desc";
@@ -243,32 +245,20 @@ export default function Clients() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<number | null>(null);
 
+  // OTIMIZAÇÃO: Chamando o novo hook para obter os dados de planos e métodos do cache.
+  const { data: preloadedData, error: preloadError } = usePreloadedData();
+
+  // OTIMIZAÇÃO: Este useEffect agora apenas reage aos dados do hook, sem fazer chamadas de API.
   useEffect(() => {
-    const loadPlansAndMethods = async () => {
-      try {
-        const cachedData:
-          | { plans: Plan[]; paymentMethods: PaymentMethod[] }
-          | undefined = queryClient.getQueryData(["preloadData"]);
-        if (cachedData) {
-          setPlans(cachedData.plans);
-          setPaymentMethods(cachedData.paymentMethods);
-        } else {
-          const [plansData, paymentMethodsData] = await Promise.all([
-            fetchPlans(),
-            fetchPaymentMethods(),
-          ]);
-          setPlans(plansData);
-          setPaymentMethods(paymentMethodsData);
-        }
-      } catch (error) {
-        if (error instanceof AxiosError) {
-          toast.error(`Erro ao carregar planos ou métodos: ${error.message}`);
-          if (error.response?.status === 401) handleUnauthorized();
-        }
-      }
-    };
-    loadPlansAndMethods();
-  }, [queryClient, handleUnauthorized]);
+    if (preloadedData) {
+      setPlans(preloadedData.plans);
+      setPaymentMethods(preloadedData.paymentMethods);
+    }
+    if (preloadError) {
+      toast.error("Erro ao carregar dados de suporte (planos e métodos).");
+      console.error("Erro de pré-carregamento:", preloadError);
+    }
+  }, [preloadedData, preloadError]);
 
   const {
     data: clientsResponse,
@@ -276,9 +266,7 @@ export default function Clients() {
     isFetching,
     error,
   } = useQuery({
-    // OTIMIZAÇÃO: Adicionado sortConfig à chave da query
     queryKey: ["clients", page, limit, searchTerm, sortConfig],
-    // OTIMIZAÇÃO: Passando os parâmetros de ordenação para a função de fetch
     queryFn: () =>
       fetchClients(
         page,
@@ -292,7 +280,6 @@ export default function Clients() {
     placeholderData: (previousData) => previousData,
   });
 
-  // OTIMIZAÇÃO: Removida a ordenação do lado do cliente.
   const clients = clientsResponse?.data ?? [];
 
   const handleSort = useCallback((key: SortKey) => {
@@ -476,7 +463,7 @@ export default function Clients() {
         <div className="table-wrapper">
           {isLoading ? (
             <ClientsTableSkeleton />
-          ) : clientsResponse && clients.length > 0 ? (
+          ) : clients.length > 0 ? (
             <ClientsTable
               clients={clients}
               onEdit={handleEdit}
