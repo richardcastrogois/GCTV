@@ -1,5 +1,3 @@
-// frontend/src/app/dashboard/page.tsx
-
 "use client";
 
 import {
@@ -46,7 +44,6 @@ ChartJS.register(
   BarElement
 );
 
-// O dynamic import do gráfico agora pode usar um skeleton como placeholder
 const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
   loading: () => (
     <div className="h-full w-full bg-gray-700/50 animate-pulse rounded-lg" />
@@ -54,14 +51,17 @@ const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
   ssr: false,
 });
 
-// --- Interfaces (sem alteração) ---
+// ===================================================================================
+// AJUSTE 1: As interfaces foram atualizadas para corresponder à nova resposta da API.
+// ===================================================================================
 interface FilteredMonthStats {
   grossByPaymentMethod: Record<string, number>;
   dailyNetProfit: { date: string; netAmount: number }[];
+  totalNetAmount8: number; // Movido para cá
+  totalNetAmount15: number; // Movido para cá
 }
 interface LiveStats {
-  totalNetAmount8: number;
-  totalNetAmount15: number;
+  // totalNetAmount8 e totalNetAmount15 foram removidos daqui.
   activeClients: number;
   clientsByPlan: Record<string, number>;
   clientsByPaymentMethod: Record<string, number>;
@@ -74,7 +74,6 @@ interface ApiErrorData {
   message?: string;
 }
 
-// --- QueryClient e Fetch (sem alteração) ---
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -97,8 +96,6 @@ const fetchDashboardData = async (
   );
   return data;
 };
-
-// --- INÍCIO: NOVOS COMPONENTES SKELETON ---
 
 const GrossBalanceCardsSkeleton = () => (
   <>
@@ -133,8 +130,6 @@ const DailyProfitChartSkeleton = () => (
   </div>
 );
 
-// CORREÇÃO: O esqueleto da coluna direita não precisa mais das classes de layout,
-// pois a div pai cuidará disso.
 const ClientAnalysisCardSkeleton = () => (
   <div className="flex flex-col gap-4 animate-pulse w-full">
     <div className="card w-full h-40 bg-gray-800/80 p-4 rounded-lg">
@@ -152,10 +147,6 @@ const ClientAnalysisCardSkeleton = () => (
     </div>
   </div>
 );
-
-// --- FIM: NOVOS COMPONENTES SKELETON ---
-
-// --- COMPONENTE PRINCIPAL DO DASHBOARD (COM LAYOUT CORRIGIDO) ---
 
 function Dashboard() {
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
@@ -182,8 +173,6 @@ function Dashboard() {
     setFilterYear(year);
   }, []);
 
-  // CORREÇÃO ESTRUTURAL: A lógica de isLoading foi movida para DENTRO das divs de coluna.
-  // Isso preserva seu layout de duas colunas em todos os momentos.
   if (isLoading) {
     return (
       <div className="dashboard-container">
@@ -194,12 +183,10 @@ function Dashboard() {
           </div>
         </header>
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Coluna Esquerda com Skeletons */}
           <div className="w-full lg:w-2/3 flex flex-col gap-6">
             <GrossBalanceCardsSkeleton />
             <DailyProfitChartSkeleton />
           </div>
-          {/* Coluna Direita com Skeleton */}
           <div className="w-full lg:w-1/3 flex flex-col gap-4">
             <ClientAnalysisCardSkeleton />
           </div>
@@ -216,7 +203,6 @@ function Dashboard() {
     );
   }
 
-  // Renderização normal quando os dados estão prontos
   return (
     <div className="dashboard-container">
       <header className="w-full flex justify-between items-center flex-wrap gap-4 mb-6">
@@ -237,7 +223,13 @@ function Dashboard() {
           />
         </div>
         <div className="w-full lg:w-1/3 flex flex-col gap-4">
-          <ClientAnalysisCard liveStats={data.liveData} />
+          {/* ======================================================================= */}
+          {/* AJUSTE 2: Passando os dados corretos para o componente.                 */}
+          {/* ======================================================================= */}
+          <ClientAnalysisCard
+            filteredStats={data.filteredData}
+            liveStats={data.liveData}
+          />
         </div>
       </div>
     </div>
@@ -252,13 +244,11 @@ export default function DashboardPage() {
   );
 }
 
-// --- INÍCIO: SEUS COMPONENTES ORIGINAIS (SEM ALTERAÇÃO NO CÓDIGO INTERNO) ---
-
 const GrossBalanceCards = memo(
   ({
     grossByPaymentMethod,
   }: {
-    grossByPaymentMethod: FilteredMonthStats["grossByPaymentMethod"];
+    grossByPaymentMethod: Record<string, number>;
   }) => {
     const getCardClass = (method: string) => {
       switch (method.toLowerCase()) {
@@ -329,7 +319,7 @@ const DailyProfitChart = memo(
     filterMonth,
     filterYear,
   }: {
-    dailyNetProfit: FilteredMonthStats["dailyNetProfit"];
+    dailyNetProfit: { date: string; netAmount: number }[];
     filterMonth: number;
     filterYear: number;
   }) => {
@@ -453,120 +443,130 @@ const DailyProfitChart = memo(
 );
 DailyProfitChart.displayName = "DailyProfitChart";
 
-const ClientAnalysisCard = memo(({ liveStats }: { liveStats: LiveStats }) => {
-  const getPlanColor = (plan: string) => {
-    switch (plan.toLowerCase()) {
-      case "p2p":
-        return "#F1916D";
-      case "platinum":
-        return "#a64dff";
-      case "comum":
-        return "#4d8cff";
-      default:
-        return "#F3DADF";
-    }
-  };
-  const getMethodColor = (method: string) => {
-    switch (method.toLowerCase()) {
-      case "nubank":
-        return "#a64dff";
-      case "banco do brasil":
-        return "#ffd700";
-      case "caixa":
-        return "#4d8cff";
-      case "picpay":
-        return "#00da77";
-      case "pagseguro":
-        return "#ffa000";
-      default:
-        return "#F3DADF";
-    }
-  };
-  return (
-    <>
-      <div className="card w-full current-month-card">
-        <h2
-          className="text-xl font-semibold mb-4"
-          style={{ color: "var(--text-primary-secondary)" }}
-        >
-          Como está meu mês (livre):
-        </h2>
-        <div className="flex flex-col gap-2">
-          <div
-            className="text-2xl font-semibold"
-            style={{ color: "var(--card-text)" }}
+// ===================================================================================
+// AJUSTE 3: O componente foi atualizado para receber as novas props
+// e usar os dados de 'filteredStats' para os cálculos.
+// ===================================================================================
+const ClientAnalysisCard = memo(
+  ({
+    filteredStats,
+    liveStats,
+  }: {
+    filteredStats: FilteredMonthStats;
+    liveStats: LiveStats;
+  }) => {
+    const getPlanColor = (plan: string) => {
+      switch (plan.toLowerCase()) {
+        case "p2p":
+          return "#F1916D";
+        case "platinum":
+          return "#a64dff";
+        case "comum":
+          return "#4d8cff";
+        default:
+          return "#F3DADF";
+      }
+    };
+    const getMethodColor = (method: string) => {
+      switch (method.toLowerCase()) {
+        case "nubank":
+          return "#a64dff";
+        case "banco do brasil":
+          return "#ffd700";
+        case "caixa":
+          return "#4d8cff";
+        case "picpay":
+          return "#00da77";
+        case "pagseguro":
+          return "#ffa000";
+        default:
+          return "#F3DADF";
+      }
+    };
+    return (
+      <>
+        <div className="card w-full current-month-card">
+          <h2
+            className="text-xl font-semibold mb-4"
+            style={{ color: "var(--text-primary-secondary)" }}
           >
-            -R$8/ativação: R$ {liveStats.totalNetAmount8.toFixed(2)}
-          </div>
-          <div
-            className="text-2xl font-semibold"
-            style={{ color: "var(--card-text)" }}
-          >
-            -R$15/ativação: R$ {liveStats.totalNetAmount15.toFixed(2)}
-          </div>
-        </div>
-      </div>
-      <div
-        className="card w-full"
-        style={{ minHeight: "300px", overflowY: "auto" }}
-      >
-        <h2
-          className="text-3xl font-bold m-4"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          Análise dos Clientes (Meu Mês)
-        </h2>
-        <div className="flex flex-col gap-3 p-4">
-          <p>
-            <strong className="text-2xl font-bold">Clientes Ativos:</strong>{" "}
-            <span
-              className="text-2xl font-bold"
-              style={{ color: "var(--accent-blue)" }}
+            Como está meu mês:
+          </h2>
+          <div className="flex flex-col gap-2">
+            <div
+              className="text-2xl font-semibold"
+              style={{ color: "var(--card-text)" }}
             >
-              {liveStats.activeClients}
-            </span>
-          </p>
-          <p className="mt-3">
-            <strong className="text-2xl font-bold">Por Plano:</strong>
-          </p>
-          {Object.entries(liveStats.clientsByPlan || {}).map(
-            ([plan, count]) => (
-              <p
-                key={plan}
-                style={{
-                  color: getPlanColor(plan),
-                  fontWeight: "bold",
-                  fontSize: "1.25rem",
-                }}
-              >
-                - {plan}: {count as ReactNode}
-              </p>
-            )
-          )}
-          <p className="mt-3">
-            <strong className="text-xl font-bold">
-              Por Método de Pagamento:
-            </strong>
-          </p>
-          {Object.entries(liveStats.clientsByPaymentMethod || {}).map(
-            ([method, count]) => (
-              <p
-                key={method}
-                style={{
-                  color: getMethodColor(method),
-                  fontWeight: "bold",
-                  fontSize: "1.25rem",
-                }}
-              >
-                - {method}: {count as ReactNode}
-              </p>
-            )
-          )}
+              -R$8/ativação: R$ {filteredStats.totalNetAmount8.toFixed(2)}
+            </div>
+            <div
+              className="text-2xl font-semibold"
+              style={{ color: "var(--card-text)" }}
+            >
+              -R$15/ativação: R$ {filteredStats.totalNetAmount15.toFixed(2)}
+            </div>
+          </div>
         </div>
-      </div>
-    </>
-  );
-});
+        <div
+          className="card w-full"
+          style={{ minHeight: "300px", overflowY: "auto" }}
+        >
+          <h2
+            className="text-3xl font-bold m-4"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Análise dos Clientes (Ao Vivo)
+          </h2>
+          <div className="flex flex-col gap-3 p-4">
+            <p>
+              <strong className="text-2xl font-bold">Clientes Ativos:</strong>{" "}
+              <span
+                className="text-2xl font-bold"
+                style={{ color: "var(--accent-blue)" }}
+              >
+                {liveStats.activeClients}
+              </span>
+            </p>
+            <p className="mt-3">
+              <strong className="text-2xl font-bold">Por Plano:</strong>
+            </p>
+            {Object.entries(liveStats.clientsByPlan || {}).map(
+              ([plan, count]) => (
+                <p
+                  key={plan}
+                  style={{
+                    color: getPlanColor(plan),
+                    fontWeight: "bold",
+                    fontSize: "1.25rem",
+                  }}
+                >
+                  - {plan}: {count as ReactNode}
+                </p>
+              )
+            )}
+            <p className="mt-3">
+              <strong className="text-xl font-bold">
+                Por Método de Pagamento:
+              </strong>
+            </p>
+            {Object.entries(liveStats.clientsByPaymentMethod || {}).map(
+              ([method, count]) => (
+                <p
+                  key={method}
+                  style={{
+                    color: getMethodColor(method),
+                    fontWeight: "bold",
+                    fontSize: "1.25rem",
+                  }}
+                >
+                  - {method}: {count as ReactNode}
+                </p>
+              )
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
+);
 ClientAnalysisCard.displayName = "ClientAnalysisCard";
-
-// --- FIM: SEUS COMPONENTES ORIGINAIS ---

@@ -4,15 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { Faker, pt_BR } from "@faker-js/faker";
 import bcrypt from "bcryptjs";
 
-// --- CHAVE DE CONTROLE PRINCIPAL ---
-// Esta flag é a sua ferramenta de segurança.
-// false = MODO PRODUÇÃO: Limpa o banco de dados de testes, deixando apenas os dados essenciais.
-// true  = MODO DESENVOLVIMENTO: Gera 300 clientes de teste para você trabalhar.
 const CREATE_FAKE_DATA = false;
-// ----------------------------------
-
-// O script de seed é um processo isolado, então é correto e seguro
-// que ele crie e gerencie sua própria instância do PrismaClient.
 const prisma = new PrismaClient();
 const faker = new Faker({ locale: [pt_BR] });
 
@@ -26,7 +18,6 @@ async function main() {
   try {
     console.log("🚀 Iniciando o processo de seed...");
 
-    // --- DADOS ESSENCIAIS (Sempre serão criados ou atualizados) ---
     console.log(
       "🔄 Inserindo/Atualizando dados essenciais (Planos e Métodos de Pagamento)..."
     );
@@ -62,15 +53,12 @@ async function main() {
     }
     console.log("✅ Planos essenciais inseridos/atualizados.");
 
-    // --- LÓGICA DE LIMPEZA OU CRIAÇÃO DE DADOS DE TESTE ---
-
     if (CREATE_FAKE_DATA) {
       console.log(">>> MODO DE DESENVOLVIMENTO: Criando dados fictícios...");
 
-      // Limpa tabelas para evitar duplicatas
       await prisma.client.deleteMany({});
       await prisma.user.deleteMany({
-        where: { username: { not: "platinum2025" } }, // Protege seu usuário admin
+        where: { username: { not: "platinum2025" } },
       });
       console.log("🧹 Tabelas Client e User (exceto admin) limpas.");
 
@@ -124,9 +112,8 @@ async function main() {
     }
   } catch (error) {
     console.error("❌ Erro ao executar o seed:", error);
-    process.exit(1); // Encerra o processo com erro
+    process.exit(1);
   } finally {
-    // É crucial desconectar o Prisma ao final de um script para que o processo termine.
     await prisma.$disconnect();
     console.log("🏁 Processo de seed finalizado.");
   }
