@@ -24,9 +24,9 @@ export const login: RequestHandler = async (
   try {
     const { username, password } = req.body;
 
-    // ===================================================================================
+    // ==================================================================================
     // MUDANÇA 2: Lógica de autenticação agora busca o usuário no BANCO DE DADOS.
-    // ===================================================================================
+    // ==================================================================================
     const user = await prisma.user.findUnique({
       where: { username },
     });
