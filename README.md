@@ -4,7 +4,7 @@
 
  - Uma aplicação full-stack robusta e de alta performance, projetada para o gerenciamento completo do ciclo de vida de clientes de serviços por assinatura. A plataforma oferece um controle financeiro detalhado e um dashboard analítico para tomada de decisões estratégicas.
 
-![](../GCTV/frontend/public/logingctv.png)
+![](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/logingctv.png)
 
 
  🔗&nbsp;&nbsp;&nbsp;Links
@@ -150,14 +150,34 @@ Além disso, a configuração de um pipeline de CI/CD seguro e isolado, criando 
 
 <br>
 
-## 🖥 Project Images  
-  
-  ![Login](../GCTV/frontend/public/logingctv.png)
-  ![Dashboard](../GCTV/frontend/public/dashboardgctv.png)
-  ![Clientes Ativos](../GCTV/frontend/public/clienteativogctv.png)
-  ![Editar Clientes](../GCTV/frontend/public/editarclientegctv.png)
-  ![Cadastrar Cliente](../GCTV/frontend/public/cadastroclientegctv.png)
-  ![Clientes Expirados](../GCTV/frontend/public/clienteexpiradogctv.png)
+---
+
+## 🖥️ Imagens do Projeto
+
+| Login |
+| :---: |
+![Tela de Login](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/logingctv.png)
+
+| Dashboard |
+| :---: |
+![Tela do Dashboard](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/dashboardgctv.png)
+
+| Clientes Ativos |
+| :---: |
+![Tela de Clientes Ativos](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/clienteativogctv.png)
+
+
+| Clientes Expirados |
+| :---: |
+ ![Tela de Clientes Expirados](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/clienteexpiradogctv.png) |
+
+| Cadastro de Cliente |
+| :---: |
+![Tela de Cadastro de Cliente](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/cadastroclientegctv.png)
+
+| Edição de Cliente |
+| :---: |
+![Tela de Edição de Cliente](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/editarclientegctv.png)
 
 <br>
 
