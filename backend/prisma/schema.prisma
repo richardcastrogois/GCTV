@@ -61,6 +61,7 @@ model Client {
   email                  String
   phone                  String?
   dueDate                DateTime
+  dueDateString          String
   grossAmount            Float
   netAmount              Float
   isActive               Boolean   @default(true)
@@ -80,5 +81,6 @@ model Client {
   @@index([email])
   @@index([isActive])
   @@index([dueDate])
-  @@index([userId]) 
+  @@index([userId])
+  @@index([dueDateString])
 }

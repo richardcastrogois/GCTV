@@ -1,10 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import { Faker, pt_BR } from "@faker-js/faker";
 import bcrypt from "bcryptjs";
+import { format } from "date-fns"; // <-- IMPORT ADICIONADO
 
-// ===================================================================================
-// AJUSTE 1: Travado em 'true' para sempre criar dados no ambiente de portfólio.
-// ===================================================================================
 const CREATE_FAKE_DATA = true;
 const prisma = new PrismaClient();
 const faker = new Faker({ locale: [pt_BR] });
@@ -57,7 +55,6 @@ async function main() {
     if (CREATE_FAKE_DATA) {
       console.log(">>> MODO PORTFÓLIO: Criando dados fictícios...");
 
-      // Limpa dados antigos para garantir um estado inicial limpo
       await prisma.client.deleteMany({});
       await prisma.user.deleteMany({});
       console.log("🧹 Tabelas Client e User limpas.");
@@ -65,9 +62,6 @@ async function main() {
       const allPlans = await prisma.plan.findMany();
       const allPaymentMethods = await prisma.paymentMethod.findMany();
 
-      // ===================================================================================
-      // AJUSTE 2: Criando 50 clientes, conforme solicitado.
-      // ===================================================================================
       console.log(
         `Criando 50 clientes fictícios com histórico de pagamentos...`
       );
@@ -77,7 +71,6 @@ async function main() {
         const tempUsername = `${fullName.split(" ")[0].toLowerCase()}${i}`;
         const tempPassword = bcrypt.hashSync("tempPassword123", 10);
 
-        // Cria um usuário admin "padrão" para facilitar o login no portfólio
         if (i === 0) {
           await prisma.user.create({
             data: { username: "admin", password: bcrypt.hashSync("admin", 10) },
@@ -88,21 +81,17 @@ async function main() {
           data: { username: tempUsername, password: tempPassword },
         });
 
-        // ===================================================================================
-        // AJUSTE 3: Geração de um histórico de pagamentos rico e variado.
-        // ===================================================================================
         const paymentHistory = [];
-        const numPayments = faker.number.int({ min: 1, max: 12 }); // Cada cliente terá de 1 a 12 pagamentos
+        const numPayments = faker.number.int({ min: 1, max: 12 });
 
         for (let j = 0; j < numPayments; j++) {
-          // Garante que alguns pagamentos tenham os valores exatos para testar a lógica do PagSeguro
           const possibleGrossAmounts = [
             30.0,
             35.0,
             faker.number.float({ min: 25, max: 80, fractionDigits: 2 }),
           ];
           const paymentBruto = faker.helpers.arrayElement(possibleGrossAmounts);
-          const paymentLiquido = paymentBruto * 0.9; // Exemplo de líquido
+          const paymentLiquido = paymentBruto * 0.9;
 
           paymentHistory.push({
             paymentDate: randomDate(
@@ -115,6 +104,18 @@ async function main() {
           });
         }
 
+        // =======================================================================
+        // AJUSTE PRINCIPAL AQUI
+        // =======================================================================
+        // 1. Geramos a data de vencimento e guardamos em uma variável
+        const clientDueDate = randomDate(
+          new Date("2025-12-01"),
+          new Date("2026-03-30")
+        );
+        // 2. Usamos a variável acima para criar a string formatada
+        const clientDueDateString = format(clientDueDate, "dd/MM/yyyy");
+        // =======================================================================
+
         await prisma.client.create({
           data: {
             fullName,
@@ -122,13 +123,14 @@ async function main() {
             phone: faker.phone.number(),
             planId: faker.helpers.arrayElement(allPlans).id,
             paymentMethodId: faker.helpers.arrayElement(allPaymentMethods).id,
-            dueDate: randomDate(new Date("2025-12-01"), new Date("2026-03-30")),
-            // Os campos abaixo são menos relevantes pois os dados vêm do histórico
+            // 3. Usamos as duas variáveis para preencher os campos
+            dueDate: clientDueDate,
+            dueDateString: clientDueDateString, // <-- CAMPO ADICIONADO
             grossAmount: 0,
             netAmount: 0,
-            isActive: faker.datatype.boolean(0.8), // 80% de chance de ser ativo
+            isActive: faker.datatype.boolean(0.8),
             userId: tempUser.id,
-            paymentHistory: paymentHistory, // <-- Adicionando o histórico de pagamentos
+            paymentHistory: paymentHistory,
           },
         });
       }
@@ -137,7 +139,6 @@ async function main() {
         "🔑 Dica: Um usuário 'admin' com senha 'admin' foi criado para facilitar o acesso."
       );
     } else {
-      // Este bloco não será executado pois CREATE_FAKE_DATA é true.
       console.log(
         ">>> MODO DE PRODUÇÃO: Nenhuma ação de criação de dados executada."
       );

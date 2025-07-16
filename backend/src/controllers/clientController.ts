@@ -1,11 +1,13 @@
-// backend/src/controllers/clientController.ts
-
 import { RequestHandler, Request, Response } from "express";
 import { Prisma } from "@prisma/client";
 import { ParsedQs } from "qs";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma";
-import { subDays } from "date-fns";
+import { subDays, startOfDay, endOfDay, format } from "date-fns";
+
+const formatDueDateString = (date: Date): string => {
+  return format(date, "dd/MM/yyyy");
+};
 
 // Tipos de dados (sem alterações)
 type ParamsWithId = { id: string };
@@ -40,6 +42,12 @@ type VisualPaymentStatusBody = {
   status: boolean;
 };
 
+
+
+// ===================================================================================
+// ALTERAÇÃO PRINCIPAL - LÓGICA DE BUSCA APRIMORADA
+// A função agora inclui a capacidade de pesquisar pela data de vencimento.
+// ===================================================================================
 function buildSearchWhereClause(
   searchTerm: string,
   isActive: boolean
@@ -52,6 +60,7 @@ function buildSearchWhereClause(
     { plan: { name: { contains: searchTerm, mode: "insensitive" } } },
     { paymentMethod: { name: { contains: searchTerm, mode: "insensitive" } } },
     { user: { username: { contains: searchTerm, mode: "insensitive" } } },
+    { dueDateString: { contains: searchTerm, mode: "insensitive" } }, // <-- Busca pela string da data
   ];
 
   const numericSearchTerm = parseFloat(searchTerm.replace(",", "."));
@@ -67,30 +76,31 @@ function buildSearchWhereClause(
 }
 
 // OTIMIZAÇÃO APLICADA: Esta função agora aceita parâmetros de ordenação
-export const getClients: RequestHandler = async (req: Request, res: Response): Promise<void> => {
+export const getClients: RequestHandler = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
     const searchTerm = (req.query.search as string) || "";
 
-    // --- INÍCIO DA OTIMIZAÇÃO DE ORDENAÇÃO ---
-    const {
-        sortKey = 'createdAt', // Chave de ordenação padrão
-        sortDirection = 'desc'
-    } = req.query as { sortKey?: string; sortDirection?: 'asc' | 'desc' };
+    const { sortKey = "createdAt", sortDirection = "desc" } = req.query as {
+      sortKey?: string;
+      sortDirection?: "asc" | "desc";
+    };
 
     const orderBy: Prisma.ClientOrderByWithRelationInput = {};
-    if (sortKey === 'plan.name') {
-        orderBy.plan = { name: sortDirection };
-    } else if (sortKey === 'paymentMethod.name') {
-        orderBy.paymentMethod = { name: sortDirection };
-    } else if (sortKey === 'user.username') {
-        orderBy.user = { username: sortDirection };
+    if (sortKey === "plan.name") {
+      orderBy.plan = { name: sortDirection };
+    } else if (sortKey === "paymentMethod.name") {
+      orderBy.paymentMethod = { name: sortDirection };
+    } else if (sortKey === "user.username") {
+      orderBy.user = { username: sortDirection };
     } else if (sortKey) {
-        (orderBy as any)[sortKey] = sortDirection;
+      (orderBy as any)[sortKey] = sortDirection;
     }
-    // --- FIM DA OTIMIZAÇÃO DE ORDENAÇÃO ---
 
     const whereClause: Prisma.ClientWhereInput = searchTerm
       ? buildSearchWhereClause(searchTerm, true)
@@ -102,7 +112,7 @@ export const getClients: RequestHandler = async (req: Request, res: Response): P
         include: { plan: true, paymentMethod: true, user: true },
         skip,
         take: limit,
-        orderBy: orderBy, // <-- APLICA A ORDENAÇÃO DINÂMICA
+        orderBy: orderBy,
       }),
       prisma.client.count({ where: whereClause }),
     ]);
@@ -114,7 +124,6 @@ export const getClients: RequestHandler = async (req: Request, res: Response): P
   }
 };
 
-// OTIMIZAÇÃO APLICADA: Esta função agora aceita parâmetros de ordenação do front-end.
 export const getExpiredClients: RequestHandler = async (
   req: Request,
   res: Response
@@ -125,27 +134,19 @@ export const getExpiredClients: RequestHandler = async (
     const skip = (page - 1) * limit;
     const searchTerm = (req.query.search as string) || "";
 
-    // --- INÍCIO DA OTIMIZAÇÃO DE ORDENAÇÃO ---
+    const { sortKey = "dueDate", sortDirection = "desc" } = req.query as {
+      sortKey?: string;
+      sortDirection?: "asc" | "desc";
+    };
 
-    // 1. Recebe os parâmetros de ordenação da requisição, com valores padrão.
-    const {
-      sortKey = "dueDate", // Chave de ordenação padrão
-      sortDirection = "desc", // Direção padrão
-    } = req.query as { sortKey?: string; sortDirection?: "asc" | "desc" };
-
-    // 2. Constrói o objeto 'orderBy' dinamicamente para o Prisma.
-    // Isso traduz a chave do front-end (ex: 'plan.name') para o formato que o Prisma entende.
     const orderBy: Prisma.ClientOrderByWithRelationInput = {};
     if (sortKey === "plan.name") {
       orderBy.plan = { name: sortDirection };
     } else if (sortKey === "user.username") {
       orderBy.user = { username: sortDirection };
     } else if (sortKey) {
-      // Mapeia chaves diretas como 'fullName', 'email', 'dueDate'
       (orderBy as any)[sortKey] = sortDirection;
     }
-
-    // --- FIM DA OTIMIZAÇÃO DE ORDENAÇÃO ---
 
     const whereClause: Prisma.ClientWhereInput = searchTerm
       ? buildSearchWhereClause(searchTerm, false)
@@ -157,7 +158,6 @@ export const getExpiredClients: RequestHandler = async (
         include: { plan: true, paymentMethod: true, user: true },
         skip,
         take: limit,
-        // 3. Aplica a ordenação dinâmica na query, substituindo a ordenação fixa.
         orderBy: orderBy,
       }),
       prisma.client.count({ where: whereClause }),
@@ -175,23 +175,19 @@ export const getClientById: RequestHandler<ParamsWithId> = async (
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
-
   if (isNaN(parseInt(id))) {
     res.status(400).json({ message: "ID inválido" });
     return;
   }
-
   try {
     const client = await prisma.client.findUnique({
       where: { id: parseInt(id) },
       include: { plan: true, paymentMethod: true, user: true },
     });
-
     if (!client) {
       res.status(404).json({ message: "Cliente não encontrado" });
       return;
     }
-
     res.json(client);
   } catch (error) {
     console.error("Erro ao buscar cliente:", error);
@@ -258,6 +254,8 @@ export const createClient: RequestHandler<
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
+    // ADICIONADO
+    const dueDateString = formatDueDateString(parsedDueDate);
 
     const [plan, paymentMethod, discountEntry] = await Promise.all([
       prisma.plan.findUnique({ where: { id: planId } }),
@@ -266,7 +264,6 @@ export const createClient: RequestHandler<
         where: { planId_paymentMethodId: { planId, paymentMethodId } },
       }),
     ]);
-
     if (!plan) {
       res.status(400).json({ message: "Plano inválido" });
       return;
@@ -275,7 +272,6 @@ export const createClient: RequestHandler<
       res.status(400).json({ message: "Método de pagamento inválido" });
       return;
     }
-
     const discountFactor = discountEntry ? discountEntry.discount : 0;
     const netAmount = grossAmount * (1 - discountFactor);
 
@@ -310,6 +306,7 @@ export const createClient: RequestHandler<
         planId,
         paymentMethodId,
         dueDate: parsedDueDate,
+        dueDateString, // <-- ADICIONADO
         grossAmount,
         netAmount,
         isActive,
@@ -372,6 +369,8 @@ export const updateClient: RequestHandler<
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
+    // ADICIONADO
+    const dueDateString = formatDueDateString(parsedDueDate);
 
     const [plan, paymentMethod, discountEntry, clientToUpdate] =
       await Promise.all([
@@ -434,6 +433,7 @@ export const updateClient: RequestHandler<
         planId,
         paymentMethodId,
         dueDate: parsedDueDate,
+        dueDateString, // <-- ADICIONADO
         grossAmount,
         netAmount,
         isActive,
@@ -510,9 +510,16 @@ export const renewClient: RequestHandler<
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
+    // ADICIONADO
+    const dueDateString = formatDueDateString(parsedDueDate);
+
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
-      data: { dueDate: parsedDueDate, isActive: true },
+      data: {
+        dueDate: parsedDueDate,
+        dueDateString, // <-- ADICIONADO
+        isActive: true,
+      },
       include: { plan: true, paymentMethod: true, user: true },
     });
     res.status(200).json(updatedClient);
@@ -553,9 +560,16 @@ export const reactivateClient: RequestHandler<
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
+    // ADICIONADO
+    const dueDateString = formatDueDateString(parsedDueDate);
+
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id), isActive: false },
-      data: { isActive: true, dueDate: parsedDueDate },
+      data: {
+        isActive: true,
+        dueDate: parsedDueDate,
+        dueDateString, // <-- ADICIONADO
+      },
       include: { plan: true, paymentMethod: true, user: true },
     });
     res.status(200).json(updatedClient);
@@ -897,4 +911,4 @@ export const deactivateExpiredClients: RequestHandler = async (req, res) => {
     console.error("Erro ao inativar clientes expirados:", error);
     res.status(500).json({ message: "Erro interno no servidor." });
   }
-};
+}

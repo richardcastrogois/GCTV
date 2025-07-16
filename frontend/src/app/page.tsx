@@ -34,7 +34,7 @@ const isTokenValid = (token: string | null): boolean => {
 };
 
 function useLoginBackground() {
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [backgroundImage, setBackgroundImage] = useState<string>("");
   const [movieTitle, setMovieTitle] = useState<string>("");
 
   useEffect(() => {

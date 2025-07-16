@@ -13,16 +13,14 @@
 ````bash
 https://gctv-ui.vercel.app/
 ````
-
-
-
-
-<img src="https://cdn-icons-png.flaticon.com/512/25/25231.png" alt="GitHub" width="20">
-&nbsp;&nbsp;Repositório no GitHub:
-
-````bash
- https://github.com/richardcastrogois/GCTV
+### Faça o teste:
 ````
+- Usuario: admin
+- Senha: admin
+````
+
+<br>
+
 
 
 <br>
