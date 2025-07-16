@@ -3,19 +3,14 @@
 import bcrypt from "bcryptjs";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { Request, Response, RequestHandler } from "express";
+import prisma from "../lib/prisma"; // <-- MUDANÇA 1: Importamos o Prisma
 
-// Otimização: Carrega usuários apenas uma vez na inicialização do módulo.
-const authUsers = process.env.AUTH_USERS
-  ? JSON.parse(process.env.AUTH_USERS)
-  : [];
+// A variável 'authUsers' foi removida, pois não será mais usada.
 
 // Otimização: Centraliza a lógica de busca do segredo JWT para evitar repetição.
 function getJwtSecrets() {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    console.error("FATAL ERROR: JWT_SECRET is not defined in .env");
-    // Em um cenário real, isso deveria impedir o servidor de iniciar.
-    // Lançar um erro aqui é mais seguro do que continuar com uma falha silenciosa.
     throw new Error("JWT_SECRET is not configured.");
   }
   const refreshSecret = secret + "_refresh";
@@ -29,13 +24,16 @@ export const login: RequestHandler = async (
   try {
     const { username, password } = req.body;
 
-    const user = authUsers.find(
-      (u: { username: string; password?: string; id: number }) =>
-        u.username === username
-    );
+    // ===================================================================================
+    // MUDANÇA 2: Lógica de autenticação agora busca o usuário no BANCO DE DADOS.
+    // ===================================================================================
+    const user = await prisma.user.findUnique({
+      where: { username },
+    });
 
     // Validação de segurança aprimorada
-    if (!user || !user.password || !bcrypt.compareSync(password, user.password)) {
+    // Usamos 'await bcrypt.compare' que é a versão assíncrona, ideal para funções async.
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       res.status(401).json({ error: "Credenciais inválidas" });
       return;
     }
@@ -46,9 +44,13 @@ export const login: RequestHandler = async (
       expiresIn: "15m",
     } as SignOptions);
 
-    const refreshToken = jwt.sign({ userId: user.id, username }, refreshSecret, {
-      expiresIn: "7d",
-    } as SignOptions);
+    const refreshToken = jwt.sign(
+      { userId: user.id, username },
+      refreshSecret,
+      {
+        expiresIn: "7d",
+      } as SignOptions
+    );
 
     res.json({ accessToken, refreshToken, userId: user.id });
   } catch (error) {
@@ -76,13 +78,14 @@ export const refreshToken: RequestHandler = async (
       username: string;
     };
 
-    const user = authUsers.find(
-      (u: { username: string; id: number }) =>
-        u.username === decoded.username && u.id === decoded.userId
-    );
+    // ===================================================================================
+    // MUDANÇA 3: A validação do refresh token também verifica no BANCO DE DADOS.
+    // ===================================================================================
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+    });
 
-    if (!user) {
-      // Usar 403 (Forbidden) é mais apropriado aqui, pois o token pode ser válido mas não pertence a um usuário atual.
+    if (!user || user.username !== decoded.username) {
       res.status(403).json({ error: "Refresh token inválido" });
       return;
     }
@@ -97,7 +100,6 @@ export const refreshToken: RequestHandler = async (
 
     res.json({ accessToken: newAccessToken });
   } catch (error) {
-    // Se jwt.verify falhar (token expirado ou malformado), ele lança um erro.
     console.error("Erro ao renovar token:", error);
     res.status(403).json({ error: "Refresh token inválido ou expirado" });
   }

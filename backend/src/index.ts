@@ -1,11 +1,9 @@
-// backend/src/index.ts
-// SUBSTITUA TODO O CONTEÚDO DESTE ARQUIVO POR ISTO:
-
 import express, { Express, Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import https from "https";
-import fs from "fs";
+// MUDANÇA 1: As importações de 'https' e 'fs' não são mais necessárias.
+// import https from "https";
+// import fs from "fs";
 import path from "path";
 import axios from "axios";
 
@@ -13,13 +11,12 @@ import axios from "axios";
 import clientRoutes from "./routes/clientRoutes";
 import authRoutes from "./routes/authRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
-// MUDANÇA CRÍTICA: A linha abaixo foi REMOVIDA, pois a rota não é mais necessária.
-// import currentMonthRoutes from "./routes/currentMonthRoutes";
 import { getExpiredClients } from "./controllers/clientController";
 import { authMiddleware } from "./middleware/authMiddleware";
 
 dotenv.config();
 
+// A configuração de CORS já está correta, permitindo o localhost.
 const corsOptions = {
   origin: ["https://platinum-tv.vercel.app", "http://localhost:3000"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -51,9 +48,7 @@ function setupRoutes(app: Express) {
 
   app.use(`${apiPrefix}/clients`, clientRoutes);
   app.use(`${apiPrefix}/auth`, authRoutes);
-  app.use(`${apiPrefix}/dashboard`, dashboardRoutes); // Esta rota agora serve o /all
-  // MUDANÇA CRÍTICA: A linha abaixo foi REMOVIDA.
-  // app.use(`${apiPrefix}/current-month`, currentMonthRoutes);
+  app.use(`${apiPrefix}/dashboard`, dashboardRoutes);
   app.get(`${apiPrefix}/expired-clients`, authMiddleware, getExpiredClients);
 
   app.get(`${apiPrefix}/proxy-image`, async (req: Request, res: Response) => {
@@ -77,26 +72,14 @@ setupRoutes(app);
 
 const PORT = process.env.PORT || 3001;
 
-if (process.env.NODE_ENV !== "production") {
-  try {
-    const httpsOptions = {
-      key: fs.readFileSync(path.join(__dirname, "..", "cert.key")),
-      cert: fs.readFileSync(path.join(__dirname, "..", "cert.pem")),
-    };
-    const server = https.createServer(httpsOptions, app);
-    server.listen(PORT, () => {
-      console.log(
-        `✅ Servidor HTTPS local rodando em https://localhost:${PORT}`
-      );
-    });
-  } catch (e) {
-    console.warn(
-      "⚠️ Certificados SSL não encontrados, iniciando servidor HTTP para desenvolvimento local."
-    );
-    app.listen(PORT, () => {
-      console.log(`✅ Servidor HTTP local rodando em http://localhost:${PORT}`);
-    });
-  }
+if (process.env.NODE_ENV === "production") {
+  // Em produção (na Vercel), apenas exportamos o app. A Vercel gerencia o servidor.
+  console.log("Servidor pronto para o ambiente de produção Vercel.");
+} else {
+  // Em desenvolvimento (local), iniciamos um servidor HTTP simples.
+  app.listen(PORT, () => {
+    console.log(`✅ Servidor HTTP local rodando em http://localhost:${PORT}`);
+  });
 }
 
 export default app;
