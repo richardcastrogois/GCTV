@@ -18,7 +18,7 @@ dotenv.config();
 
 // A configuração de CORS já está correta, permitindo o localhost.
 const corsOptions = {
-  origin: ["https://platinum-tv.vercel.app", "http://localhost:3000"],
+  origin: ["https://gctv-ui.vercel.app", "http://localhost:3000"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
