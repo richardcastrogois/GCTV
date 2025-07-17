@@ -17,7 +17,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    document.title = "PlatinumTV";
+    document.title = "GCTV";
   }, []); 
 
   const routesWithNavbar = ["/dashboard", "/clients", "/expired"];
