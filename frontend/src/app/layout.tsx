@@ -11,10 +11,14 @@ import { Inter } from "next/font/google";
 import { usePathname } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { SearchProvider } from "@/components/SearchContext";
-import { useState } from "react"; // Importar useState
+import { useState, useEffect } from "react";
 
 function AppContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
+  useEffect(() => {
+    document.title = "PlatinumTV";
+  }, []); 
 
   const routesWithNavbar = ["/dashboard", "/clients", "/expired"];
 
