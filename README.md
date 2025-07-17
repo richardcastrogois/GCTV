@@ -184,7 +184,7 @@ Além disso, a configuração de um pipeline de CI/CD seguro e isolado, criando 
 
   ### 1. Clone este repositório
  ```bash
-  git clone [https://github.com/richardcastrogois/GCTV.git](https://github.com/richardcastrogois/GCTV.git)
+  git clone [https://github.com/richardcastrogois/GCTV.git]
   ```
 
   ### 2. Navegue até a pasta do backend e instale as dependências
