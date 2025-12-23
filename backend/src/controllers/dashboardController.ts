@@ -137,6 +137,7 @@ export const getUnifiedDashboardData: RequestHandler = async (
     };
     const totalNetAmount8 = totalGrossAmount - totalPayments * 8;
     const totalNetAmount15 = totalGrossAmount - totalPayments * 15;
+    const thyPayment = totalNetAmount15 * 0.15;
 
     // O objeto 'filteredData' agora inclui os novos totais calculados.
     const filteredData = {
@@ -147,6 +148,9 @@ export const getUnifiedDashboardData: RequestHandler = async (
       })),
       totalNetAmount8: parseFloat(totalNetAmount8.toFixed(2)),
       totalNetAmount15: parseFloat(totalNetAmount15.toFixed(2)),
+      totalGrossAmount,
+      totalPayments,
+      thyPayment: parseFloat(thyPayment.toFixed(2)),
     };
 
     // Os dados de clientes por plano e método de pagamento continuam vindo dos agregados "ao vivo".

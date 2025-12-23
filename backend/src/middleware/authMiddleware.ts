@@ -19,7 +19,21 @@ export const authMiddleware: RequestHandler = (
   res: Response,
   next: NextFunction
 ): void => {
-  const authHeader = req.headers.authorization;
+  const authHeader = req.headers.authorization || "";
+
+  if (req.originalUrl.startsWith("/api/clients/deactivate-expired")) {
+    const expected = `Bearer ${process.env.CRON_SECRET}`;
+
+    if (authHeader === expected) {
+      return next();
+    }
+
+    console.error(
+      "Tentativa de acesso ao endpoint do CRON com token inválido ou ausente."
+    );
+    res.status(401).json({ error: "Token de CRON inválido" });
+    return;
+  }
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     // Responde com 401 (Unauthorized) se o token não for fornecido ou estiver no formato errado.

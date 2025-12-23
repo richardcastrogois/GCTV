@@ -1,0 +1,181 @@
+/* === TOAST ESTILO HEROUI (SUCESSO) === */
+
+.hero-toast {
+  position: relative;
+  min-width: 280px;
+  max-width: 360px;
+  background: #032d1d;
+  color: #ecfdf5;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  overflow: visible;
+  animation: hero-toast-in 0.35s cubic-bezier(0.24, 0.8, 0.25, 1) forwards;
+}
+
+/* animação de SAÍDA (quando t.visible = false) */
+.hero-toast--leave {
+  animation: hero-toast-out 0.28s cubic-bezier(0.24, 0.8, 0.25, 1) forwards;
+}
+
+/* container do texto */
+.hero-toast-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+/* título (linha de cima) */
+.hero-toast-text-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5fbd87;
+}
+
+/* descrição (linha de baixo, opcional) */
+.hero-toast-text-subtitle {
+  font-size: 13px;
+  color: #5fbd87;
+}
+
+/* botão X de fechar à direita */
+.hero-toast-close {
+  position: absolute;
+  top: 18%;
+  right: -6px;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 197, 94, 0.8);
+  background: #032d1d;
+  color: #6ee7b7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+}
+.hero-toast-close:hover {
+  background: rgba(6, 95, 70, 0.9);
+}
+
+
+/* === TOAST ESTILO HEROUI (ERRO) === */
+
+.hero-toast--error {
+  /* reaproveita layout do .hero-toast, só troca cores */
+  background: #310413;
+  border-color: #320615;
+}
+
+/* texto em rosa do erro */
+.hero-toast-text-title--error,
+.hero-toast-text-subtitle--error {
+  color: #d55f87;
+}
+
+/* botão X do erro (mesma posição, outras cores) */
+.hero-toast-close--error {
+  border-color: #d55f87;
+  background: #310413;
+  color: #d55f87;
+}
+
+.hero-toast-close--error:hover {
+  background: #4d0a25; /* um pouquinho mais claro que o fundo */
+}
+
+/* === TOAST ESTILO HEROUI (AVISO / WARNING) === */
+
+.hero-toast-warning {
+  position: relative;
+  min-width: 280px;
+  max-width: 360px;
+  background: #2c1e06;          /* fundo que você pediu */
+  color: #352308;               /* texto que você pediu */
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.65);
+  border: 1px solid #352308;    /* borda puxando pro mesmo tom */
+  overflow: visible;
+  animation: hero-toast-in 0.35s cubic-bezier(0.24, 0.8, 0.25, 1) forwards;
+}
+
+/* animação de saída (usando os mesmos keyframes do sucesso) */
+.hero-toast-warning--leave {
+  animation: hero-toast-out 0.28s cubic-bezier(0.24, 0.8, 0.25, 1) forwards;
+}
+
+/* título e subtítulo do warning */
+.hero-toast-warning-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #facc15; /* um amarelo mais vivo pra destacar o título */
+}
+
+.hero-toast-warning-subtitle {
+  font-size: 13px;
+  color: #eab308; /* amarelo um pouco mais suave pro subtítulo */
+}
+
+/* botão de fechar no warning */
+.hero-toast-warning-close {
+  position: absolute;
+  top: 18%;
+  right: -6px;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid #facc15;
+  background: #2c1e06;
+  color: #facc15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+}
+
+.hero-toast-warning-close:hover {
+  background: #3b2909;
+}
+
+
+
+/* === animações === */
+@keyframes hero-toast-in {
+  from {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes hero-toast-out {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+}

@@ -87,7 +87,7 @@ export default function Login() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (isTokenValid(token)) {
-      router.push("/dashboard");
+      router.push("/newpage");
     } else {
       setIsSessionChecking(false);
     }
@@ -105,7 +105,7 @@ export default function Login() {
         localStorage.setItem("token", data.accessToken);
         localStorage.setItem("refreshToken", data.refreshToken);
         toast.success("Login realizado com sucesso!");
-        router.push("/dashboard");
+        router.push("/newpage");
       } else {
         throw new Error("Resposta inválida do servidor.");
       }

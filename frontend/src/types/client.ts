@@ -39,6 +39,7 @@ export interface Client {
   plan: Plan; // Assumindo que a API sempre retorna um objeto Plan (mesmo que "padrão")
   paymentMethod: PaymentMethod; // Assumindo que a API sempre retorna (mesmo que "padrão")
   dueDate: string; // Deve ser string ISO Date
+  dueDateString?: string | null;
   grossAmount: number;
   netAmount: number;
   isActive: boolean;

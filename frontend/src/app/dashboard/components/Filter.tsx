@@ -167,7 +167,7 @@ const Filter = memo(({ onFilterChange }: FilterProps) => {
   );
 
   return (
-    <div className="flex flex-col sm:flex-row items-center">
+    <div className="flex flex-wrap sm:flex-row gap-4 sm:gap-1 items-center">
       <div className="flex items-center">
         <label
           className="mr-2 text-lg"

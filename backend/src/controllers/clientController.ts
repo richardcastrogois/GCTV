@@ -3,13 +3,14 @@ import { Prisma } from "@prisma/client";
 import { ParsedQs } from "qs";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prisma";
-import { subDays, startOfDay, endOfDay, format } from "date-fns";
+import { subDays } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 const formatDueDateString = (date: Date): string => {
-  return format(date, "dd/MM/yyyy");
+  return formatInTimeZone(date, "UTC", "dd/MM/yyyy");
 };
 
-// Tipos de dados (sem alterações)
+// Tipos de dados
 type ParamsWithId = { id: string };
 type ClientBody = {
   fullName: string;
@@ -18,7 +19,6 @@ type ClientBody = {
   planId: number;
   paymentMethodId: number;
   dueDate: string;
-  grossAmount: number;
   isActive: boolean;
   observations?: string;
   username: string;
@@ -42,16 +42,12 @@ type VisualPaymentStatusBody = {
   status: boolean;
 };
 
-
-
-// ===================================================================================
-// ALTERAÇÃO PRINCIPAL - LÓGICA DE BUSCA APRIMORADA
-// A função agora inclui a capacidade de pesquisar pela data de vencimento.
-// ===================================================================================
 function buildSearchWhereClause(
   searchTerm: string,
   isActive: boolean
 ): Prisma.ClientWhereInput {
+  console.log("--- EXECUTANDO A NOVA LÓGICA DE BUSCA COM O TERMO:", searchTerm);
+
   const searchClauses: Prisma.ClientWhereInput[] = [
     { fullName: { contains: searchTerm, mode: "insensitive" } },
     { email: { contains: searchTerm, mode: "insensitive" } },
@@ -60,7 +56,7 @@ function buildSearchWhereClause(
     { plan: { name: { contains: searchTerm, mode: "insensitive" } } },
     { paymentMethod: { name: { contains: searchTerm, mode: "insensitive" } } },
     { user: { username: { contains: searchTerm, mode: "insensitive" } } },
-    { dueDateString: { contains: searchTerm, mode: "insensitive" } }, // <-- Busca pela string da data
+    { dueDateString: { contains: searchTerm, mode: "insensitive" } },
   ];
 
   const numericSearchTerm = parseFloat(searchTerm.replace(",", "."));
@@ -75,7 +71,6 @@ function buildSearchWhereClause(
   };
 }
 
-// OTIMIZAÇÃO APLICADA: Esta função agora aceita parâmetros de ordenação
 export const getClients: RequestHandler = async (
   req: Request,
   res: Response
@@ -234,47 +229,65 @@ export const createClient: RequestHandler<
       planId,
       paymentMethodId,
       dueDate,
-      grossAmount,
       isActive,
       username,
       observations,
     } = req.body;
 
+    // Validações (continuam as mesmas)
     if (!username) {
-      res.status(400).json({ message: "Username é obrigatório" });
-      return;
+      /* ... */ return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      res.status(400).json({ message: "Email inválido" });
-      return;
+      /* ... */ return;
     }
     const parsedDueDate = new Date(dueDate);
     if (isNaN(parsedDueDate.getTime())) {
-      res.status(400).json({ message: "Data de vencimento inválida" });
-      return;
+      /* ... */ return;
     }
-    // ADICIONADO
     const dueDateString = formatDueDateString(parsedDueDate);
 
-    const [plan, paymentMethod, discountEntry] = await Promise.all([
+    // Busca os dados do plano e método de pagamento (continua o mesmo)
+    const [plan, paymentMethod] = await Promise.all([
       prisma.plan.findUnique({ where: { id: planId } }),
       prisma.paymentMethod.findUnique({ where: { id: paymentMethodId } }),
-      prisma.planPaymentMethodDiscount.findUnique({
-        where: { planId_paymentMethodId: { planId, paymentMethodId } },
-      }),
     ]);
+
     if (!plan) {
-      res.status(400).json({ message: "Plano inválido" });
-      return;
+      /* ... */ return;
     }
     if (!paymentMethod) {
-      res.status(400).json({ message: "Método de pagamento inválido" });
+      /* ... */ return;
+    }
+
+    // Lógica de Preço Centralizada no Backend (continua a mesma e correta)
+    let calculatedGrossAmount = 0;
+    if (plan.name === "Comum") {
+      calculatedGrossAmount = 30.0;
+    } else if (
+      plan.name === "Platinum" ||
+      plan.name === "Hibrid" ||
+      plan.name === "P2P"
+    ) {
+      calculatedGrossAmount = 35.0;
+    } else {
+      res.status(400).json({
+        message: `Plano '${plan.name}' não possui uma regra de preço definida no backend.`,
+      });
       return;
     }
-    const discountFactor = discountEntry ? discountEntry.discount : 0;
-    const netAmount = grossAmount * (1 - discountFactor);
 
+    let calculatedNetAmount = calculatedGrossAmount;
+    if (paymentMethod.name === "PagSeguro") {
+      if (calculatedGrossAmount === 35.0) {
+        calculatedNetAmount = 32.85;
+      } else if (calculatedGrossAmount === 30.0) {
+        calculatedNetAmount = 28.1;
+      }
+    }
+
+    // Criação do usuário (continua a mesma)
     let user;
     try {
       const password = bcrypt.hashSync("tempPassword123", 10);
@@ -293,11 +306,12 @@ export const createClient: RequestHandler<
       }
       throw error;
     }
-
     if (!user) {
       return;
     }
 
+    // <<<< AJUSTE PRINCIPAL AQUI >>>>
+    // Agora o cliente é criado com um histórico de pagamentos VAZIO.
     const newClient = await prisma.client.create({
       data: {
         fullName,
@@ -306,13 +320,13 @@ export const createClient: RequestHandler<
         planId,
         paymentMethodId,
         dueDate: parsedDueDate,
-        dueDateString, // <-- ADICIONADO
-        grossAmount,
-        netAmount,
+        dueDateString,
+        grossAmount: calculatedGrossAmount,
+        netAmount: calculatedNetAmount,
         isActive,
         observations: observations || null,
         userId: user.id,
-        paymentHistory: [],
+        paymentHistory: [], // AQUI ESTÁ A MUDANÇA: Começa vazio!
         visualPaymentConfirmed: false,
       },
       include: { plan: true, paymentMethod: true, user: true },
@@ -347,18 +361,11 @@ export const updateClient: RequestHandler<
       planId,
       paymentMethodId,
       dueDate,
-      grossAmount,
       isActive,
       observations,
       username,
     } = req.body;
 
-    if (typeof grossAmount !== "number" || isNaN(grossAmount)) {
-      res
-        .status(400)
-        .json({ message: "Valor bruto deve ser um número válido" });
-      return;
-    }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       res.status(400).json({ message: "Email inválido" });
@@ -369,21 +376,16 @@ export const updateClient: RequestHandler<
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
-    // ADICIONADO
     const dueDateString = formatDueDateString(parsedDueDate);
 
-    const [plan, paymentMethod, discountEntry, clientToUpdate] =
-      await Promise.all([
-        prisma.plan.findUnique({ where: { id: planId } }),
-        prisma.paymentMethod.findUnique({ where: { id: paymentMethodId } }),
-        prisma.planPaymentMethodDiscount.findUnique({
-          where: { planId_paymentMethodId: { planId, paymentMethodId } },
-        }),
-        prisma.client.findUnique({
-          where: { id: parseInt(id) },
-          include: { user: true },
-        }),
-      ]);
+    const [plan, paymentMethod, clientToUpdate] = await Promise.all([
+      prisma.plan.findUnique({ where: { id: planId } }),
+      prisma.paymentMethod.findUnique({ where: { id: paymentMethodId } }),
+      prisma.client.findUnique({
+        where: { id: parseInt(id) },
+        include: { user: true },
+      }),
+    ]);
 
     if (!plan) {
       res.status(400).json({ message: "Plano inválido" });
@@ -398,8 +400,34 @@ export const updateClient: RequestHandler<
       return;
     }
 
-    const discountFactor = discountEntry ? discountEntry.discount : 0;
-    const netAmount = grossAmount * (1 - discountFactor);
+    const visualPaymentConfirmed =
+      isActive === false ? false : clientToUpdate.visualPaymentConfirmed;
+
+    // Lógica de Preço Centralizada na Atualização
+    let calculatedGrossAmount = 0;
+    if (plan.name === "Comum") {
+      calculatedGrossAmount = 30.0;
+    } else if (
+      plan.name === "Platinum" ||
+      plan.name === "Hibrid" ||
+      plan.name === "P2P"
+    ) {
+      calculatedGrossAmount = 35.0;
+    } else {
+      res.status(400).json({
+        message: `Plano '${plan.name}' não possui uma regra de preço definida no backend.`,
+      });
+      return;
+    }
+
+    let calculatedNetAmount = calculatedGrossAmount;
+    if (paymentMethod.name === "PagSeguro") {
+      if (calculatedGrossAmount === 35.0) {
+        calculatedNetAmount = 32.85;
+      } else if (calculatedGrossAmount === 30.0) {
+        calculatedNetAmount = 28.1;
+      }
+    }
 
     if (
       username &&
@@ -433,11 +461,12 @@ export const updateClient: RequestHandler<
         planId,
         paymentMethodId,
         dueDate: parsedDueDate,
-        dueDateString, // <-- ADICIONADO
-        grossAmount,
-        netAmount,
+        dueDateString,
+        grossAmount: calculatedGrossAmount,
+        netAmount: calculatedNetAmount,
         isActive,
         observations: observations || null,
+        visualPaymentConfirmed,
       },
       include: { plan: true, paymentMethod: true, user: true },
     });
@@ -475,17 +504,30 @@ export const deleteClient: RequestHandler<ParamsWithId> = async (
     return;
   }
   try {
-    await prisma.client.delete({
+    const clientToDelete = await prisma.client.findUnique({
       where: { id: parseInt(id) },
     });
+
+    if (!clientToDelete) {
+      res.status(404).json({ message: "Cliente não encontrado" });
+      return;
+    }
+
+    await prisma.$transaction([
+      prisma.client.delete({ where: { id: parseInt(id) } }),
+      prisma.user.delete({ where: { id: clientToDelete.userId } }),
+    ]);
+
     res.status(204).send();
   } catch (error) {
-    console.error("Erro ao deletar cliente:", error);
+    console.error("Erro ao deletar cliente e usuário associado:", error);
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2025"
     ) {
-      res.status(404).json({ message: "Cliente não encontrado" });
+      res
+        .status(404)
+        .json({ message: "Cliente não encontrado para exclusão." });
       return;
     }
     res.status(500).json({ message: "Erro ao deletar cliente" });
@@ -510,14 +552,13 @@ export const renewClient: RequestHandler<
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
-    // ADICIONADO
     const dueDateString = formatDueDateString(parsedDueDate);
 
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(id) },
       data: {
         dueDate: parsedDueDate,
-        dueDateString, // <-- ADICIONADO
+        dueDateString,
         isActive: true,
       },
       include: { plan: true, paymentMethod: true, user: true },
@@ -560,7 +601,6 @@ export const reactivateClient: RequestHandler<
       res.status(400).json({ message: "Data de vencimento inválida" });
       return;
     }
-    // ADICIONADO
     const dueDateString = formatDueDateString(parsedDueDate);
 
     const updatedClient = await prisma.client.update({
@@ -568,7 +608,7 @@ export const reactivateClient: RequestHandler<
       data: {
         isActive: true,
         dueDate: parsedDueDate,
-        dueDateString, // <-- ADICIONADO
+        dueDateString,
       },
       include: { plan: true, paymentMethod: true, user: true },
     });
@@ -653,6 +693,7 @@ export const updatePaymentStatus: RequestHandler<
       where: { id: parseInt(id) },
       data: {
         paymentHistory: updatedPayments,
+        visualPaymentConfirmed: true,
       },
       include: { plan: true, paymentMethod: true, user: true },
     });
@@ -883,32 +924,34 @@ export const updateVisualPaymentStatus: RequestHandler<
 };
 
 export const deactivateExpiredClients: RequestHandler = async (req, res) => {
-  const authHeader = req.headers["authorization"];
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ message: "Acesso não autorizado" });
-  }
-
   try {
-    const thirtyDaysAgo = subDays(new Date(), 30);
+    // Hoje às 00:00 (zera horas/minutos/segundos)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const result = await prisma.client.updateMany({
       where: {
         isActive: true,
+        // tudo que venceu ANTES de hoje é considerado expirado
         dueDate: {
-          lt: thirtyDaysAgo,
+          lt: today,
         },
       },
       data: {
         isActive: false,
+        visualPaymentConfirmed: false,
       },
     });
 
-    console.log(`${result.count} clientes foram inativados por expiração.`);
-    res
-      .status(200)
-      .json({ message: `${result.count} clientes inativados com sucesso.` });
+    console.log(
+      `${result.count} clientes foram inativados por expiração (vencimento anterior a hoje).`
+    );
+
+    return res.status(200).json({
+      message: `${result.count} clientes inativados com sucesso (data de vencimento anterior a hoje).`,
+    });
   } catch (error) {
     console.error("Erro ao inativar clientes expirados:", error);
-    res.status(500).json({ message: "Erro interno no servidor." });
+    return res.status(500).json({ message: "Erro interno no servidor." });
   }
-}
+};

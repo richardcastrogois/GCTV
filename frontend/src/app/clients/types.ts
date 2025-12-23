@@ -37,6 +37,7 @@ export interface Client {
   plan: Plan;
   paymentMethod: PaymentMethod;
   dueDate: string;
+  dueDateString?: string | null;
   grossAmount: number;
   netAmount: number;
   isActive: boolean;

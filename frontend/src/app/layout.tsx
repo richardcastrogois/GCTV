@@ -12,13 +12,22 @@ import { usePathname } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { SearchProvider } from "@/components/SearchContext";
 import { useState, useEffect } from "react";
+import { Providers as HeroProviders } from "./providers";
 
 function AppContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    document.title = "GCTV";
-  }, []); 
+    document.title = "PlatinumTV";
+  }, []);
+
+  // rota isolada só para teste
+  const isTestRoute = pathname.startsWith("/newpage");
+  if (isTestRoute) {
+    return (
+      <main className="h-screen w-screen overflow-hidden">{children}</main>
+    );
+  }
 
   const routesWithNavbar = ["/dashboard", "/clients", "/expired"];
 
@@ -56,17 +65,18 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  
   const [queryClient] = useState(() => new QueryClient());
 
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className="dark">
       <body
         className={`${inter.className} min-h-screen w-screen`}
         suppressHydrationWarning={true}
       >
         <QueryClientProvider client={queryClient}>
-          <AppContent>{children}</AppContent>
+          <HeroProviders>
+            <AppContent>{children}</AppContent>
+          </HeroProviders>
         </QueryClientProvider>
       </body>
     </html>

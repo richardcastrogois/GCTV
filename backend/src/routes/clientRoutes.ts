@@ -30,6 +30,9 @@ const router: Router = Router();
 router.get("/plans", authMiddleware, getPlans);
 router.get("/payment-methods", authMiddleware, getPaymentMethods);
 
+// Endpoint especial chamado pelo Cron da Vercel às 05:00 (ver vercel.json)
+router.get("/deactivate-expired", deactivateExpiredClients);
+
 // Rotas principais de clientes (CRUD)
 router.get("/", authMiddleware, getClients);
 router.get("/expired", authMiddleware, getExpiredClients);
@@ -54,7 +57,5 @@ router.put(
   authMiddleware,
   updateVisualPaymentStatus
 );
-
-router.post("/clients/deactivate-expired", deactivateExpiredClients);
 
 export default router;
