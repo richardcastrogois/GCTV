@@ -560,6 +560,7 @@ export const renewClient: RequestHandler<
         dueDate: parsedDueDate,
         dueDateString,
         isActive: true,
+        visualPaymentConfirmed: false,
       },
       include: { plan: true, paymentMethod: true, user: true },
     });

@@ -790,232 +790,248 @@ export default function ManagePaymentsModal({
                           </TableHeader>
 
                           <TableBody>
-                            {modalClient.paymentHistory.map((p, index) => {
-                              const isEditing = editingPaymentIndex === index;
-                              const isDeletingThisRow =
-                                deletingPaymentIndex === index;
+                            {[...modalClient.paymentHistory]
+                              .map((p, index) => ({ p, originalIndex: index }))
+                              .reverse()
+                              .map(({ p, originalIndex }) => {
+                                const isEditing =
+                                  editingPaymentIndex === originalIndex;
+                                const isDeletingThisRow =
+                                  deletingPaymentIndex === originalIndex;
 
-                              return (
-                                <TableRow key={`${index}-${p.paymentDate}`}>
-                                  <TableCell>
-                                    {isEditing ? (
-                                      <Input
-                                        type="date"
-                                        value={editPaymentDate}
-                                        onChange={(e) =>
-                                          setEditPaymentDate(e.target.value)
-                                        }
-                                        variant="flat"
-                                        radius="lg"
-                                        classNames={{
-                                          inputWrapper: inputWrapperSmallCls,
-                                          input: inputTextSmallCls,
-                                        }}
-                                      />
-                                    ) : (
-                                      <span className="tabular-nums">
-                                        {formatDateToUTC(p.paymentDate)}
-                                      </span>
-                                    )}
-                                  </TableCell>
-
-                                  <TableCell>
-                                    {isEditing ? (
-                                      <Input
-                                        type="number"
-                                        value={String(editPaymentBruto || "")}
-                                        onChange={(e) =>
-                                          setEditPaymentBruto(
-                                            e.target.value === ""
-                                              ? 0
-                                              : Number(e.target.value)
-                                          )
-                                        }
-                                        variant="flat"
-                                        radius="lg"
-                                        classNames={{
-                                          inputWrapper: inputWrapperSmallCls,
-                                          input: inputTextSmallCls,
-                                        }}
-                                        min={0}
-                                        step="0.01"
-                                      />
-                                    ) : (
-                                      <span className="tabular-nums">
-                                        {(p.paymentBruto ?? 0).toFixed(2)}
-                                      </span>
-                                    )}
-                                  </TableCell>
-
-                                  <TableCell>
-                                    {isEditing ? (
-                                      <Input
-                                        type="number"
-                                        value={String(editPaymentLiquido || "")}
-                                        onChange={(e) =>
-                                          setEditPaymentLiquido(
-                                            e.target.value === ""
-                                              ? 0
-                                              : Number(e.target.value)
-                                          )
-                                        }
-                                        variant="flat"
-                                        radius="lg"
-                                        classNames={{
-                                          inputWrapper: inputWrapperSmallCls,
-                                          input: inputTextSmallCls,
-                                        }}
-                                        min={0}
-                                        step="0.01"
-                                      />
-                                    ) : (
-                                      <span className="tabular-nums">
-                                        {(p.paymentLiquido ?? 0).toFixed(2)}
-                                      </span>
-                                    )}
-                                  </TableCell>
-
-                                  <TableCell>
-                                    {isEditing ? (
-                                      <div className="flex items-center justify-center gap-1 sm:gap-2">
-                                        <Button
-                                          isIconOnly
-                                          size="sm"
-                                          variant="light"
-                                          radius="full"
-                                          onPress={handleSaveEditPayment}
-                                          disabled={isSavingEditedPayment}
-                                          className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-emerald-500/15"
-                                        >
-                                          {isSavingEditedPayment ? (
-                                            <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                                          ) : (
-                                            <Save className="w-4 h-4 text-emerald-400" />
-                                          )}
-                                        </Button>
-
-                                        <Button
-                                          isIconOnly
-                                          size="sm"
-                                          variant="light"
-                                          radius="full"
-                                          onPress={() =>
-                                            setEditingPaymentIndex(null)
+                                return (
+                                  <TableRow key={originalIndex}>
+                                    <TableCell>
+                                      {isEditing ? (
+                                        <Input
+                                          type="date"
+                                          value={editPaymentDate}
+                                          onChange={(e) =>
+                                            setEditPaymentDate(e.target.value)
                                           }
-                                          disabled={isSavingEditedPayment}
-                                          className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-rose-500/15"
-                                        >
-                                          <X className="w-4 h-4 text-rose-400" />
-                                        </Button>
-                                      </div>
-                                    ) : (
-                                      <>
-                                        {/* ✅ Desktop/Tablet: ícones inline */}
-                                        <div className="hidden sm:flex items-center justify-center gap-2">
-                                          <Button
-                                            isIconOnly
-                                            size="sm"
-                                            variant="light"
-                                            radius="full"
-                                            onPress={() =>
-                                              handleEditPayment(index, p)
-                                            }
-                                            disabled={isSavingEditedPayment}
-                                            className="w-9 h-9 rounded-full hover:bg-sky-500/15"
-                                          >
-                                            <Pencil className="w-4 h-4 text-sky-400" />
-                                          </Button>
+                                          variant="flat"
+                                          radius="lg"
+                                          classNames={{
+                                            inputWrapper: inputWrapperSmallCls,
+                                            input: inputTextSmallCls,
+                                          }}
+                                        />
+                                      ) : (
+                                        <span className="tabular-nums">
+                                          {formatDateToUTC(p.paymentDate)}
+                                        </span>
+                                      )}
+                                    </TableCell>
 
+                                    <TableCell>
+                                      {isEditing ? (
+                                        <Input
+                                          type="number"
+                                          value={String(editPaymentBruto || "")}
+                                          onChange={(e) =>
+                                            setEditPaymentBruto(
+                                              e.target.value === ""
+                                                ? 0
+                                                : Number(e.target.value)
+                                            )
+                                          }
+                                          variant="flat"
+                                          radius="lg"
+                                          classNames={{
+                                            inputWrapper: inputWrapperSmallCls,
+                                            input: inputTextSmallCls,
+                                          }}
+                                          min={0}
+                                          step="0.01"
+                                        />
+                                      ) : (
+                                        <span className="tabular-nums">
+                                          {(p.paymentBruto ?? 0).toFixed(2)}
+                                        </span>
+                                      )}
+                                    </TableCell>
+
+                                    <TableCell>
+                                      {isEditing ? (
+                                        <Input
+                                          type="number"
+                                          value={String(
+                                            editPaymentLiquido || ""
+                                          )}
+                                          onChange={(e) =>
+                                            setEditPaymentLiquido(
+                                              e.target.value === ""
+                                                ? 0
+                                                : Number(e.target.value)
+                                            )
+                                          }
+                                          variant="flat"
+                                          radius="lg"
+                                          classNames={{
+                                            inputWrapper: inputWrapperSmallCls,
+                                            input: inputTextSmallCls,
+                                          }}
+                                          min={0}
+                                          step="0.01"
+                                        />
+                                      ) : (
+                                        <span className="tabular-nums">
+                                          {(p.paymentLiquido ?? 0).toFixed(2)}
+                                        </span>
+                                      )}
+                                    </TableCell>
+
+                                    <TableCell>
+                                      {isEditing ? (
+                                        <div className="flex items-center justify-center gap-1 sm:gap-2">
                                           <Button
                                             isIconOnly
                                             size="sm"
                                             variant="light"
                                             radius="full"
-                                            onPress={() =>
-                                              handleDeletePayment(index)
-                                            }
-                                            disabled={isDeletingThisRow}
-                                            className="w-9 h-9 rounded-full hover:bg-rose-500/15"
+                                            onPress={handleSaveEditPayment}
+                                            disabled={isSavingEditedPayment}
+                                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-emerald-500/15"
                                           >
-                                            {isDeletingThisRow ? (
-                                              <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+                                            {isSavingEditedPayment ? (
+                                              <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
                                             ) : (
-                                              <Trash2 className="w-4 h-4 text-rose-400" />
+                                              <Save className="w-4 h-4 text-emerald-400" />
                                             )}
                                           </Button>
-                                        </div>
 
-                                        {/* ✅ Mobile: 3 pontinhos + dropdown */}
-                                        <div className="flex sm:hidden justify-center">
-                                          <Dropdown
-                                            placement="bottom-end"
-                                            offset={4}
+                                          <Button
+                                            isIconOnly
+                                            size="sm"
+                                            variant="light"
+                                            radius="full"
+                                            onPress={() =>
+                                              setEditingPaymentIndex(null)
+                                            }
+                                            disabled={isSavingEditedPayment}
+                                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-rose-500/15"
                                           >
-                                            <DropdownTrigger>
-                                              <Button
-                                                isIconOnly
-                                                size="sm"
-                                                variant="light"
-                                                radius="full"
-                                                aria-label="Ações"
-                                                className="
+                                            <X className="w-4 h-4 text-rose-400" />
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          {/* ✅ Desktop/Tablet: ícones inline */}
+                                          <div className="hidden sm:flex items-center justify-center gap-2">
+                                            <Button
+                                              isIconOnly
+                                              size="sm"
+                                              variant="light"
+                                              radius="full"
+                                              onPress={() =>
+                                                handleEditPayment(
+                                                  originalIndex,
+                                                  p
+                                                )
+                                              }
+                                              disabled={isSavingEditedPayment}
+                                              className="w-9 h-9 rounded-full hover:bg-sky-500/15"
+                                            >
+                                              <Pencil className="w-4 h-4 text-sky-400" />
+                                            </Button>
+
+                                            <Button
+                                              isIconOnly
+                                              size="sm"
+                                              variant="light"
+                                              radius="full"
+                                              onPress={() =>
+                                                handleDeletePayment(
+                                                  originalIndex
+                                                )
+                                              }
+                                              disabled={isDeletingThisRow}
+                                              className="w-9 h-9 rounded-full hover:bg-rose-500/15"
+                                            >
+                                              {isDeletingThisRow ? (
+                                                <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+                                              ) : (
+                                                <Trash2 className="w-4 h-4 text-rose-400" />
+                                              )}
+                                            </Button>
+                                          </div>
+
+                                          {/* ✅ Mobile: 3 pontinhos + dropdown */}
+                                          <div className="flex sm:hidden justify-center">
+                                            <Dropdown
+                                              placement="bottom-end"
+                                              offset={4}
+                                            >
+                                              <DropdownTrigger>
+                                                <Button
+                                                  isIconOnly
+                                                  size="sm"
+                                                  variant="light"
+                                                  radius="full"
+                                                  aria-label="Ações"
+                                                  className="
                                                   w-8 h-8 min-w-[32px]
                                                   rounded-full
                                                   hover:bg-white/10
                                                 "
-                                              >
-                                                <MoreVertical className="w-4 h-4 text-foreground-500" />
-                                              </Button>
-                                            </DropdownTrigger>
+                                                >
+                                                  <MoreVertical className="w-4 h-4 text-foreground-500" />
+                                                </Button>
+                                              </DropdownTrigger>
 
-                                            <DropdownMenu
-                                              aria-label="Ações do pagamento"
-                                              className={actionsMenuCls}
-                                              itemClasses={{
-                                                base: actionsItemBaseCls,
-                                              }}
-                                            >
-                                              <DropdownItem
-                                                key="edit"
-                                                isDisabled={
-                                                  isSavingEditedPayment ||
-                                                  isDeletingThisRow
-                                                }
-                                                onPress={() =>
-                                                  handleEditPayment(index, p)
-                                                }
-                                                startContent={
-                                                  <Pencil className="w-4 h-4 text-sky-400" />
-                                                }
+                                              <DropdownMenu
+                                                aria-label="Ações do pagamento"
+                                                className={actionsMenuCls}
+                                                itemClasses={{
+                                                  base: actionsItemBaseCls,
+                                                }}
                                               >
-                                                Editar
-                                              </DropdownItem>
+                                                <DropdownItem
+                                                  key="edit"
+                                                  isDisabled={
+                                                    isSavingEditedPayment ||
+                                                    isDeletingThisRow
+                                                  }
+                                                  onPress={() =>
+                                                    handleEditPayment(
+                                                      originalIndex,
+                                                      p
+                                                    )
+                                                  }
+                                                  startContent={
+                                                    <Pencil className="w-4 h-4 text-sky-400" />
+                                                  }
+                                                >
+                                                  Editar
+                                                </DropdownItem>
 
-                                              <DropdownItem
-                                                key="delete"
-                                                className={actionsDeleteCls}
-                                                isDisabled={
-                                                  isSavingEditedPayment ||
-                                                  isDeletingThisRow
-                                                }
-                                                onPress={() =>
-                                                  handleDeletePayment(index)
-                                                }
-                                                startContent={
-                                                  <Trash2 className="w-4 h-4 text-[#D01355]" />
-                                                }
-                                              >
-                                                Excluir
-                                              </DropdownItem>
-                                            </DropdownMenu>
-                                          </Dropdown>
-                                        </div>
-                                      </>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
+                                                <DropdownItem
+                                                  key="delete"
+                                                  className={actionsDeleteCls}
+                                                  isDisabled={
+                                                    isSavingEditedPayment ||
+                                                    isDeletingThisRow
+                                                  }
+                                                  onPress={() =>
+                                                    handleDeletePayment(
+                                                      originalIndex
+                                                    )
+                                                  }
+                                                  startContent={
+                                                    <Trash2 className="w-4 h-4 text-[#D01355]" />
+                                                  }
+                                                >
+                                                  Excluir
+                                                </DropdownItem>
+                                              </DropdownMenu>
+                                            </Dropdown>
+                                          </div>
+                                        </>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
                           </TableBody>
                         </Table>
                       </div>
