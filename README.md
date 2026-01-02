@@ -158,24 +158,48 @@ Além disso, a configuração de um pipeline de CI/CD seguro e isolado, criando 
 
 | Dashboard |
 | :---: |
-![Tela do Dashboard](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/dashboardgctv.png)
+![Tela do Dashboard](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/dashboardnew.png)
 
 | Clientes Ativos |
 | :---: |
-![Tela de Clientes Ativos](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/clienteativogctv.png)
+![Tela de Clientes Ativos](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/clienteativonew.png)
 
 
 | Clientes Expirados |
 | :---: |
- ![Tela de Clientes Expirados](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/clienteexpiradogctv.png) |
+ ![Tela de Clientes Expirados](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/clienteexpiradonew.png) |
 
 | Cadastro de Cliente |
 | :---: |
-![Tela de Cadastro de Cliente](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/cadastroclientegctv.png)
+![Tela de Cadastro de Cliente](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/cadastrarclientenew.png)
 
 | Edição de Cliente |
 | :---: |
-![Tela de Edição de Cliente](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/editarclientegctv.png)
+![Tela de Edição de Cliente](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/editarclientenew.png)
+
+| Detalhe do Cliente |
+| :---: |
+![Tela de Detalhes do Cliente](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/detalheclientenew.png)
+
+| Exclusão de Cliente |
+| :---: |
+![Tela de Exclusã de Cliente](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/excluirclientenew.png)
+
+| Renovação de Cliente |
+| :---: |
+![Tela de Renovação de Cliente](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/renovarclintenew.png)
+
+| Gerenciador de Pagamento |
+| :---: |
+![Tela de Gerenciamento de Pagamento](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/gerenciarpagamentonew.png)
+
+| Responsividade Mobile |
+| :---: |
+![Tela para Mobile](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/responsividadecel1.png)
+
+| Responsividade Mobile, exemplo com pesquisa |
+| :---: |
+![Tela para Mobile com pesquisa](https://raw.githubusercontent.com/richardcastrogois/GCTV/main/frontend/public/responsividadecel2.png)
 
 <br>
 
