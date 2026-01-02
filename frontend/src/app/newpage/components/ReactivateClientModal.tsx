@@ -22,18 +22,48 @@ import styles from "../testeScroll.module.css";
 import { Client } from "@/types/client";
 import { reactivateClient } from "@/app/expired/api";
 
+/** ====== Helpers (mesma lógica do Renew para +1 mês em UTC) ====== */
+function daysInMonthUTC(year: number, monthIndex0: number) {
+  return new Date(Date.UTC(year, monthIndex0 + 1, 0)).getUTCDate();
+}
+
+function addOneMonthKeepDayUTC(base: Date) {
+  const y = base.getUTCFullYear();
+  const m = base.getUTCMonth();
+  const d = base.getUTCDate();
+
+  const nextMonthIndex = m + 1;
+  const nextY = y + Math.floor(nextMonthIndex / 12);
+  const nextM = nextMonthIndex % 12;
+
+  const dim = daysInMonthUTC(nextY, nextM);
+  const safeDay = Math.min(d, dim);
+
+  return new Date(Date.UTC(nextY, nextM, safeDay));
+}
+
+function toYYYYMMDD_UTC(d: Date) {
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+const getDefaultReactivateDueYYYYMMDD = () => {
+  // Base: hoje (em UTC, dia “cravado”)
+  const now = new Date();
+  const baseUTC = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  const plus = addOneMonthKeepDayUTC(baseUTC);
+  return toYYYYMMDD_UTC(plus);
+};
+/** =============================================================== */
+
 type ReactivateClientModalProps = {
   client: Client;
   onReactivated: (id: number) => void;
   iconClassName?: string;
-};
-
-const getTodayYYYYMMDD = () => {
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, "0");
-  const dd = String(today.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 };
 
 const formatDateBRFromYYYYMMDD = (yyyyMMdd?: string) => {
@@ -51,14 +81,14 @@ const ReactivateClientModal: React.FC<ReactivateClientModalProps> = ({
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const [newDueDate, setNewDueDate] = React.useState<string>(() =>
-    getTodayYYYYMMDD()
+    getDefaultReactivateDueYYYYMMDD()
   );
   const [isSaving, setIsSaving] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string>("");
 
   // sempre que trocar o cliente, reseta o estado
   React.useEffect(() => {
-    setNewDueDate(getTodayYYYYMMDD());
+    setNewDueDate(getDefaultReactivateDueYYYYMMDD());
     setErrorMsg("");
     setIsSaving(false);
   }, [client?.id]);
@@ -79,8 +109,8 @@ const ReactivateClientModal: React.FC<ReactivateClientModalProps> = ({
       return;
     }
 
-    // ao abrir, sempre sugere a data de hoje
-    setNewDueDate(getTodayYYYYMMDD());
+    // ao abrir, sugere hoje + 1 mês (UTC), igual o Renovar
+    setNewDueDate(getDefaultReactivateDueYYYYMMDD());
     setErrorMsg("");
     setIsSaving(false);
     onOpen();
