@@ -65,8 +65,8 @@ const customStyles: StylesConfig<SelectOption, false> = {
     backgroundColor: state.isSelected
       ? "var(--accent-blue)"
       : state.isFocused
-      ? "rgba(241, 145, 109, 0.4)"
-      : "transparent",
+        ? "rgba(241, 145, 109, 0.4)"
+        : "transparent",
     color: state.isSelected
       ? "var(--button-active-text)"
       : "var(--text-primary-secondary)",
@@ -118,17 +118,11 @@ const Filter = memo(({ onFilterChange }: FilterProps) => {
       { value: 11, label: "Novembro" },
       { value: 12, label: "Dezembro" },
     ],
-    []
+    [],
   );
 
-  const years = useMemo(
-    () => [
-      { value: 2023, label: "2023" },
-      { value: 2024, label: "2024" },
-      { value: 2025, label: "2025" },
-    ],
-    []
-  );
+  // ✅ ANOS DINÂMICOS (sem hardcode)
+  const [years, setYears] = useState<SelectOption[]>([]);
 
   const [selectedMonth, setSelectedMonth] = useState<SelectOption | null>(null);
   const [selectedYear, setSelectedYear] = useState<SelectOption | null>(null);
@@ -136,15 +130,28 @@ const Filter = memo(({ onFilterChange }: FilterProps) => {
   // Este useEffect é bom para inicialização no lado do cliente e evitar erros de hidratação (SSR)
   useEffect(() => {
     const currentDate = new Date();
+
+    // ✅ Gera anos a partir de um ano base até o ano atual
+    const startYear = 2023; // mantenha o primeiro ano que você quer suportar
+    const currentYearNumber = currentDate.getFullYear();
+
+    const generatedYears: SelectOption[] = [];
+    for (let y = startYear; y <= currentYearNumber; y++) {
+      generatedYears.push({ value: y, label: String(y) });
+    }
+
+    setYears(generatedYears);
+
     const currentMonth = months.find(
-      (m) => m.value === currentDate.getMonth() + 1
+      (m) => m.value === currentDate.getMonth() + 1,
     );
-    const currentYear = years.find(
-      (y) => y.value === currentDate.getFullYear()
+    const currentYear = generatedYears.find(
+      (y) => y.value === currentYearNumber,
     );
+
     setSelectedMonth(currentMonth || null);
     setSelectedYear(currentYear || null);
-  }, [months, years]);
+  }, [months]);
 
   const handleMonthChange = useCallback(
     (option: SelectOption | null) => {
@@ -153,7 +160,7 @@ const Filter = memo(({ onFilterChange }: FilterProps) => {
         onFilterChange(option.value, selectedYear.value);
       }
     },
-    [selectedYear, onFilterChange]
+    [selectedYear, onFilterChange],
   );
 
   const handleYearChange = useCallback(
@@ -163,7 +170,7 @@ const Filter = memo(({ onFilterChange }: FilterProps) => {
         onFilterChange(selectedMonth.value, option.value);
       }
     },
-    [selectedMonth, onFilterChange]
+    [selectedMonth, onFilterChange],
   );
 
   return (
