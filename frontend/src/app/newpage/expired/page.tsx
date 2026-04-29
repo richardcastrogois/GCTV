@@ -16,6 +16,7 @@ import { TestSidebar } from "../components/TestSidebar";
 import { TestMobileSidebar } from "../components/TestMobileSidebar";
 import { UsersFilters } from "../components/UsersFilters";
 import ExpiredUsersTable from "../components/ExpiredUsersTable";
+import { useNewpageFilters } from "../components/NewpageFiltersContext";
 
 import { fetchExpiredClients } from "@/app/expired/api";
 import { Client } from "@/types/client";
@@ -85,40 +86,20 @@ const ExpiredUsersPage: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
-  const [searchValue, setSearchValue] = React.useState("");
-  const [userTypeLabel, setUserTypeLabel] =
-    React.useState<string>("Selecione o tipo");
-  const [paymentLabel, setPaymentLabel] = React.useState<string>(
-    "Selecione o Pagamento"
-  );
-  const [dateQuery, setDateQuery] = React.useState("");
-
-  const [expiresOrder, setExpiresOrder] = React.useState<"asc" | "desc" | null>(
-    null
-  );
-
-  const toggleExpiresOrder = React.useCallback(() => {
-    setExpiresOrder((prev) => {
-      if (prev === "asc") return "desc";
-      if (prev === "desc") return "asc";
-      return "asc";
-    });
-  }, []);
-
-  const hasActiveFilters =
-    searchValue.trim() !== "" ||
-    userTypeLabel !== "Selecione o tipo" ||
-    paymentLabel !== "Selecione o Pagamento" ||
-    dateQuery.trim() !== "" ||
-    expiresOrder !== null;
-
-  const handleClearFilters = () => {
-    setSearchValue("");
-    setUserTypeLabel("Selecione o tipo");
-    setPaymentLabel("Selecione o Pagamento");
-    setDateQuery("");
-    setExpiresOrder(null);
-  };
+  const {
+    searchValue,
+    setSearchValue,
+    userTypeLabel,
+    setUserTypeLabel,
+    paymentLabel,
+    setPaymentLabel,
+    dateQuery,
+    setDateQuery,
+    expiresOrder,
+    toggleExpiresOrder,
+    hasActiveFilters,
+    handleClearFilters,
+  } = useNewpageFilters();
 
   const [clients, setClients] = React.useState<Client[]>([]);
   const [loading, setLoading] = React.useState(true);
